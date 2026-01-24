@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
   Users, 
@@ -14,11 +15,10 @@ interface NavItem {
   icon: React.ReactNode;
   label: string;
   href: string;
-  active?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard", active: true },
+  { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/" },
   { icon: <Users size={20} />, label: "Clients", href: "/clients" },
   { icon: <Calendar size={20} />, label: "Programs", href: "/schedule" },
   { icon: <Library size={20} />, label: "Exercises", href: "/library" },
@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
 ];
 
 export default function Sidebar() {
+  const pathname = usePathname();
   return (
     <aside className="fixed left-0 top-0 h-screen w-[220px] bg-sidebar flex flex-col border-r border-sidebar-border">
       {/* Logo Section */}
@@ -39,24 +40,26 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-4">
         <ul className="space-y-1">
-          {navItems.map((item) => (
-            <li key={item.label}>
-              <a
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  item.active
-                    ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </a>
-            </li>
-          ))}
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <li key={item.label}>
+                <a
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </a>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
