@@ -7,6 +7,7 @@ import SearchBar from "./components/SearchBar";
 import ClientCard, { ClientData } from "./components/ClientCard";
 import AddClientCard from "./components/AddClientCard";
 import Pagination from "./components/Pagination";
+import AddClientModal from "./components/AddClientModal";
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -19,7 +20,7 @@ const mockClients: ClientData[] = [
     name: "Tom Holland",
     photo: "/avatars/tom.jpg",
     avatarGradient: "bg-gradient-to-br from-blue-500 to-indigo-600",
-    program: "Hypertrophy",
+    currentProgram: "Hypertrophy",
     week: 8,
     totalWeeks: 12,
     compliance: 92,
@@ -41,7 +42,7 @@ const mockClients: ClientData[] = [
     name: "Sarah Miller",
     photo: "/avatars/sarah.jpg",
     avatarGradient: "bg-gradient-to-br from-rose-400 to-pink-600",
-    program: "Weight Loss",
+    currentProgram: "Weight Loss",
     week: 3,
     totalWeeks: 8,
     compliance: 45,
@@ -58,7 +59,7 @@ const mockClients: ClientData[] = [
     name: "David Chen",
     photo: "/avatars/david.jpg",
     avatarGradient: "bg-gradient-to-br from-amber-400 to-orange-600",
-    program: "Strength",
+    currentProgram: "Strength",
     week: 12,
     totalWeeks: 16,
     compliance: 78,
@@ -75,7 +76,7 @@ const mockClients: ClientData[] = [
     name: "Anna Smith",
     photo: "/avatars/anna.jpg",
     avatarGradient: "bg-gradient-to-br from-emerald-400 to-teal-600",
-    program: "Mobility",
+    currentProgram: "Mobility",
     week: 1,
     totalWeeks: 6,
     compliance: 100,
@@ -97,7 +98,7 @@ const mockClients: ClientData[] = [
     name: "Jessica Lee",
     photo: "/avatars/jessica.jpg",
     avatarGradient: "bg-gradient-to-br from-violet-400 to-purple-600",
-    program: "CrossFit",
+    currentProgram: "CrossFit",
     week: 5,
     totalWeeks: 10,
     compliance: 85,
@@ -119,7 +120,7 @@ const mockClients: ClientData[] = [
     name: "Mark Evans",
     photo: "/avatars/mark.jpg",
     avatarGradient: "bg-gradient-to-br from-slate-400 to-slate-600",
-    program: "Rehab",
+    currentProgram: "Rehab",
     week: 2,
     totalWeeks: 8,
     compliance: 20,
@@ -136,9 +137,9 @@ const mockClients: ClientData[] = [
 export default function Home() {
   const [clients, setClients] = useState<ClientData[]>(mockClients);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
+  const fetchUsers = async () => {
       try {
         setLoading(true);
         const usersCollection = collection(db, "users");
@@ -164,7 +165,7 @@ export default function Home() {
             name: data.displayName || data.username || "Unknown User",
             photo: data.profilePhoto || "", // Use profilePhoto from Firebase or empty string
             avatarGradient: gradients[gradientIndex],
-            program: "No Program", // Default until we integrate programs
+            currentProgram: "No Program", // Default until we integrate programs
             week: 0,
             totalWeeks: 0,
             compliance: 0,
@@ -189,6 +190,7 @@ export default function Home() {
       }
     };
 
+  useEffect(() => {
     fetchUsers();
   }, []);
 
@@ -206,7 +208,10 @@ export default function Home() {
               <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
               <p className="text-muted-foreground mt-1">View clients progress</p>
             </div>
-            <button className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm">
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm"
+            >
               <Plus className="w-5 h-5" />
               Add New Client
             </button>
@@ -249,6 +254,15 @@ export default function Home() {
           />
         </div>
       </main>
+
+      {/* Add Client Modal */}
+      <AddClientModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onClientAdded={() => {
+          fetchUsers(); // Refresh the client list
+        }}
+      />
     </div>
   );
 }

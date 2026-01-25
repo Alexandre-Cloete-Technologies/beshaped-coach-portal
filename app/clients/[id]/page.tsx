@@ -26,100 +26,12 @@ import {
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Link from "next/link";
-
-// Mock client data
-const clientData = {
-  id: "1",
-  name: "Jane Doe",
-  email: "janedoe@email.com",
-  phone: "+1 (555) 123-4567",
-  avatar: "/avatars/jane.jpg",
-  avatarGradient: "bg-gradient-to-br from-rose-400 to-pink-600",
-  isOnline: true,
-  memberSince: "Jan 2023",
-  streak: 12,
-  currentProgram: {
-    name: "Hypertrophy Phase 2",
-    image: "/programs/hypertrophy.jpg",
-    goal: "Muscle Gain",
-    intensity: "High Intensity",
-    currentWeek: 3,
-    totalWeeks: 8,
-    progress: 65,
-    status: "ACTIVE",
-    nextWorkout: "Lower Body Power",
-  },
-  stats: {
-    weight: {
-      current: 142.5,
-      unit: "lbs",
-      change: 1.2,
-      period: "this week",
-    },
-    sleep: {
-      average: "7h 12m",
-      period: "Last 7 days average",
-    },
-    water: {
-      current: 2.1,
-      unit: "L",
-      goalMet: true,
-    },
-  },
-  recentActivity: [
-    {
-      id: 1,
-      type: "workout",
-      title: 'Completed "Upper Body Power"',
-      description: "Personal Best on Bench Press! 🔥",
-      timestamp: "Today, 8:00 AM",
-      icon: Dumbbell,
-    },
-    {
-      id: 2,
-      type: "nutrition",
-      title: "Logged Nutrition",
-      description: "2,400 kcal • 180g Protein • 220g Carbs",
-      timestamp: "Yesterday, 8:00 PM",
-      icon: Utensils,
-    },
-    {
-      id: 3,
-      type: "weight",
-      title: "Weight Check-in",
-      description: "Recorded 142.5 lbs ( -0.5 lbs )",
-      timestamp: "Yesterday, 7:30 AM",
-      icon: Scale,
-    },
-  ],
-  upcoming: [
-    {
-      id: 1,
-      day: "MON",
-      date: 14,
-      title: "Lower Body Power",
-      time: "09:00 AM - 10:30 AM",
-    },
-    {
-      id: 2,
-      day: "WED",
-      date: 15,
-      title: "Active Recovery",
-      time: "Any time",
-    },
-    {
-      id: 3,
-      day: "THU",
-      date: 16,
-      title: "Check-in Call",
-      time: "04:00 PM (Zoom)",
-    },
-  ],
-  coachNote: {
-    text: "Client is experiencing mild knee pain. Monitor squat depth in next session.",
-    timestamp: "2 hours ago",
-  },
-};
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useParams } from "next/navigation";
+import WorkoutHistory from "./WorkoutHistory";
+import Progress from "./Progress";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
@@ -130,7 +42,116 @@ const tabs = [
 ];
 
 export default function ClientDetailPage() {
-  const activeTab = "overview";
+  const params = useParams();
+  const clientId = params?.id as string;
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const [client, setClient] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchClient = async () => {
+      if (!clientId) return;
+
+      try {
+        setLoading(true);
+        const clientDoc = await getDoc(doc(db, "users", clientId));
+        
+        if (clientDoc.exists()) {
+          const data = clientDoc.data();
+          
+          // Serialize and deserialize to remove all Firestore references
+          const serializedData = JSON.parse(JSON.stringify(data));
+          
+          // Properly extract stats to avoid Firestore object references
+          const stats = {
+            totalWorkouts: serializedData.stats?.totalWorkouts || 0,
+            currentStreak: serializedData.stats?.currentStreak || 0,
+            longestStreak: serializedData.stats?.longestStreak || 0,
+          };
+          
+          // Fetch program name if currentProgram is a reference
+          let programName = "No Program";
+          if (data.currentProgram) {
+            try {
+              // Check if it's a DocumentReference
+              if (data.currentProgram.path) {
+                // It's a reference, fetch the document
+                const programDoc = await getDoc(data.currentProgram);
+                if (programDoc.exists()) {
+                  const programData: any = programDoc.data();
+                  programName = programData?.name || programData?.programName || "Unknown Program";
+                }
+              } else if (typeof data.currentProgram === 'string') {
+                // It's already a string
+                programName = data.currentProgram;
+              }
+            } catch (err) {
+              console.error("Error fetching program:", err);
+              programName = "Unknown Program";
+            }
+          }
+          
+          setClient({
+            id: clientDoc.id,
+            name: serializedData.displayName || serializedData.username || "Unknown User",
+            email: serializedData.email || "No email",
+            phone: serializedData.phone || "No phone",
+            avatarGradient: `bg-gradient-to-br from-${['rose', 'purple', 'emerald', 'amber', 'blue'][clientId.charCodeAt(0) % 5]}-400 to-${['pink', 'purple', 'teal', 'orange', 'indigo'][clientId.charCodeAt(0) % 5]}-600`,
+            isOnline: false,
+            memberSince: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Unknown",
+            streak: stats.currentStreak,
+            currentProgram: programName,
+            stats: stats,
+          });
+          setError(null);
+        } else {
+          setError("Client not found");
+        }
+      } catch (err) {
+        console.error("Error fetching client:", err);
+        setError("Failed to load client data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClient();
+  }, [clientId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar />
+        <main className="ml-[220px] min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading client...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !client) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar />
+        <main className="ml-[220px] min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error || "Client not found"}</p>
+            <Link 
+              href="/clients"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              ← Back to Clients
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -153,35 +174,35 @@ export default function ClientDetailPage() {
               <div className="flex items-start gap-4">
                 {/* Avatar */}
                 <div className="relative">
-                  <div className={`w-24 h-24 rounded-2xl ${clientData.avatarGradient} flex items-center justify-center`}>
+                  <div className={`w-24 h-24 rounded-2xl ${client.avatarGradient} flex items-center justify-center`}>
                     <span className="text-white text-2xl font-semibold">
-                      {clientData.name.split(' ').map(n => n[0]).join('')}
+                      {client.name.split(' ').map((n: string) => n[0]).join('')}
                     </span>
                   </div>
-                  {clientData.isOnline && (
+                  {client.isOnline && (
                     <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-4 border-card rounded-full" />
                   )}
                 </div>
 
                 {/* Client Info */}
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground mb-2">{clientData.name}</h1>
+                  <h1 className="text-2xl font-bold text-foreground mb-2">{String(client.name)}</h1>
                   <div className="flex flex-col gap-1 mb-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Mail className="w-4 h-4" />
-                      {clientData.email}
+                      {String(client.email)}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Phone className="w-4 h-4" />
-                      {clientData.phone}
+                      {String(client.phone)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400">
-                      📅 Member since {clientData.memberSince}
+                      📅 Member since {String(client.memberSince)}
                     </span>
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400">
-                      🔥 {clientData.streak} Day Streak
+                      🔥 {Number(client.streak)} Day Streak
                     </span>
                   </div>
                 </div>
@@ -193,10 +214,7 @@ export default function ClientDetailPage() {
                   <Edit className="w-4 h-4" />
                   Edit
                 </button>
-                <button className="h-9 px-4 rounded-lg border border-border bg-card flex items-center gap-2 text-sm font-medium text-card-foreground hover:bg-accent transition-colors">
-                  <Archive className="w-4 h-4" />
-                  Archive
-                </button>
+
               </div>
             </div>
 
@@ -208,6 +226,7 @@ export default function ClientDetailPage() {
                 return (
                   <button
                     key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
                         ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
@@ -222,233 +241,76 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-3 gap-6">
-            {/* Left Column - Main Content */}
-            <div className="col-span-2 space-y-6">
-              {/* Current Program */}
-              <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-foreground">Current Program</h2>
-                  <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    View Full Plan
-                  </button>
-                </div>
-
-                <div className="flex gap-4">
-                  {/* Program Image */}
-                  <div className="w-48 h-48 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex-shrink-0 overflow-hidden">
-                    <img 
-                      src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=400&fit=crop" 
-                      alt="Program"
-                      className="w-full h-full object-cover"
-                    />
+          {/* Tab Content */}
+          {activeTab === "workout-history" ? (
+            <WorkoutHistory />
+          ) : activeTab === "progress" ? (
+            <Progress />
+          ) : activeTab === "overview" ? (
+            /* Main Content Grid */
+            <div className="grid grid-cols-3 gap-6">
+              {/* Left Column - Main Content */}
+              <div className="col-span-2 space-y-6">
+                {/* Current Program */}
+                <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-foreground">Current Program</h2>
                   </div>
 
-                  {/* Program Details */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                          {clientData.currentProgram.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Goal: {clientData.currentProgram.goal} • {clientData.currentProgram.intensity}
-                        </p>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        {clientData.currentProgram.status}
-                      </span>
+                  <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                      <Dumbbell className="w-8 h-8 text-white" />
                     </div>
-
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">
-                          Week {clientData.currentProgram.currentWeek} of {clientData.currentProgram.totalWeeks}
-                        </span>
-                        <span className="font-semibold text-blue-600">
-                          {clientData.currentProgram.progress}%
-                        </span>
-                      </div>
-                      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 rounded-full transition-all"
-                          style={{ width: `${clientData.currentProgram.progress}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-0.5">NEXT WORKOUT</p>
-                        <p className="text-sm font-semibold text-foreground">
-                          {clientData.currentProgram.nextWorkout}
-                        </p>
-                      </div>
-                      <button className="w-9 h-9 rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center transition-colors">
-                        <ArrowRight className="w-4 h-4 text-white" />
-                      </button>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-foreground mb-1">
+                        {String(client.currentProgram)}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {Number(client.stats.totalWorkouts)} workouts completed
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Stats Row */}
-              <div className="grid grid-cols-3 gap-4">
-                {/* Weight */}
-                <div className="bg-card rounded-xl border border-border shadow-sm p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <Weight className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase">Weight</span>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground mb-1">
-                    {clientData.stats.weight.current} <span className="text-base font-normal text-muted-foreground">{clientData.stats.weight.unit}</span>
-                  </p>
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
-                    ↓ {clientData.stats.weight.change} lbs {clientData.stats.weight.period}
-                  </p>
-                </div>
-
-                {/* Sleep */}
-                <div className="bg-card rounded-xl border border-border shadow-sm p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <Moon className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase">Avg Sleep</span>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground mb-1">
-                    {clientData.stats.sleep.average}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {clientData.stats.sleep.period}
-                  </p>
-                </div>
-
-                {/* Water */}
-                <div className="bg-card rounded-xl border border-border shadow-sm p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <Droplet className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase">Water</span>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground mb-1">
-                    {clientData.stats.water.current} <span className="text-base font-normal text-muted-foreground">{clientData.stats.water.unit}</span>
-                  </p>
-                  <p className="text-xs text-blue-600 flex items-center gap-1">
-                    💧 Goal met today
+                {/* Stats Row - Placeholder */}
+                <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+                  <h2 className="text-lg font-semibold text-foreground mb-4">Stats & Activity</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Workout stats, nutrition logs, and activity tracking coming soon...
                   </p>
                 </div>
               </div>
 
-              {/* Recent Activity */}
-              <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-foreground">Recent Activity</h2>
-                  <button className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors">
-                    <Filter className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {clientData.recentActivity.map((activity) => {
-                    const Icon = activity.icon;
-                    return (
-                      <div key={activity.id} className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center flex-shrink-0">
-                          <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-foreground mb-0.5">
-                            {activity.title}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {activity.description}
-                          </p>
-                        </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {activity.timestamp}
-                        </span>
-                      </div>
-                    );
-                  })}
+              {/* Right Column - Sidebar */}
+              <div className="space-y-6">
+                {/* Quick Actions */}
+                <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+                  <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
+                  <div className="space-y-2">
+                    <button className="w-full h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors">
+                      <MessageSquare className="w-4 h-4" />
+                      Send Message
+                    </button>
+                    <button className="w-full h-10 px-4 rounded-lg border border-border bg-card text-sm font-medium text-card-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Log Note
+                    </button>
+                    <button className="w-full h-10 px-4 rounded-lg border border-border bg-card text-sm font-medium text-card-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Assign Workout
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Right Column - Sidebar */}
-            <div className="space-y-6">
-              {/* Quick Actions */}
-              <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
-                <div className="space-y-2">
-                  <button className="w-full h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors">
-                    <MessageSquare className="w-4 h-4" />
-                    Send Message
-                  </button>
-                  <button className="w-full h-10 px-4 rounded-lg border border-border bg-card text-sm font-medium text-card-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    Log Note
-                  </button>
-                  <button className="w-full h-10 px-4 rounded-lg border border-border bg-card text-sm font-medium text-card-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Assign Workout
-                  </button>
-                </div>
-              </div>
-
-              {/* Upcoming */}
-              <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-foreground">Upcoming</h2>
-                  <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    See All
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {clientData.upcoming.map((event) => (
-                    <div key={event.id} className="flex items-start gap-3">
-                      <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex-shrink-0">
-                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase">
-                          {event.day}
-                        </span>
-                        <span className="text-lg font-bold text-blue-600 dark:text-blue-400 leading-none">
-                          {event.date}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground mb-0.5">
-                          {event.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {event.time}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Coach Note */}
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl p-4">
-                <div className="flex items-start gap-2 mb-2">
-                  <div className="w-5 h-5 rounded bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-3 h-3 text-amber-700 dark:text-amber-500" />
-                  </div>
-                  <span className="text-xs font-semibold text-amber-900 dark:text-amber-400 uppercase">
-                    Coach Note
-                  </span>
-                </div>
-                <p className="text-sm text-amber-900 dark:text-amber-300 italic">
-                  "{clientData.coachNote.text}"
-                </p>
-              </div>
+          ) : (
+            /* Placeholder for other tabs */
+            <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center">
+              <p className="text-muted-foreground">
+                {tabs.find((t) => t.id === activeTab)?.label} content coming soon...
+              </p>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </div>

@@ -7,7 +7,7 @@ export interface ClientData {
   name: string;
   photo: string;
   avatarGradient?: string;
-  program: string;
+  currentProgram: string;
   week: number;
   totalWeeks: number;
   compliance: number;
@@ -125,7 +125,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
           <div>
             <h3 className="font-semibold text-card-foreground">{client.name}</h3>
             <p className="text-xs text-muted-foreground">
-              {client.program} • Wk {client.week}
+              {client.currentProgram} • Wk {client.week}
             </p>
           </div>
         </div>

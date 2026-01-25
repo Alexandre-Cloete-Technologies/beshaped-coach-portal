@@ -3,6 +3,7 @@
 import { Plus, Search, SlidersHorizontal, MoreVertical } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Pagination from "../components/Pagination";
+import AddClientModal from "../components/AddClientModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
@@ -88,9 +89,9 @@ export default function ClientsPage() {
   const [clients, setClients] = useState(mockClients);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
+  const fetchUsers = async () => {
       try {
         setLoading(true);
         const usersCollection = collection(db, "users");
@@ -135,6 +136,7 @@ export default function ClientsPage() {
       }
     };
 
+  useEffect(() => {
     fetchUsers();
   }, []);
 
@@ -176,7 +178,10 @@ export default function ClientsPage() {
               </button>
 
               {/* Add New Client Button */}
-              <button className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm">
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm"
+              >
                 <Plus className="w-4 h-4" />
                 Add New Client
               </button>
@@ -348,6 +353,15 @@ export default function ClientsPage() {
           </div>
         </div>
       </main>
+
+      {/* Add Client Modal */}
+      <AddClientModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onClientAdded={() => {
+          fetchUsers(); // Refresh the client list
+        }}
+      />
     </div>
   );
 }
