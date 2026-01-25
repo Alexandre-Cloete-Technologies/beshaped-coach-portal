@@ -1,3 +1,5 @@
+"use client";
+
 import { Plus } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import StatsCard from "./components/StatsCard";
@@ -5,6 +7,10 @@ import SearchBar from "./components/SearchBar";
 import ClientCard, { ClientData } from "./components/ClientCard";
 import AddClientCard from "./components/AddClientCard";
 import Pagination from "./components/Pagination";
+import { useEffect, useState } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 
 // Mock client data
 const mockClients: ClientData[] = [
@@ -128,6 +134,64 @@ const mockClients: ClientData[] = [
 ];
 
 export default function Home() {
+  const [clients, setClients] = useState<ClientData[]>(mockClients);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const usersCollection = collection(db, "users");
+        const usersSnapshot = await getDocs(usersCollection);
+        
+        const fetchedUsers: ClientData[] = usersSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          
+          // Generate avatar gradient based on user ID
+          const gradients = [
+            "bg-gradient-to-br from-blue-500 to-indigo-600",
+            "bg-gradient-to-br from-rose-400 to-pink-600",
+            "bg-gradient-to-br from-amber-400 to-orange-600",
+            "bg-gradient-to-br from-emerald-400 to-teal-600",
+            "bg-gradient-to-br from-violet-400 to-purple-600",
+            "bg-gradient-to-br from-slate-400 to-slate-600",
+          ];
+          const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
+          
+          // Transform Firebase user to ClientData format
+          return {
+            id: doc.id,
+            name: data.displayName || data.username || "Unknown User",
+            photo: data.profilePhoto || "", // Use profilePhoto from Firebase or empty string
+            avatarGradient: gradients[gradientIndex],
+            program: "No Program", // Default until we integrate programs
+            week: 0,
+            totalWeeks: 0,
+            compliance: 0,
+            totalWorkouts: data.stats?.totalWorkouts || 0,
+            completedWorkouts: data.stats?.totalWorkouts || 0,
+            weight: 0,
+            weightChange: 0,
+            lastWorkout: "No activity",
+            status: "medium",
+            nextWorkout: "Not scheduled",
+          };
+        });
+
+        // Combine Firebase users with mock clients (keeping mock clients)
+        setClients([...fetchedUsers, ...mockClients]);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        // Keep using mock clients on error
+        setClients(mockClients);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
@@ -162,10 +226,18 @@ export default function Home() {
 
           {/* Client Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-            {mockClients.map((client) => (
-              <ClientCard key={client.id} client={client} />
-            ))}
-            <AddClientCard />
+            {loading ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                Loading clients...
+              </div>
+            ) : (
+              <>
+                {clients.map((client) => (
+                  <ClientCard key={client.id} client={client} />
+                ))}
+                <AddClientCard />
+              </>
+            )}
           </div>
 
           {/* Pagination */}

@@ -4,6 +4,9 @@ import { Plus, Search, SlidersHorizontal, MoreVertical } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Pagination from "../components/Pagination";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // Mock client data for the table
 const mockClients = [
@@ -82,6 +85,59 @@ const engagementConfig = {
 };
 
 export default function ClientsPage() {
+  const [clients, setClients] = useState(mockClients);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const usersCollection = collection(db, "users");
+        const usersSnapshot = await getDocs(usersCollection);
+        
+        const fetchedUsers = usersSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          
+          // Generate avatar gradient based on user ID
+          const gradients = [
+            "bg-gradient-to-br from-rose-400 to-pink-600",
+            "bg-gradient-to-br from-purple-400 to-purple-600",
+            "bg-gradient-to-br from-emerald-400 to-teal-600",
+            "bg-gradient-to-br from-amber-400 to-orange-600",
+            "bg-gradient-to-br from-blue-400 to-indigo-600",
+          ];
+          const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
+          
+          return {
+            id: doc.id,
+            name: data.displayName || data.username || "Unknown User",
+            email: data.email || "No email",
+            avatarGradient: gradients[gradientIndex],
+            status: "Active", // Default for now
+            currentProgram: "No Program", // Will be updated when we integrate programs
+            programProgress: 0,
+            lastActive: "Recently",
+            engagement: "Medium",
+          };
+        });
+
+        // Combine Firebase users with mock clients (keeping mock clients for now)
+        setClients([...fetchedUsers, ...mockClients]);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        setError("Failed to load users from database");
+        // Keep using mock clients on error
+        setClients(mockClients);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
@@ -153,7 +209,26 @@ export default function ClientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {mockClients.map((client, index) => {
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      Loading clients...
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-sm text-red-500">
+                      {error}
+                    </td>
+                  </tr>
+                ) : clients.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      No clients found
+                    </td>
+                  </tr>
+                ) : (
+                  clients.map((client, index) => {
                   const engagement = engagementConfig[client.engagement as keyof typeof engagementConfig];
                   const initials = client.avatarInitials || client.name.split(' ').map(n => n[0]).join('');
                   
@@ -256,7 +331,8 @@ export default function ClientsPage() {
                       </td>
                     </tr>
                   );
-                })}
+                }))
+                }
               </tbody>
             </table>
           </div>

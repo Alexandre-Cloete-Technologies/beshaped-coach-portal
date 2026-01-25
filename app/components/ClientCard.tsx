@@ -151,7 +151,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
           {/* Stats */}
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Weight</span>
+              <span className="text-muted-foreground">Bodyweight</span>
               <span className="font-medium text-card-foreground">
                 {client.weight} kg 
                 {client.weightChange !== 0 && (
