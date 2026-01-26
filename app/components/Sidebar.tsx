@@ -20,7 +20,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/" },
   { icon: <Users size={20} />, label: "Clients", href: "/clients" },
-  { icon: <Calendar size={20} />, label: "Programs", href: "/schedule" },
+  { icon: <Calendar size={20} />, label: "Programs", href: "/programs" },
   { icon: <Library size={20} />, label: "Exercises", href: "/library" },
   { icon: <CreditCard size={20} />, label: "Billing", href: "/billing" },
 ];
