@@ -1,7 +1,10 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Search, Filter, Download, List, LayoutGrid } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface WorkoutSet {
   setNumber: number;
@@ -10,9 +13,50 @@ interface WorkoutSet {
   rpe: number;
 }
 
+interface ProgramExercise {
+  exerciseId: string;
+  exerciseName: string;
+  order: number;
+  sets: number;
+  repsRange: string;
+  tempo?: string;
+  restPeriod: string;
+  notes: string | null;
+}
+
 interface Exercise {
   name: string;
   sets: WorkoutSet[];
+}
+
+// WorkoutLog exercise structure from Firebase
+interface WorkoutLogExerciseSet {
+  done: boolean;
+  reps: string;
+  weight: string;
+}
+
+interface WorkoutLogExercise {
+  name: string;
+  sets: WorkoutLogExerciseSet[];
+}
+
+interface WorkoutLog {
+  id: string;
+  dateCompleted: Date;
+  userId: string;
+  programName: string;
+  phaseNumber: number;
+  workoutName: string;
+  dayNumber: number;
+  weekNumber: number;
+  totalDuration: number | null;
+  status: "completed" | "in-progress" | "skipped";
+  exercises: WorkoutLogExercise[];
+  totalVolume: number;
+  totalSets: number;
+  totalReps: number;
+  notes: string | null;
 }
 
 interface Workout {
@@ -25,62 +69,20 @@ interface Workout {
   volume?: string;
   avgRpe?: number;
   exercises?: Exercise[];
+  programExercises?: ProgramExercise[];
+  workoutLogExercises?: WorkoutLogExercise[];
   phase?: string;
+  workoutLogId?: string;
 }
 
 const mockWorkouts: Workout[] = [
   {
-    date: "Oct 26",
-    dayOfWeek: "Thursday",
-    time: "9:00 AM",
-    name: "Upper Body Power",
-    status: "completed",
-    duration: "1h 15m",
-    volume: "15,240 lb",
-    avgRpe: 8.5,
-    phase: "Hypertrophy Phase 2 - Week 3",
-    exercises: [
-      {
-        name: "Barbell Bench Press",
-        sets: [
-          { setNumber: 1, weight: "185lb", reps: 8, rpe: 7 },
-          { setNumber: 2, weight: "185lb", reps: 8, rpe: 8 },
-          { setNumber: 3, weight: "195lb", reps: 6, rpe: 9.5 },
-        ],
-      },
-      {
-        name: "Incline Dumbbell Press",
-        sets: [
-          { setNumber: 1, weight: "65lb", reps: 10, rpe: 7 },
-          { setNumber: 2, weight: "65lb", reps: 10, rpe: 8 },
-          { setNumber: 3, weight: "65lb", reps: 10, rpe: 9 },
-        ],
-      },
-      {
-        name: "Weighted Pull-ups",
-        sets: [
-          { setNumber: 1, weight: "BW+25lb", reps: 8, rpe: 7 },
-          { setNumber: 2, weight: "BW+25lb", reps: 8, rpe: 8 },
-          { setNumber: 3, weight: "BW+25lb", reps: 7, rpe: 9 },
-          { setNumber: 4, weight: "BW", reps: 10, rpe: 8 },
-        ],
-      },
-    ],
-  },
-  {
-    date: "Oct 24",
-    dayOfWeek: "Tuesday",
-    time: "5:30 PM",
-    name: "Lower Body Hypertrophy",
-    status: "completed",
-    avgRpe: 8.0,
-  },
-  {
-    date: "Oct 22",
-    dayOfWeek: "Sunday",
+    date: "N/A",
+    dayOfWeek: "N/A",
     time: "--:--",
-    name: "Active Recovery",
+    name: "No workouts found",
     status: "skipped",
+    phase: "No program assigned",
   },
 ];
 
@@ -112,8 +114,36 @@ const mockWorkoutStatus: Record<string, "completed" | "partial" | "skipped"> = {
 };
 
 export default function WorkoutHistory() {
+  const params = useParams();
+  const clientId = params?.id as string;
+  
   const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
   const [expandedWorkout, setExpandedWorkout] = useState<number>(0);
+  
+  // Program and workout data from Firestore
+  const [programWorkouts, setProgramWorkouts] = useState<Array<{ 
+    workoutName: string;
+    phase: string;
+    phaseOrder: number;
+    dayNumber: number;
+    dayName: string;
+    isRestDay: boolean;
+    description?: string;
+    exercises: Array<{
+      exerciseId: string;
+      exerciseName: string;
+      order: number;
+      sets: number;
+      repsRange: string;
+      tempo?: string;
+      restPeriod: string;
+      notes: string | null;
+    }>;
+  }>>([]);
+  const [loadingProgram, setLoadingProgram] = useState(true);
+  
+  // WorkoutLogs from Firebase
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   
   // Calendar state
   const today = new Date();
@@ -121,6 +151,151 @@ export default function WorkoutHistory() {
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<Date | null>(today); // Default to today
   const [timePeriod, setTimePeriod] = useState<"day" | "week" | "month">("month");
+
+  // Fetch client's program and extract workout names from phase maps
+  useEffect(() => {
+    const fetchProgramWorkouts = async () => {
+      if (!clientId) return;
+      
+      try {
+        setLoadingProgram(true);
+        
+        // Fetch the client/user document
+        const userDoc = await getDoc(doc(db, "users", clientId));
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          
+          // Check if user has a currentProgram reference
+          if (userData.currentProgram) {
+            let programDoc;
+            
+            // Handle DocumentReference
+            if (userData.currentProgram.path) {
+              programDoc = await getDoc(userData.currentProgram);
+            } else if (typeof userData.currentProgram === 'string') {
+              // If it's a string ID, fetch it from programs collection
+              programDoc = await getDoc(doc(db, "programs", userData.currentProgram));
+            }
+            
+            if (programDoc && programDoc.exists()) {
+              const programData: any = programDoc.data();
+              
+              // Extract workouts with exercises from phase maps
+              const workouts: Array<{ 
+                workoutName: string;
+                phase: string;
+                phaseOrder: number;
+                dayNumber: number;
+                dayName: string;
+                isRestDay: boolean;
+                description?: string;
+                exercises: Array<{
+                  exerciseId: string;
+                  exerciseName: string;
+                  order: number;
+                  sets: number;
+                  repsRange: string;
+                  tempo?: string;
+                  restPeriod: string;
+                  notes: string | null;
+                }>;
+              }> = [];
+              
+              if (programData.phases && Array.isArray(programData.phases)) {
+                // Iterate through phases
+                programData.phases.forEach((phase: any, phaseIndex: number) => {
+                  const phaseName = phase.name || `Phase ${phaseIndex + 1}`;
+                  const phaseOrder = phase.order || phaseIndex + 1;
+                  
+                  // Each phase has workouts array
+                  if (phase.workouts && Array.isArray(phase.workouts)) {
+                    phase.workouts.forEach((workout: any) => {
+                      // Skip rest days or workouts without names
+                      if (workout.workoutName && !workout.isRestDay) {
+                        workouts.push({ 
+                          workoutName: workout.workoutName,
+                          phase: phaseName,
+                          phaseOrder: phaseOrder,
+                          dayNumber: workout.dayNumber || 0,
+                          dayName: workout.dayName || '',
+                          isRestDay: workout.isRestDay || false,
+                          description: workout.description,
+                          exercises: (workout.exercises || []).map((ex: any) => ({
+                            exerciseId: ex.exerciseId || '',
+                            exerciseName: ex.exerciseName || '',
+                            order: ex.order || 0,
+                            sets: ex.sets || 0,
+                            repsRange: ex.repsRange || '',
+                            tempo: ex.tempo,
+                            restPeriod: ex.restPeriod || '',
+                            notes: ex.notes || null,
+                          })),
+                        });
+                      }
+                    });
+                  }
+                });
+              }
+              
+              setProgramWorkouts(workouts);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching program workouts:", error);
+      } finally {
+        setLoadingProgram(false);
+      }
+    };
+
+    fetchProgramWorkouts();
+  }, [clientId]);
+
+  // Fetch workout logs for this client
+  useEffect(() => {
+    const fetchWorkoutLogs = async () => {
+      if (!clientId) return;
+      
+      try {
+        // Query workoutLogs collection for this user
+        const workoutLogsRef = collection(db, "workoutLogs");
+        const q = query(workoutLogsRef, where("userId", "==", clientId));
+        const querySnapshot = await getDocs(q);
+        
+        const logs: WorkoutLog[] = querySnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            dateCompleted: data.dateCompleted?.toDate ? data.dateCompleted.toDate() : new Date(data.dateCompleted),
+            userId: data.userId,
+            programName: data.programName || "",
+            phaseNumber: data.phaseNumber || 1,
+            workoutName: data.workoutName || "",
+            dayNumber: data.dayNumber || 0,
+            weekNumber: data.weekNumber || 0,
+            totalDuration: data.totalDuration || null,
+            status: data.status || "completed",
+            exercises: data.exercises || [],
+            totalVolume: data.totalVolume || 0,
+            totalSets: data.totalSets || 0,
+            totalReps: data.totalReps || 0,
+            notes: data.notes || null,
+          };
+        });
+        
+        // Sort by date (most recent first)
+        logs.sort((a, b) => b.dateCompleted.getTime() - a.dateCompleted.getTime());
+        
+        setWorkoutLogs(logs);
+        console.log("Fetched workout logs:", logs);
+      } catch (error) {
+        console.error("Error fetching workout logs:", error);
+      }
+    };
+
+    fetchWorkoutLogs();
+  }, [clientId]);
 
   // Navigate to previous month
   const goToPreviousMonth = () => {
@@ -161,9 +336,58 @@ export default function WorkoutHistory() {
 
   // Filter workouts based on selected time period
   const filteredWorkouts = useMemo(() => {
+    // If we have workoutLogs, use those as the primary data source
+    if (workoutLogs.length > 0) {
+      const workoutsFromLogs: Workout[] = workoutLogs.map((log) => {
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const date = log.dateCompleted;
+        
+        return {
+          date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
+          dayOfWeek: dayNames[date.getDay()],
+          time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          name: log.workoutName,
+          status: log.status === "in-progress" ? "partial" : log.status as "completed" | "partial" | "skipped",
+          phase: `Phase ${log.phaseNumber} Day ${log.dayNumber} Week ${log.weekNumber}`,
+          workoutLogExercises: log.exercises,
+          duration: log.totalDuration ? `${log.totalDuration}m` : undefined,
+          volume: log.totalVolume ? `${log.totalVolume.toLocaleString()} lb` : undefined,
+          workoutLogId: log.id,
+        };
+      });
+      
+      return workoutsFromLogs;
+    }
+    
+    // Fall back to program workouts if no workout logs
+    const generatedWorkouts: Workout[] = programWorkouts.map((programWorkout, index) => {
+      // Generate mock date for display (you can replace with actual dates from Firebase)
+      const date = new Date();
+      date.setDate(date.getDate() - index);
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      
+      return {
+        date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
+        dayOfWeek: programWorkout.dayName || dayNames[date.getDay()],
+        time: index === 0 ? "9:00 AM" : "--:--",
+        name: programWorkout.workoutName,
+        status: (index === 0 ? "completed" : "completed") as "completed" | "partial" | "skipped",
+        phase: `Phase ${programWorkout.phaseOrder} - Day ${programWorkout.dayNumber}`,
+        programExercises: programWorkout.exercises,
+        duration: index === 0 ? "1h 15m" : undefined,
+        volume: index === 0 ? "15,240 lb" : undefined,
+        avgRpe: index === 0 ? 8.5 : undefined,
+      };
+    });
+
+    // If no program workouts, fall back to mock data
+    const workoutsToUse = generatedWorkouts.length > 0 ? generatedWorkouts : mockWorkouts;
+
     if (timePeriod === "month") {
       // Show all workouts for the current month
-      return mockWorkouts;
+      return workoutsToUse;
     } else if (timePeriod === "week" && selectedDate) {
       // Show workouts for the selected week
       const weekStart = new Date(selectedDate);
@@ -171,21 +395,21 @@ export default function WorkoutHistory() {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
       
-      return mockWorkouts.filter((workout) => {
+      return workoutsToUse.filter((workout) => {
         // In real app, you'd parse workout.date properly
         // For now, return all for demonstration
         return true;
       });
     } else if (timePeriod === "day" && selectedDate) {
       // Show workouts for the selected day
-      return mockWorkouts.filter((workout) => {
+      return workoutsToUse.filter((workout) => {
         // In real app, compare workout date with selectedDate
         // For now, return first workout for demonstration
-        return workout === mockWorkouts[0];
+        return workout === workoutsToUse[0];
       });
     }
-    return mockWorkouts;
-  }, [timePeriod, selectedDate]);
+    return workoutsToUse;
+  }, [timePeriod, selectedDate, programWorkouts, workoutLogs]);
 
   // Get display title based on time period
   const getWorkoutListTitle = () => {
@@ -329,6 +553,11 @@ export default function WorkoutHistory() {
 
   return (
     <div className="flex flex-col gap-6">
+      {loadingProgram && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
+          Loading workout names from program...
+        </div>
+      )}
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative w-full sm:w-72">
@@ -544,13 +773,13 @@ export default function WorkoutHistory() {
 
         {/* Right Content - Workout List */}
         <div className="w-full lg:w-2/3 flex flex-col gap-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-xl font-bold text-card-foreground">{getWorkoutListTitle()}</h3>
-            {timePeriod === "month" && (
-              <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-xl font-bold text-card-foreground">{getWorkoutListTitle()}</h3>
+              <span className="text-sm font-medium text-muted-foreground">
                 Hypertrophy Phase 2 - Week 3
               </span>
-            )}
+            </div>
           </div>
 
           {/* Today's Workout - Expanded by Default */}
@@ -606,6 +835,13 @@ export default function WorkoutHistory() {
                   <div className="flex-1 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
                     <div className="flex flex-col gap-1">
                       <h3 className="text-card-foreground font-bold text-lg">{workout.name}</h3>
+                      {workout.phase && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            {workout.phase}
+                          </span>
+                        </div>
+                      )}
                       {index === 0 && workout.duration && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{workout.duration} duration</span>
@@ -615,7 +851,7 @@ export default function WorkoutHistory() {
                       )}
                       {index !== 0 && <div className="flex items-center gap-2">{getStatusBadge(workout.status)}</div>}
                     </div>
-                    <div className="flex items-center gap-6 mr-8">
+                    {/* <div className="flex items-center gap-6 mr-8">
                       <div className="flex flex-col items-end">
                         <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                           Avg RPE
@@ -624,7 +860,7 @@ export default function WorkoutHistory() {
                           {workout.avgRpe ? workout.avgRpe.toFixed(1) : "--"}
                         </span>
                       </div>
-                    </div>
+                    </div> */}
                   </div>
 
                   <div className="absolute right-5 top-5 md:static md:right-auto md:top-auto">
@@ -632,7 +868,106 @@ export default function WorkoutHistory() {
                   </div>
                 </summary>
 
-                {workout.exercises ? (
+                {/* Display exercises from workoutLogs (primary) */}
+                {workout.workoutLogExercises && workout.workoutLogExercises.length > 0 ? (
+                  <div className="border-t border-border bg-muted/30 p-5">
+                    {/* Phase Info Header */}
+                    {workout.phase && (
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
+                        <span className="text-xs font-bold uppercase tracking-wide text-primary">Phase:</span>
+                        <span className="text-sm font-medium text-card-foreground">{workout.phase}</span>
+                      </div>
+                    )}
+                    <div className="grid gap-3">
+                      {workout.workoutLogExercises.map((exercise, exIdx) => (
+                        <div key={exIdx} className="bg-card rounded-lg p-4 border border-border">
+                          <div className="flex justify-between items-start mb-3">
+                            <h5 className="font-bold text-card-foreground text-sm">
+                              {exIdx + 1}. {exercise.name}
+                            </h5>
+                            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                              {exercise.sets.length} Sets
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                            {exercise.sets.map((set, setIdx) => (
+                              <div
+                                key={setIdx}
+                                className={`p-2 rounded flex flex-col items-center justify-center text-center ${
+                                  set.done 
+                                    ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800" 
+                                    : "bg-muted border border-border"
+                                }`}
+                              >
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
+                                  Set {setIdx + 1}
+                                </span>
+                                {set.done && set.weight && set.reps ? (
+                                  <span className="font-bold text-card-foreground">
+                                    {set.weight} x {set.reps}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">--</span>
+                                )}
+                                {set.done ? (
+                                  <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">✓ Done</span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">Not done</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : workout.programExercises && workout.programExercises.length > 0 ? (
+                  <div className="border-t border-border bg-muted/30 p-5">
+                    {/* Phase Info Header */}
+                    {workout.phase && (
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
+                        <span className="text-xs font-bold uppercase tracking-wide text-primary">Phase:</span>
+                        <span className="text-sm font-medium text-card-foreground">{workout.phase}</span>
+                      </div>
+                    )}
+                    <div className="grid gap-3">
+                      {workout.programExercises.map((exercise, exIdx) => (
+                        <div key={exIdx} className="bg-card rounded-lg p-4 border border-border">
+                          <div className="flex justify-between items-start mb-2">
+                            <h5 className="font-bold text-card-foreground text-sm">
+                              {exercise.order}. {exercise.exerciseName}
+                            </h5>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                                {exercise.sets} Sets
+                              </span>
+                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
+                                {exercise.repsRange} Reps
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            {exercise.restPeriod && (
+                              <span className="flex items-center gap-1">
+                                <span className="font-medium">Rest:</span> {exercise.restPeriod}
+                              </span>
+                            )}
+                            {exercise.tempo && (
+                              <span className="flex items-center gap-1">
+                                <span className="font-medium">Tempo:</span> {exercise.tempo}
+                              </span>
+                            )}
+                          </div>
+                          {exercise.notes && (
+                            <p className="mt-2 text-xs text-muted-foreground italic border-l-2 border-primary pl-2">
+                              {exercise.notes}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : workout.exercises ? (
                   <div className="border-t border-border bg-muted/30 p-5">
                     <div className="grid gap-4">
                       {workout.exercises.map((exercise, exIdx) => (
@@ -667,9 +1002,17 @@ export default function WorkoutHistory() {
                   </div>
                 ) : (
                   <div className="border-t border-border bg-muted/30 p-5">
-                    <p className="text-muted-foreground text-sm italic">
-                      {workout.status === "skipped" ? "No data recorded." : "Workout details..."}
-                    </p>
+                    <div className="flex flex-col gap-2">
+                      {workout.phase && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-primary">Phase & Day:</span>
+                          <span className="text-sm text-card-foreground">{workout.phase}</span>
+                        </div>
+                      )}
+                      <p className="text-muted-foreground text-sm italic">
+                        {workout.status === "skipped" ? "No data recorded." : "No exercises found for this workout."}
+                      </p>
+                    </div>
                   </div>
                 )}
               </details>

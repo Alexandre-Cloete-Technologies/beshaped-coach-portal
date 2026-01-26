@@ -237,6 +237,199 @@ export default function Home() {
     }
   };
 
+  const populateWorkoutLogs = async () => {
+    try {
+      setIsPopulating(true);
+      
+      const workoutLogsCollection = collection(db, "workoutLogs");
+      
+      // Get users and programs
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      const programsSnapshot = await getDocs(collection(db, "programs"));
+      
+      if (usersSnapshot.empty) {
+        alert("Please create some users first!");
+        return;
+      }
+      
+      if (programsSnapshot.empty) {
+        alert("Please create some programs first!");
+        return;
+      }
+      
+      const userDocs = usersSnapshot.docs;
+      const programDocs = programsSnapshot.docs;
+      const { addDoc, Timestamp } = await import("firebase/firestore");
+      
+      const sampleWorkoutLogs = [];
+      const now = new Date();
+      
+      // Workout Log 1 - Completed Upper Body
+      sampleWorkoutLogs.push({
+        dateCompleted: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), // Yesterday
+        userId: userDocs[0].id,
+        programId: programDocs[0].ref,
+        programName: programDocs[0].data().name || "Training Program",
+        phaseNumber: 1,
+        workoutName: "Upper Body Power",
+        dayNumber: 1,
+        weekNumber: 3,
+        startedAt: Timestamp.fromDate(new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000 - 75 * 60 * 1000)),
+        completedAt: Timestamp.fromDate(new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000)),
+        totalDuration: 75,
+        status: "completed" as const,
+        exercises: [
+          {
+            name: "Barbell Bench Press",
+            sets: [
+              { done: true, reps: "10", weight: "185" },
+              { done: true, reps: "9", weight: "185" },
+              { done: true, reps: "8", weight: "195" },
+              { done: true, reps: "7", weight: "195" },
+            ],
+          },
+          {
+            name: "Incline Dumbbell Press",
+            sets: [
+              { done: true, reps: "12", weight: "65" },
+              { done: true, reps: "11", weight: "65" },
+              { done: true, reps: "10", weight: "65" },
+            ],
+          },
+          {
+            name: "Cable Flyes",
+            sets: [
+              { done: true, reps: "15", weight: "30" },
+              { done: true, reps: "14", weight: "30" },
+              { done: true, reps: "12", weight: "30" },
+            ],
+          },
+        ],
+        totalVolume: 8655,
+        totalSets: 7,
+        totalReps: 67,
+        personalBests: ["Incline Dumbbell Press - 12 reps @ 65lbs"],
+        notes: "Great session, felt strong today!",
+        energyLevel: "high" as const,
+        sleepQuality: "good" as const,
+      });
+
+      // Workout Log 2 - Completed Lower Body
+      sampleWorkoutLogs.push({
+        dateCompleted: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+        userId: userDocs[0].id,
+        programId: programDocs[0].ref,
+        programName: programDocs[0].data().name || "Training Program",
+        phaseNumber: 1,
+        workoutName: "Lower Body Strength",
+        dayNumber: 2,
+        weekNumber: 3,
+        startedAt: Timestamp.fromDate(new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000 - 90 * 60 * 1000)),
+        completedAt: Timestamp.fromDate(new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)),
+        totalDuration: 90,
+        status: "completed" as const,
+        exercises: [
+          {
+            name: "Barbell Back Squat",
+            sets: [
+              { done: true, reps: "5", weight: "225" },
+              { done: true, reps: "5", weight: "245" },
+              { done: true, reps: "5", weight: "265" },
+              { done: true, reps: "5", weight: "275" },
+              { done: true, reps: "4", weight: "285" },
+            ],
+          },
+          {
+            name: "Romanian Deadlift",
+            sets: [
+              { done: true, reps: "10", weight: "135" },
+              { done: true, reps: "10", weight: "155" },
+              { done: true, reps: "8", weight: "175" },
+            ],
+          },
+          {
+            name: "Leg Press",
+            sets: [
+              { done: true, reps: "12", weight: "360" },
+              { done: true, reps: "12", weight: "360" },
+              { done: true, reps: "10", weight: "400" },
+            ],
+          },
+        ],
+        totalVolume: 6475,
+        totalSets: 11,
+        totalReps: 86,
+        personalBests: ["Barbell Back Squat - 285lbs x 4"],
+        notes: "Legs are going to be sore tomorrow",
+        energyLevel: "medium" as const,
+        sleepQuality: "fair" as const,
+      });
+
+      // Workout Log 3 - Skipped
+      sampleWorkoutLogs.push({
+        dateCompleted: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+        userId: userDocs[0].id,
+        programId: programDocs[0].ref,
+        programName: programDocs[0].data().name || "Training Program",
+        phaseNumber: 1,
+        workoutName: "Pull Day",
+        dayNumber: 3,
+        weekNumber: 2,
+        startedAt: null,
+        completedAt: null,
+        totalDuration: null,
+        status: "skipped" as const,
+        skipReason: "Feeling under the weather, needed rest",
+        skippedAt: Timestamp.fromDate(new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000)),
+        exercises: [
+          {
+            name: "Pull-ups",
+            sets: [
+              { done: false, reps: "", weight: "" },
+              { done: false, reps: "", weight: "" },
+              { done: false, reps: "", weight: "" },
+            ],
+          },
+          {
+            name: "Barbell Rows",
+            sets: [
+              { done: false, reps: "", weight: "" },
+              { done: false, reps: "", weight: "" },
+              { done: false, reps: "", weight: "" },
+            ],
+          },
+          {
+            name: "Face Pulls",
+            sets: [
+              { done: false, reps: "", weight: "" },
+              { done: false, reps: "", weight: "" },
+              { done: false, reps: "", weight: "" },
+            ],
+          },
+        ],
+        totalVolume: 0,
+        totalSets: 0,
+        totalReps: 0,
+        personalBests: [],
+        notes: null,
+        energyLevel: "low" as const,
+        sleepQuality: "poor" as const,
+      });
+
+      // Add all documents to Firestore
+      for (const workoutLog of sampleWorkoutLogs) {
+        await addDoc(workoutLogsCollection, workoutLog);
+      }
+
+      alert(`Successfully created ${sampleWorkoutLogs.length} workout logs!`);
+    } catch (error) {
+      console.error("Error populating workout logs:", error);
+      alert("Error creating workout logs. Check console for details.");
+    } finally {
+      setIsPopulating(false);
+    }
+  };
+
   const fetchUsers = async () => {
       try {
         setLoading(true);
@@ -385,6 +578,13 @@ export default function Home() {
                 className="h-11 px-5 rounded-xl bg-blue-600 text-white font-medium flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPopulating ? "Populating..." : "Populate WeightLogs"}
+              </button>
+              <button 
+                onClick={populateWorkoutLogs}
+                disabled={isPopulating}
+                className="h-11 px-5 rounded-xl bg-red-600 text-white font-medium flex items-center gap-2 hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPopulating ? "Populating..." : "Populate WorkoutLogs"}
               </button>
               <button 
                 onClick={() => setIsModalOpen(true)}
