@@ -2,7 +2,12 @@
 
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 
-export default function SearchBar() {
+interface SearchBarProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export default function SearchBar({ value, onChange }: SearchBarProps) {
   return (
     <div className="flex items-center gap-4">
       {/* Search Input */}
@@ -10,6 +15,8 @@ export default function SearchBar() {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <input
           type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           placeholder="Search by name, program, or goal..."
           className="w-full h-12 pl-12 pr-4 rounded-xl border border-border bg-card text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
         />

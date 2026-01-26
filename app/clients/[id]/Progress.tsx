@@ -35,14 +35,14 @@ export default function Progress() {
 
           {/* Chart */}
           <div className="w-full h-64 relative">
-            <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-muted-foreground text-right pr-2">
+            <div className="absolute left-0 top-0 bottom-8 w-10 flex flex-col justify-between text-xs text-muted-foreground text-right pr-2">
               <span>160</span>
               <span>155</span>
               <span>150</span>
               <span>145</span>
               <span>140</span>
             </div>
-            <div className="absolute left-10 right-0 top-2 bottom-6">
+            <div className="absolute left-12 right-0 top-0 bottom-8">
               <div className="w-full h-full flex flex-col justify-between">
                 <div className="w-full h-px bg-border"></div>
                 <div className="w-full h-px bg-border"></div>
@@ -51,45 +51,48 @@ export default function Progress() {
                 <div className="w-full h-px bg-border"></div>
               </div>
               <svg
-                className="absolute inset-0 w-full h-full overflow-visible"
-                preserveAspectRatio="none"
-                viewBox="0 0 100 100"
+                className="absolute inset-0 w-full h-full"
+                viewBox="0 0 600 100"
+                preserveAspectRatio="xMidYMid meet"
               >
-                <path
-                  className="text-primary"
-                  d="M0,20 L20,30 L40,45 L60,65 L80,75 L100,85"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M0,20 L20,30 L40,45 L60,65 L80,75 L100,85 L100,100 L0,100 Z"
-                  fill="url(#gradient)"
-                  opacity="0.1"
-                />
                 <defs>
-                  <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="rgb(25, 93, 230)" />
-                    <stop offset="100%" stopColor="rgb(25, 93, 230)" stopOpacity="0" />
+                  <linearGradient id="bodyweight-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
                   </linearGradient>
                 </defs>
-                <circle className="fill-card stroke-primary" cx="0" cy="20" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-primary" cx="20" cy="30" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-primary" cx="40" cy="45" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-primary" cx="60" cy="65" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-primary" cx="80" cy="75" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-primary" cx="100" cy="85" r="3" strokeWidth="2" />
+                {/* Area fill */}
+                <path
+                  d="M0,20 L100,30 L200,45 L300,65 L400,75 L500,85 L600,85 L600,100 L0,100 Z"
+                  fill="url(#bodyweight-gradient)"
+                />
+                {/* Line */}
+                <path
+                  d="M0,20 L100,30 L200,45 L300,65 L400,75 L500,85 L600,85"
+                  fill="none"
+                  stroke="rgb(59, 130, 246)"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="3"
+                />
+                {/* Data points */}
+                <circle className="fill-card stroke-primary" cx="0" cy="20" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-primary" cx="100" cy="30" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-primary" cx="200" cy="45" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-primary" cx="300" cy="65" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-primary" cx="400" cy="75" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-primary" cx="500" cy="85" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-primary" cx="600" cy="85" r="4" strokeWidth="2.5" />
               </svg>
             </div>
-            <div className="absolute left-10 right-0 bottom-0 flex justify-between text-xs text-muted-foreground">
+            <div className="absolute left-12 right-0 bottom-0 flex justify-between text-xs text-muted-foreground">
               <span>Jan</span>
               <span>Feb</span>
               <span>Mar</span>
               <span>Apr</span>
               <span>May</span>
               <span>Jun</span>
+              <span>Jul</span>
             </div>
           </div>
         </div>
@@ -161,14 +164,14 @@ export default function Progress() {
 
           {/* Chart */}
           <div className="w-full h-56 relative">
-            <div className="absolute left-0 top-0 bottom-6 w-8 flex flex-col justify-between text-xs text-muted-foreground text-right pr-2">
+            <div className="absolute left-0 top-0 bottom-8 w-10 flex flex-col justify-between text-xs text-muted-foreground text-right pr-2">
               <span>225</span>
               <span>200</span>
               <span>175</span>
               <span>150</span>
               <span>125</span>
             </div>
-            <div className="absolute left-10 right-0 top-2 bottom-6">
+            <div className="absolute left-12 right-0 top-0 bottom-8">
               <div className="w-full h-full flex flex-col justify-between">
                 <div className="w-full h-px bg-border"></div>
                 <div className="w-full h-px bg-border"></div>
@@ -177,33 +180,48 @@ export default function Progress() {
                 <div className="w-full h-px bg-border"></div>
               </div>
               <svg
-                className="absolute inset-0 w-full h-full overflow-visible"
-                preserveAspectRatio="none"
-                viewBox="0 0 100 100"
+                className="absolute inset-0 w-full h-full"
+                viewBox="0 0 600 100"
+                preserveAspectRatio="xMidYMid meet"
               >
+                <defs>
+                  <linearGradient id="lift-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.15" />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {/* Area fill */}
                 <path
-                  d="M0,90 L20,80 L40,75 L60,50 L80,40 L100,20"
+                  d="M0,90 L100,80 L200,75 L300,50 L400,40 L500,20 L600,20 L600,100 L0,100 Z"
+                  fill="url(#lift-gradient)"
+                />
+                {/* Line */}
+                <path
+                  d="M0,90 L100,80 L200,75 L300,50 L400,40 L500,20 L600,20"
                   fill="none"
                   stroke="#f59e0b"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth="2"
+                  strokeWidth="3"
                 />
-                <circle className="fill-card stroke-orange-500" cx="0" cy="90" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-orange-500" cx="20" cy="80" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-orange-500" cx="40" cy="75" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-orange-500" cx="60" cy="50" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-orange-500" cx="80" cy="40" r="3" strokeWidth="2" />
-                <circle className="fill-card stroke-orange-500" cx="100" cy="20" r="3" strokeWidth="2" />
+                {/* Data points */}
+                <circle className="fill-card stroke-orange-500" cx="0" cy="90" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-orange-500" cx="100" cy="80" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-orange-500" cx="200" cy="75" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-orange-500" cx="300" cy="50" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-orange-500" cx="400" cy="40" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-orange-500" cx="500" cy="20" r="4" strokeWidth="2.5" />
+                <circle className="fill-card stroke-orange-500" cx="600" cy="20" r="4" strokeWidth="2.5" />
               </svg>
             </div>
-            <div className="absolute left-10 right-0 bottom-0 flex justify-between text-xs text-muted-foreground">
+            <div className="absolute left-12 right-0 bottom-0 flex justify-between text-xs text-muted-foreground">
               <span>Jan</span>
               <span>Feb</span>
               <span>Mar</span>
               <span>Apr</span>
               <span>May</span>
               <span>Jun</span>
+              <span>Jul</span>
             </div>
           </div>
         </div>

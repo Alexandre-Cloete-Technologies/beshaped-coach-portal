@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, AlertTriangle, Check } from "lucide-react";
+import { ArrowRight, AlertTriangle, Check, Target } from "lucide-react";
 
 export interface ClientData {
   id: string;
@@ -10,9 +10,12 @@ export interface ClientData {
   currentProgram: string;
   week: number;
   totalWeeks: number;
+  currentDay?: number;
+  currentPhase?: number;
   compliance: number;
   totalWorkouts: number;
   completedWorkouts: number;
+  totalWorkoutsInProgram?: number;
   weight: number;
   weightChange: number;
   lastWorkout: string;
@@ -23,6 +26,7 @@ export interface ClientData {
     totalExercises: number;
   };
   nextWorkout: string;
+  goals?: string;
 }
 
 const statusColors = {
@@ -110,6 +114,15 @@ export default function ClientCard({ client }: { client: ClientData }) {
     return <span className="text-red-500">{lastWorkout}</span>;
   };
 
+  // Format program info with phase, day, and week
+  const formatProgramInfo = () => {
+    const parts = [];
+    if (client.currentPhase) parts.push(`Phase ${client.currentPhase}`);
+    if (client.currentDay) parts.push(`Day ${client.currentDay}`);
+    parts.push(`Week ${client.week}`);
+    return `${client.currentProgram} • ${parts.join(' ')}`;
+  };
+
   return (
     <div 
       className={`bg-card rounded-2xl border ${isAlert ? 'border-red-300 dark:border-red-800 shadow-red-100 dark:shadow-red-900/20' : 'border-border'} p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4`}
@@ -125,7 +138,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
           <div>
             <h3 className="font-semibold text-card-foreground">{client.name}</h3>
             <p className="text-xs text-muted-foreground">
-              {client.currentProgram} • Wk {client.week}
+              {formatProgramInfo()}
             </p>
           </div>
         </div>
@@ -143,9 +156,9 @@ export default function ClientCard({ client }: { client: ClientData }) {
               <span className="text-muted-foreground">Program Progress</span>
             </div>
             <div className="text-xs text-muted-foreground mb-1">
-              Week {client.week} of {client.totalWeeks}
+              Week {client.totalWorkouts} of {client.totalWorkoutsInProgram || 0}
             </div>
-            <ProgressBar current={client.week} total={client.totalWeeks} />
+            <ProgressBar current={client.totalWorkouts} total={client.totalWorkoutsInProgram || 1} />
           </div>
 
           {/* Stats */}
@@ -171,6 +184,15 @@ export default function ClientCard({ client }: { client: ClientData }) {
                 {client.completedWorkouts}/{client.totalWorkouts} ({client.compliance}%)
               </span>
             </div>
+            {client.goals && (
+              <div className="flex items-start gap-1.5 pt-1">
+                <Target className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="text-muted-foreground">Goals: </span>
+                  <span className="font-medium text-card-foreground">{client.goals}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

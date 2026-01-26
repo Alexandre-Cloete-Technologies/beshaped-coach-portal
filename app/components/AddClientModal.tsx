@@ -1,8 +1,8 @@
 "use client";
 
 import { X, Check } from "lucide-react";
-import { useState } from "react";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { useState, useEffect } from "react";
+import { collection, addDoc, Timestamp, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface AddClientModalProps {
@@ -11,29 +11,44 @@ interface AddClientModalProps {
   onClientAdded?: () => void;
 }
 
-// Pool of available programs
-const AVAILABLE_PROGRAMS = [
-  "Hypertrophy",
-  "Weight Loss",
-  "Strength",
-  "Mobility",
-  "CrossFit",
-  "Powerlifting",
-  "Endurance",
-  "Rehab",
-  "Athletic Performance",
-  "Bodybuilding",
-  "Functional Fitness",
-  "No Program",
-];
-
 export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddClientModalProps) {
   const [loading, setLoading] = useState(false);
+  const [programs, setPrograms] = useState<string[]>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     currentProgram: "",
   });
+
+  // Fetch programs from Firebase when modal opens
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      if (!isOpen) return;
+      
+      try {
+        setLoadingPrograms(true);
+        const programsCollection = collection(db, "programs");
+        const programsSnapshot = await getDocs(programsCollection);
+        
+        const programNames = programsSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return data.name || "Unnamed Program";
+        });
+        
+        // Add "No Program" option at the end
+        setPrograms([...programNames, "No Program"]);
+      } catch (error) {
+        console.error("Error fetching programs:", error);
+        // Fallback to just "No Program" if there's an error
+        setPrograms(["No Program"]);
+      } finally {
+        setLoadingPrograms(false);
+      }
+    };
+
+    fetchPrograms();
+  }, [isOpen]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -158,27 +173,37 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
 
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-2">
-                Current Program
+                Assign the client a training program
               </label>
-              <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-border bg-background min-h-[100px] max-h-[200px] overflow-y-auto">
-                {AVAILABLE_PROGRAMS.map((program) => (
-                  <button
-                    key={program}
-                    type="button"
-                    onClick={() => selectProgram(program)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                      formData.currentProgram === program
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {formData.currentProgram === program && (
-                      <Check className="w-3 h-3 inline mr-1" />
-                    )}
-                    {program}
-                  </button>
-                ))}
-              </div>
+              {loadingPrograms ? (
+                <div className="flex items-center justify-center p-3 rounded-lg border border-border bg-background min-h-[100px]">
+                  <p className="text-sm text-muted-foreground">Loading programs...</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-border bg-background min-h-[100px] max-h-[200px] overflow-y-auto">
+                  {programs.length > 0 ? (
+                    programs.map((program) => (
+                      <button
+                        key={program}
+                        type="button"
+                        onClick={() => selectProgram(program)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          formData.currentProgram === program
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {formData.currentProgram === program && (
+                          <Check className="w-3 h-3 inline mr-1" />
+                        )}
+                        {program}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No programs available</p>
+                  )}
+                </div>
+              )}
               {formData.currentProgram && (
                 <p className="text-xs text-muted-foreground mt-2">
                   Selected: <span className="font-medium text-card-foreground">{formData.currentProgram}</span>
