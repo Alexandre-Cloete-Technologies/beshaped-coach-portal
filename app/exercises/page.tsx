@@ -1,0 +1,501 @@
+"use client";
+
+import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Dumbbell, ChevronsUpDown } from "lucide-react";
+import Sidebar from "../components/Sidebar";
+import { useEffect, useState, useMemo } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+interface Exercise {
+  id: string;
+  name: string;
+  muscleGroup: string;
+  equipment: string;
+  difficulty: "beginner" | "intermediate" | "advanced";
+  description?: string;
+  instructions?: string[];
+  videoUrl?: string;
+  createdAt?: Date;
+}
+
+// Define muscle group order and icons
+const muscleGroupOrder = [
+  "Chest",
+  "Back", 
+  "Shoulders",
+  "Arms",
+  "Legs",
+  "Core",
+  "Full Body",
+  "Cardio",
+  "Other"
+];
+
+// Map specific muscles to broader categories
+const muscleToCategory: Record<string, string> = {
+  // Chest
+  "chest": "Chest",
+  "pectorals": "Chest",
+  "pecs": "Chest",
+  "upper chest": "Chest",
+  "lower chest": "Chest",
+  
+  // Back
+  "back": "Back",
+  "lats": "Back",
+  "latissimus dorsi": "Back",
+  "rhomboids": "Back",
+  "traps": "Back",
+  "trapezius": "Back",
+  "lower back": "Back",
+  "erector spinae": "Back",
+  "rear delts": "Back",
+  "upper back": "Back",
+  "mid back": "Back",
+  
+  // Shoulders
+  "shoulders": "Shoulders",
+  "delts": "Shoulders",
+  "deltoids": "Shoulders",
+  "front delts": "Shoulders",
+  "side delts": "Shoulders",
+  "lateral delts": "Shoulders",
+  "anterior deltoid": "Shoulders",
+  "posterior deltoid": "Shoulders",
+  "rotator cuff": "Shoulders",
+  
+  // Arms
+  "arms": "Arms",
+  "biceps": "Arms",
+  "triceps": "Arms",
+  "forearms": "Arms",
+  "brachialis": "Arms",
+  "bicep": "Arms",
+  "tricep": "Arms",
+  "forearm": "Arms",
+  "wrists": "Arms",
+  
+  // Legs
+  "legs": "Legs",
+  "quads": "Legs",
+  "quadriceps": "Legs",
+  "hamstrings": "Legs",
+  "glutes": "Legs",
+  "gluteus": "Legs",
+  "calves": "Legs",
+  "calf": "Legs",
+  "hip flexors": "Legs",
+  "adductors": "Legs",
+  "abductors": "Legs",
+  "thighs": "Legs",
+  "lower body": "Legs",
+  
+  // Core
+  "core": "Core",
+  "abs": "Core",
+  "abdominals": "Core",
+  "obliques": "Core",
+  "lower abs": "Core",
+  "upper abs": "Core",
+  "transverse abdominis": "Core",
+  "hip": "Core",
+  "pelvis": "Core",
+  
+  // Full Body
+  "full body": "Full Body",
+  "compound": "Full Body",
+  "total body": "Full Body",
+  "whole body": "Full Body",
+  
+  // Cardio
+  "cardio": "Cardio",
+  "cardiovascular": "Cardio",
+  "heart": "Cardio",
+  "conditioning": "Cardio",
+  "endurance": "Cardio",
+};
+
+// Function to get category from muscle name
+const getCategoryFromMuscle = (muscle: string): string => {
+  if (!muscle) return "Other";
+  
+  const normalized = muscle.toLowerCase().trim();
+  
+  // Direct match
+  if (muscleToCategory[normalized]) {
+    return muscleToCategory[normalized];
+  }
+  
+  // Check if any key is contained in the muscle string
+  for (const [key, category] of Object.entries(muscleToCategory)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return category;
+    }
+  }
+  
+  // Check if muscle string contains any category name directly
+  for (const category of muscleGroupOrder) {
+    if (normalized.includes(category.toLowerCase())) {
+      return category;
+    }
+  }
+  
+  return "Other";
+};
+
+// Mock exercises for fallback
+const mockExercises: Exercise[] = [
+  { id: "1", name: "Barbell Bench Press", muscleGroup: "Chest", equipment: "Barbell", difficulty: "intermediate", description: "Compound chest exercise" },
+  { id: "2", name: "Incline Dumbbell Press", muscleGroup: "Chest", equipment: "Dumbbells", difficulty: "intermediate", description: "Upper chest focus" },
+  { id: "3", name: "Cable Flyes", muscleGroup: "Chest", equipment: "Cable Machine", difficulty: "beginner", description: "Chest isolation movement" },
+  { id: "4", name: "Push-ups", muscleGroup: "Chest", equipment: "Bodyweight", difficulty: "beginner", description: "Classic bodyweight exercise" },
+  { id: "5", name: "Pull-ups", muscleGroup: "Back", equipment: "Pull-up Bar", difficulty: "intermediate", description: "Lat-focused compound movement" },
+  { id: "6", name: "Barbell Rows", muscleGroup: "Back", equipment: "Barbell", difficulty: "intermediate", description: "Horizontal pulling movement" },
+  { id: "7", name: "Lat Pulldowns", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner", description: "Machine lat exercise" },
+  { id: "8", name: "Seated Cable Rows", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner", description: "Back thickness builder" },
+  { id: "9", name: "Deadlift", muscleGroup: "Back", equipment: "Barbell", difficulty: "advanced", description: "Full posterior chain" },
+  { id: "10", name: "Overhead Press", muscleGroup: "Shoulders", equipment: "Barbell", difficulty: "intermediate", description: "Compound shoulder press" },
+  { id: "11", name: "Lateral Raises", muscleGroup: "Shoulders", equipment: "Dumbbells", difficulty: "beginner", description: "Side delt isolation" },
+  { id: "12", name: "Face Pulls", muscleGroup: "Shoulders", equipment: "Cable Machine", difficulty: "beginner", description: "Rear delt and rotator cuff" },
+  { id: "13", name: "Barbell Curl", muscleGroup: "Arms", equipment: "Barbell", difficulty: "beginner", description: "Bicep builder" },
+  { id: "14", name: "Tricep Pushdowns", muscleGroup: "Arms", equipment: "Cable Machine", difficulty: "beginner", description: "Tricep isolation" },
+  { id: "15", name: "Hammer Curls", muscleGroup: "Arms", equipment: "Dumbbells", difficulty: "beginner", description: "Brachialis focus" },
+  { id: "16", name: "Barbell Back Squat", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate", description: "King of leg exercises" },
+  { id: "17", name: "Romanian Deadlift", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate", description: "Hamstring focus" },
+  { id: "18", name: "Leg Press", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Quad-focused machine" },
+  { id: "19", name: "Leg Curls", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Hamstring isolation" },
+  { id: "20", name: "Calf Raises", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Calf development" },
+  { id: "21", name: "Plank", muscleGroup: "Core", equipment: "Bodyweight", difficulty: "beginner", description: "Core stability" },
+  { id: "22", name: "Cable Crunches", muscleGroup: "Core", equipment: "Cable Machine", difficulty: "beginner", description: "Weighted ab exercise" },
+  { id: "23", name: "Hanging Leg Raises", muscleGroup: "Core", equipment: "Pull-up Bar", difficulty: "intermediate", description: "Lower ab focus" },
+];
+
+export default function ExercisesPage() {
+  const [exercises, setExercises] = useState<Exercise[]>(mockExercises);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Fetch exercises from Firebase
+  useEffect(() => {
+    const fetchExercises = async () => {
+      try {
+        setLoading(true);
+        const exercisesCollection = collection(db, "exercises");
+        const exercisesSnapshot = await getDocs(exercisesCollection);
+        
+        if (!exercisesSnapshot.empty) {
+          const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            
+            // Check multiple potential fields for muscle data
+            let rawMuscle = data.muscleGroup || 
+                           data.muscle_group || 
+                           data.muscle || 
+                           data.muscles || 
+                           data.target || 
+                           data.bodyPart || 
+                           data.primaryMuscle || 
+                           data.primary_muscle || 
+                           data.musclesInvolved ||
+                           data.muscles_involved ||
+                           data.muscleGroups ||
+                           data.muscle_groups ||
+                           data.category ||
+                           data.primaryGroup ||
+                           "";
+            
+            // Handle array of muscles (take the first one)
+            if (Array.isArray(rawMuscle) && rawMuscle.length > 0) {
+              rawMuscle = rawMuscle[0];
+            } else if (rawMuscle && typeof rawMuscle === 'object') {
+              // Handle valid object (non-array) that might contain the muscle name
+              // Use 'as any' to avoid TS errors when accessing dynamic properties
+              const muscleObj = rawMuscle as any;
+              rawMuscle = muscleObj.name || muscleObj.title || muscleObj.slug || muscleObj.label || muscleObj.toString() || "";
+            }
+            
+            // Use helper to categorize specific muscles (e.g. "Biceps" -> "Arms")
+            const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
+            
+            // Log for debugging (helpful to see what fields are available)
+            // console.log("Exercise:", data.name, "Raw Muscle:", rawMuscle, "Category:", muscleCategory);
+            
+            return {
+              id: doc.id,
+              name: data.name || "Unnamed Exercise",
+              muscleGroup: muscleCategory, // Normalized category
+              equipment: data.equipment || "None",
+              difficulty: data.difficulty || "intermediate",
+              description: data.description,
+              instructions: data.instructions,
+              videoUrl: data.videoUrl,
+              createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+            };
+          });
+          
+          setExercises(fetchedExercises.length > 0 ? fetchedExercises : mockExercises);
+        }
+      } catch (error) {
+        console.error("Error fetching exercises:", error);
+        setExercises(mockExercises);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExercises();
+  }, []);
+
+  // Group exercises by muscle group
+  const groupedExercises = useMemo(() => {
+    const groups: Record<string, Exercise[]> = {};
+    
+    // Initialize all groups
+    muscleGroupOrder.forEach(group => {
+      groups[group] = [];
+    });
+    
+    // Filter by search and group
+    const filtered = searchQuery.trim() 
+      ? exercises.filter(ex => 
+          ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          ex.muscleGroup.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          ex.equipment.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : exercises;
+    
+    filtered.forEach(exercise => {
+      const group = muscleGroupOrder.includes(exercise.muscleGroup) 
+        ? exercise.muscleGroup 
+        : "Other";
+      groups[group].push(exercise);
+    });
+    
+    return groups;
+  }, [exercises, searchQuery]);
+
+  // Auto-expand groups when searching
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      // Expand all groups that have matching exercises
+      const groupsWithMatches = new Set<string>();
+      Object.entries(groupedExercises).forEach(([group, exs]) => {
+        if (exs.length > 0) {
+          groupsWithMatches.add(group);
+        }
+      });
+      setExpandedGroups(groupsWithMatches);
+    }
+  }, [searchQuery, groupedExercises]);
+
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(group)) {
+        next.delete(group);
+      } else {
+        next.add(group);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedGroups(new Set(muscleGroupOrder));
+  };
+
+  const collapseAll = () => {
+    setExpandedGroups(new Set());
+  };
+
+  const allExpanded = expandedGroups.size === muscleGroupOrder.length;
+
+  const getDifficultyBadge = (difficulty: string) => {
+    switch (difficulty) {
+      case "beginner":
+        return "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300";
+      case "intermediate":
+        return "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
+      case "advanced":
+        return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const totalExercises = exercises.length;
+  const filteredTotal = Object.values(groupedExercises).reduce((sum, exs) => sum + exs.length, 0);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Sidebar />
+
+      <main className="ml-[220px] min-h-screen">
+        <div className="p-8">
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">Exercise Library</h1>
+              <p className="text-muted-foreground">
+                {totalExercises} exercises organized by muscle group
+              </p>
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="bg-card p-4 rounded-xl shadow-sm border border-border mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+            {/* Search */}
+            <div className="relative flex-1 w-full md:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-muted border-none rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                placeholder="Search exercises by name, muscle, or equipment..."
+              />
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {/* Expand/Collapse All */}
+              <button 
+                onClick={allExpanded ? collapseAll : expandAll}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronsUpDown className="w-4 h-4" />
+                {allExpanded ? "Collapse All" : "Expand All"}
+              </button>
+              
+              {/* Add Button */}
+              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all">
+                <Plus className="w-5 h-5" />
+                Add Exercise
+              </button>
+            </div>
+          </div>
+
+          {/* Search Results Info */}
+          {searchQuery && (
+            <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Found {filteredTotal} exercise{filteredTotal !== 1 ? "s" : ""} matching "{searchQuery}"</span>
+              <button 
+                onClick={() => setSearchQuery("")}
+                className="text-primary hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+          {/* Grouped Exercises */}
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              Loading exercises...
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {muscleGroupOrder.map((group) => {
+                const groupExercises = groupedExercises[group];
+                const isExpanded = expandedGroups.has(group);
+                const hasExercises = groupExercises.length > 0;
+                
+                // Hide empty groups when searching
+                if (searchQuery && !hasExercises) return null;
+                
+                return (
+                  <div 
+                    key={group}
+                    className="bg-card rounded-xl border border-border overflow-hidden"
+                  >
+                    {/* Group Header */}
+                    <button
+                      onClick={() => toggleGroup(group)}
+                      className={`w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors ${
+                        !hasExercises ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                      disabled={!hasExercises}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        )}
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                          <Dumbbell className="w-4 h-4" />
+                        </div>
+                        <span className="font-semibold text-card-foreground">{group}</span>
+                      </div>
+                      <span className={`text-sm font-medium px-2.5 py-1 rounded-full ${
+                        hasExercises 
+                          ? "bg-primary/10 text-primary" 
+                          : "bg-muted text-muted-foreground"
+                      }`}>
+                        {groupExercises.length} exercise{groupExercises.length !== 1 ? "s" : ""}
+                      </span>
+                    </button>
+                    
+                    {/* Expanded Content */}
+                    {isExpanded && hasExercises && (
+                      <div className="border-t border-border">
+                        {groupExercises.map((exercise, idx) => (
+                          <div 
+                            key={exercise.id}
+                            className={`flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group ${
+                              idx !== groupExercises.length - 1 ? "border-b border-border/50" : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                              <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-sm font-medium flex-shrink-0">
+                                {idx + 1}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-card-foreground truncate">{exercise.name}</p>
+                                {exercise.description && (
+                                  <p className="text-xs text-muted-foreground truncate">{exercise.description}</p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs text-muted-foreground hidden sm:block">{exercise.equipment}</span>
+                              <span className={`text-xs font-medium px-2 py-1 rounded ${getDifficultyBadge(exercise.difficulty)}`}>
+                                {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
+                              </span>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded transition-colors">
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && filteredTotal === 0 && searchQuery && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-2">No exercises found matching "{searchQuery}"</p>
+              <button
+                onClick={() => setSearchQuery("")}
+                className="text-primary hover:underline text-sm"
+              >
+                Clear search
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
