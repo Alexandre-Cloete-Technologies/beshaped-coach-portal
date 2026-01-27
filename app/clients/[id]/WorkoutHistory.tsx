@@ -43,7 +43,7 @@ interface WorkoutLogExercise {
 
 interface WorkoutLog {
   id: string;
-  dateCompleted: Date;
+  completedAt: Date;
   userId: string;
   programName: string;
   phaseNumber: number;
@@ -73,6 +73,10 @@ interface Workout {
   workoutLogExercises?: WorkoutLogExercise[];
   phase?: string;
   workoutLogId?: string;
+  programName?: string;
+  phaseNumber?: number;
+  weekNumber?: number;
+  dayNumber?: number;
 }
 
 const mockWorkouts: Workout[] = [
@@ -86,32 +90,7 @@ const mockWorkouts: Workout[] = [
   },
 ];
 
-// Mock workout status data - in real app, this would come from your database
-const mockWorkoutStatus: Record<string, "completed" | "partial" | "skipped"> = {
-  "2023-10-01": "completed",
-  "2023-10-02": "completed",
-  "2023-10-03": "partial",
-  "2023-10-04": "completed",
-  "2023-10-05": "skipped",
-  "2023-10-07": "completed",
-  "2023-10-08": "completed",
-  "2023-10-09": "completed",
-  "2023-10-10": "partial",
-  "2023-10-11": "completed",
-  "2023-10-12": "completed",
-  "2023-10-14": "completed",
-  "2023-10-15": "completed",
-  "2023-10-16": "completed",
-  "2023-10-17": "partial",
-  "2023-10-18": "completed",
-  "2023-10-19": "completed",
-  "2023-10-20": "completed",
-  "2023-10-22": "skipped",
-  "2023-10-23": "completed",
-  "2023-10-24": "completed",
-  "2023-10-25": "completed",
-  "2023-10-26": "completed",
-};
+
 
 export default function WorkoutHistory() {
   const params = useParams();
@@ -265,9 +244,13 @@ export default function WorkoutHistory() {
         
         const logs: WorkoutLog[] = querySnapshot.docs.map((doc) => {
           const data = doc.data();
+          // Use completedAt timestamp from Firebase
+          const completedAt = data.completedAt?.toDate 
+            ? data.completedAt.toDate() 
+            : (data.completedAt ? new Date(data.completedAt) : new Date());
           return {
             id: doc.id,
-            dateCompleted: data.dateCompleted?.toDate ? data.dateCompleted.toDate() : new Date(data.dateCompleted),
+            completedAt,
             userId: data.userId,
             programName: data.programName || "",
             phaseNumber: data.phaseNumber || 1,
@@ -285,7 +268,7 @@ export default function WorkoutHistory() {
         });
         
         // Sort by date (most recent first)
-        logs.sort((a, b) => b.dateCompleted.getTime() - a.dateCompleted.getTime());
+        logs.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
         
         setWorkoutLogs(logs);
         console.log("Fetched workout logs:", logs);
@@ -325,35 +308,107 @@ export default function WorkoutHistory() {
     }
   };
 
-  // Generate year options (current year ± 5 years)
+  // Generate year options (current year - 5 to + 14 years)
   const yearOptions = useMemo(() => {
     const years = [];
-    for (let i = -5; i <= 2; i++) {
+    for (let i = -5; i <= 14; i++) {
       years.push(today.getFullYear() + i);
     }
     return years;
   }, [today]);
 
+  // Helper function to check if a value is a valid Date
+  const isValidDate = (date: unknown): date is Date => {
+    return date instanceof Date && !isNaN(date.getTime());
+  };
+
+  // Helper function to check if two dates are the same day
+  const isSameDay = (date1: Date | null | undefined, date2: Date | null | undefined): boolean => {
+    if (!date1 || !date2 || !isValidDate(date1) || !isValidDate(date2)) return false;
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  };
+
+  // Helper function to check if a date is within a week
+  const isWithinWeek = (date: Date | null | undefined, weekStart: Date, weekEnd: Date): boolean => {
+    if (!date || !isValidDate(date)) return false;
+    const time = date.getTime();
+    return time >= weekStart.getTime() && time <= weekEnd.getTime();
+  };
+
+  // Helper function to check if a date is within a month
+  const isWithinMonth = (date: Date | null | undefined, month: number, year: number): boolean => {
+    if (!date || !isValidDate(date)) return false;
+    return date.getMonth() === month && date.getFullYear() === year;
+  };
+
   // Filter workouts based on selected time period
   const filteredWorkouts = useMemo(() => {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
     // If we have workoutLogs, use those as the primary data source
     if (workoutLogs.length > 0) {
-      const workoutsFromLogs: Workout[] = workoutLogs.map((log) => {
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        const date = log.dateCompleted;
+      // Filter out logs with invalid completedAt dates first
+      const validLogs = workoutLogs.filter((log) => isValidDate(log.completedAt));
+      
+      // First, filter workout logs based on selected time period and date
+      let filteredLogs = validLogs;
+
+      if (timePeriod === "day" && selectedDate) {
+        // Filter to show only workouts completed on the selected day
+        filteredLogs = validLogs.filter((log) => 
+          isSameDay(log.completedAt, selectedDate)
+        );
+      } else if (timePeriod === "week" && selectedDate) {
+        // Get week boundaries (Monday to Sunday)
+        const weekStart = new Date(selectedDate);
+        const day = selectedDate.getDay();
+        const diff = (day === 0 ? 6 : day - 1); // Adjust for Monday start (Mon=0, Sun=6)
+        weekStart.setDate(selectedDate.getDate() - diff);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        
+        filteredLogs = validLogs.filter((log) => 
+          isWithinWeek(log.completedAt, weekStart, weekEnd)
+        );
+      } else if (timePeriod === "month") {
+        // Filter to show only workouts completed in the current selected month
+        filteredLogs = validLogs.filter((log) => 
+          isWithinMonth(log.completedAt, currentMonth, currentYear)
+        );
+      }
+
+      // Map filtered logs to Workout format
+      const workoutsFromLogs: Workout[] = filteredLogs.map((log) => {
+        const date = log.completedAt;
+        
+        // Format time manually to ensure consistency
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12;
+        const formattedMinutes = String(minutes).padStart(2, '0');
+        const timeString = `${formattedHours}:${formattedMinutes} ${ampm}`;
         
         return {
           date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
           dayOfWeek: dayNames[date.getDay()],
-          time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          time: timeString,
           name: log.workoutName,
           status: log.status === "in-progress" ? "partial" : log.status as "completed" | "partial" | "skipped",
-          phase: `Phase ${log.phaseNumber} Day ${log.dayNumber} Week ${log.weekNumber}`,
+          phase: `Day ${log.dayNumber} - Week ${log.weekNumber} - Phase ${log.phaseNumber}`,
           workoutLogExercises: log.exercises,
           duration: log.totalDuration ? `${log.totalDuration}m` : undefined,
           volume: log.totalVolume ? `${log.totalVolume.toLocaleString()} lb` : undefined,
           workoutLogId: log.id,
+          programName: log.programName,
+          phaseNumber: log.phaseNumber,
+          weekNumber: log.weekNumber,
+          dayNumber: log.dayNumber,
         };
       });
       
@@ -365,8 +420,6 @@ export default function WorkoutHistory() {
       // Generate mock date for display (you can replace with actual dates from Firebase)
       const date = new Date();
       date.setDate(date.getDate() - index);
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       
       return {
         date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
@@ -374,42 +427,22 @@ export default function WorkoutHistory() {
         time: index === 0 ? "9:00 AM" : "--:--",
         name: programWorkout.workoutName,
         status: (index === 0 ? "completed" : "completed") as "completed" | "partial" | "skipped",
-        phase: `Phase ${programWorkout.phaseOrder} - Day ${programWorkout.dayNumber}`,
+        phase: `Day ${programWorkout.dayNumber} - Phase ${programWorkout.phaseOrder}`, // Fallback mock
         programExercises: programWorkout.exercises,
         duration: index === 0 ? "1h 15m" : undefined,
         volume: index === 0 ? "15,240 lb" : undefined,
         avgRpe: index === 0 ? 8.5 : undefined,
+        // Mock values for fallback
+        programName: "Hypertrophy Program",
+        phaseNumber: programWorkout.phaseOrder,
+        weekNumber: 1,
+        dayNumber: programWorkout.dayNumber,
       };
     });
 
     // If no program workouts, fall back to mock data
-    const workoutsToUse = generatedWorkouts.length > 0 ? generatedWorkouts : mockWorkouts;
-
-    if (timePeriod === "month") {
-      // Show all workouts for the current month
-      return workoutsToUse;
-    } else if (timePeriod === "week" && selectedDate) {
-      // Show workouts for the selected week
-      const weekStart = new Date(selectedDate);
-      weekStart.setDate(selectedDate.getDate() - selectedDate.getDay()); // Start of week (Sunday)
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
-      
-      return workoutsToUse.filter((workout) => {
-        // In real app, you'd parse workout.date properly
-        // For now, return all for demonstration
-        return true;
-      });
-    } else if (timePeriod === "day" && selectedDate) {
-      // Show workouts for the selected day
-      return workoutsToUse.filter((workout) => {
-        // In real app, compare workout date with selectedDate
-        // For now, return first workout for demonstration
-        return workout === workoutsToUse[0];
-      });
-    }
-    return workoutsToUse;
-  }, [timePeriod, selectedDate, programWorkouts, workoutLogs]);
+    return generatedWorkouts.length > 0 ? generatedWorkouts : mockWorkouts;
+  }, [timePeriod, selectedDate, programWorkouts, workoutLogs, currentMonth, currentYear]);
 
   // Get display title based on time period
   const getWorkoutListTitle = () => {
@@ -429,7 +462,27 @@ export default function WorkoutHistory() {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
     const daysInMonth = lastDayOfMonth.getDate();
-    const startingDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday
+    const firstDay = firstDayOfMonth.getDay();
+    // Adjust for Monday start: Sunday (0) becomes 6, others shift down by 1
+    const startingDayOfWeek = firstDay === 0 ? 6 : firstDay - 1;
+
+    // Create a map of dates with workouts for O(1) lookup
+    const workoutDates = new Map();
+    workoutLogs.forEach(log => {
+      if (isValidDate(log.completedAt)) {
+        const dateKey = `${log.completedAt.getFullYear()}-${String(log.completedAt.getMonth() + 1).padStart(2, "0")}-${String(log.completedAt.getDate()).padStart(2, "0")}`;
+        // Store the workout details
+        // If multiple workouts on same day, prioritize "completed" or simply take the first one found
+        if (!workoutDates.has(dateKey) || log.status === "completed") {
+           workoutDates.set(dateKey, {
+             status: log.status,
+             phaseNumber: log.phaseNumber,
+             weekNumber: log.weekNumber,
+             dayNumber: log.dayNumber
+           });
+        }
+      }
+    });
 
     const days: Array<{
       day: number;
@@ -437,7 +490,10 @@ export default function WorkoutHistory() {
       isPreviousMonth: boolean;
       isNextMonth: boolean;
       date: Date;
-      status: "completed" | "partial" | "skipped" | null;
+      status: "completed" | "in-progress" | "skipped" | null;
+      phaseNumber?: number;
+      weekNumber?: number;
+      dayNumber?: number;
       isToday: boolean;
       isSelected: boolean;
     }> = [];
@@ -448,13 +504,19 @@ export default function WorkoutHistory() {
       for (let i = startingDayOfWeek - 1; i >= 0; i--) {
         const day = prevMonthLastDay - i;
         const date = new Date(currentYear, currentMonth - 1, day);
+        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+        const workoutData = workoutDates.get(dateKey);
+        
         days.push({
           day,
           isCurrentMonth: false,
           isPreviousMonth: true,
           isNextMonth: false,
           date,
-          status: null,
+          status: workoutData?.status || null,
+          phaseNumber: workoutData?.phaseNumber,
+          weekNumber: workoutData?.weekNumber,
+          dayNumber: workoutData?.dayNumber,
           isToday: false,
           isSelected: false,
         });
@@ -473,13 +535,18 @@ export default function WorkoutHistory() {
         currentMonth === selectedDate.getMonth() &&
         currentYear === selectedDate.getFullYear();
 
+      const workoutData = workoutDates.get(dateKey);
+
       days.push({
         day,
         isCurrentMonth: true,
         isPreviousMonth: false,
         isNextMonth: false,
         date,
-        status: mockWorkoutStatus[dateKey] || null,
+        status: workoutData?.status || null,
+        phaseNumber: workoutData?.phaseNumber,
+        weekNumber: workoutData?.weekNumber,
+        dayNumber: workoutData?.dayNumber,
         isToday,
         isSelected,
       });
@@ -489,20 +556,26 @@ export default function WorkoutHistory() {
     const remainingDays = 42 - days.length; // 6 rows * 7 days = 42
     for (let day = 1; day <= remainingDays; day++) {
       const date = new Date(currentYear, currentMonth + 1, day);
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      const workoutData = workoutDates.get(dateKey);
+      
       days.push({
         day,
         isCurrentMonth: false,
         isPreviousMonth: false,
         isNextMonth: true,
         date,
-        status: null,
+        status: workoutData?.status || null,
+        phaseNumber: workoutData?.phaseNumber,
+        weekNumber: workoutData?.weekNumber,
+        dayNumber: workoutData?.dayNumber,
         isToday: false,
         isSelected: false,
       });
     }
 
     return days;
-  }, [currentMonth, currentYear, today, selectedDate]);
+  }, [currentMonth, currentYear, today, selectedDate, workoutLogs]);
 
   // Get month name
   const monthNames = [
@@ -523,7 +596,7 @@ export default function WorkoutHistory() {
 
   const getStatusDotColor = (status: string | null) => {
     if (status === "completed") return "bg-green-500";
-    if (status === "partial") return "bg-orange-500";
+    if (status === "partial" || status === "in-progress") return "bg-orange-500";
     if (status === "skipped") return "bg-red-500";
     return "";
   };
@@ -685,7 +758,7 @@ export default function WorkoutHistory() {
 
             {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-1 text-center mb-2">
-              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+              {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((day) => (
                 <div key={day} className="text-xs font-medium text-muted-foreground py-2">
                   {day}
                 </div>
@@ -720,10 +793,18 @@ export default function WorkoutHistory() {
                   </span>
                   {dayData.status && (
                     <span
-                      className={`h-1.5 w-1.5 rounded-full mt-1 ${
-                        dayData.isToday || dayData.isSelected ? "bg-white" : getStatusDotColor(dayData.status)
+                      className={`text-[8px] font-bold mt-0.5 leading-tight whitespace-nowrap px-1 rounded ${
+                        dayData.isToday || dayData.isSelected 
+                          ? "text-white/90" 
+                          : dayData.status === "completed" 
+                            ? "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
+                            : dayData.status === "in-progress"
+                            ? "text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30"
+                            : "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30"
                       }`}
-                    ></span>
+                    >
+                      {`D${dayData.dayNumber}/W${dayData.weekNumber}/P${dayData.phaseNumber}`}
+                    </span>
                   )}
                 </div>
               ))}
@@ -776,9 +857,11 @@ export default function WorkoutHistory() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
             <div className="flex flex-col gap-1">
               <h3 className="text-xl font-bold text-card-foreground">{getWorkoutListTitle()}</h3>
-              <span className="text-sm font-medium text-muted-foreground">
-                Hypertrophy Phase 2 - Week 3
-              </span>
+              {filteredWorkouts.length > 0 && filteredWorkouts[0].programName && (
+                <span className="text-sm font-medium text-muted-foreground">
+                  {filteredWorkouts[0].programName}
+                </span>
+              )}
             </div>
           </div>
 
@@ -801,34 +884,13 @@ export default function WorkoutHistory() {
               >
                 <summary className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-5 cursor-pointer hover:bg-accent/50 transition-colors select-none relative list-none">
                   <div className="flex items-center gap-4 min-w-[120px]">
-                    {index === 0 ? (
-                      <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/30">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-muted text-muted-foreground border border-border">
-                        <span className="text-xs font-bold uppercase tracking-wide">{workout.date.split(" ")[0]}</span>
-                        <span className="text-xl font-bold leading-none">{workout.date.split(" ")[1]}</span>
-                      </div>
-                    )}
+                    <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-muted text-muted-foreground border border-border">
+                      <span className="text-xs font-bold uppercase tracking-wide">{workout.date.split(" ")[0]}</span>
+                      <span className="text-xl font-bold leading-none">{workout.date.split(" ")[1]}</span>
+                    </div>
                     <div>
-                      {index === 0 ? (
-                        <>
-                          <p className="text-muted-foreground text-xs">{workout.time}</p>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
-                              DONE
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <h4 className="text-card-foreground font-bold text-base">{workout.dayOfWeek}</h4>
-                          <p className="text-muted-foreground text-xs">{workout.time}</p>
-                        </>
-                      )}
+                      <h4 className="text-card-foreground font-bold text-base">{workout.dayOfWeek}</h4>
+                      <p className="text-muted-foreground text-xs">{workout.time}</p>
                     </div>
                   </div>
 
@@ -874,7 +936,6 @@ export default function WorkoutHistory() {
                     {/* Phase Info Header */}
                     {workout.phase && (
                       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                        <span className="text-xs font-bold uppercase tracking-wide text-primary">Phase:</span>
                         <span className="text-sm font-medium text-card-foreground">{workout.phase}</span>
                       </div>
                     )}
@@ -926,7 +987,6 @@ export default function WorkoutHistory() {
                     {/* Phase Info Header */}
                     {workout.phase && (
                       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                        <span className="text-xs font-bold uppercase tracking-wide text-primary">Phase:</span>
                         <span className="text-sm font-medium text-card-foreground">{workout.phase}</span>
                       </div>
                     )}
