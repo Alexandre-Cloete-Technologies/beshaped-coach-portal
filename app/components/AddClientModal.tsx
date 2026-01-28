@@ -15,10 +15,21 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
   const [loading, setLoading] = useState(false);
   const [programs, setPrograms] = useState<string[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
+
+  // Static coaches data
+  const staticCoaches = [
+    { id: "c1", name: "Coach Mike" },
+    { id: "c2", name: "Sarah Connor" },
+    { id: "c3", name: "John Doe" },
+  ];
+
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     currentProgram: "",
+    role: "client",
+    assignedCoach: "",
+    goals: "",
   });
 
   // Fetch programs from Firebase when modal opens
@@ -64,6 +75,9 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
       username: "",
       email: "",
       currentProgram: "",
+      role: "client",
+      assignedCoach: "",
+      goals: "",
     });
   };
 
@@ -78,8 +92,9 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         email: formData.email,
         username: formData.username,
         profilePhoto: "",
-        role: "client",
-        assignedCoachId: null,
+        role: formData.role,
+        assignedCoachId: formData.assignedCoach || null, // Storing name as ID for now based on text input
+        goals: formData.goals,
         onboardingCompleted: false,
         createdAt: Timestamp.now(),
         lastActive: Timestamp.now(),
@@ -103,6 +118,9 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         username: "",
         email: "",
         currentProgram: "",
+        role: "client",
+        assignedCoach: "",
+        goals: "",
       });
 
       // Notify parent component
@@ -171,45 +189,102 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-card-foreground mb-2">
-                Assign the client a training program
-              </label>
-              {loadingPrograms ? (
-                <div className="flex items-center justify-center p-3 rounded-lg border border-border bg-background min-h-[100px]">
-                  <p className="text-sm text-muted-foreground">Loading programs...</p>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-border bg-background min-h-[100px] max-h-[200px] overflow-y-auto">
-                  {programs.length > 0 ? (
-                    programs.map((program) => (
-                      <button
-                        key={program}
-                        type="button"
-                        onClick={() => selectProgram(program)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          formData.currentProgram === program
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                      >
-                        {formData.currentProgram === program && (
-                          <Check className="w-3 h-3 inline mr-1" />
-                        )}
-                        {program}
-                      </button>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No programs available</p>
-                  )}
-                </div>
-              )}
-              {formData.currentProgram && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Selected: <span className="font-medium text-card-foreground">{formData.currentProgram}</span>
-                </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-card-foreground mb-2">
+                  Role
+                </label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                  className="w-full h-11 px-4 rounded-lg border border-border bg-background text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                >
+                  <option value="client">Client</option>
+                  <option value="coach">Coach</option>
+                </select>
+              </div>
+
+              {formData.role === "client" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-card-foreground mb-2">
+                      Assigned Coach
+                    </label>
+                    <select
+                      name="assignedCoach"
+                      value={formData.assignedCoach}
+                      onChange={(e) => setFormData(prev => ({ ...prev, assignedCoach: e.target.value }))}
+                      className="w-full h-11 px-4 rounded-lg border border-border bg-background text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                    >
+                      <option value="">Select a Coach</option>
+                      {staticCoaches.map((coach) => (
+                        <option key={coach.id} value={coach.name}>
+                          {coach.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
             </div>
+
+            {formData.role === "client" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-card-foreground mb-2">
+                    Goals
+                  </label>
+                  <textarea
+                    name="goals"
+                    value={formData.goals}
+                    onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
+                    className="w-full h-24 px-4 py-3 rounded-lg border border-border bg-background text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                    placeholder="e.g. Lose 5kg, Improve squat form..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-card-foreground mb-2">
+                    Assign the client a training program
+                  </label>
+                  {loadingPrograms ? (
+                    <div className="flex items-center justify-center p-3 rounded-lg border border-border bg-background min-h-[100px]">
+                      <p className="text-sm text-muted-foreground">Loading programs...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-border bg-background min-h-[100px] max-h-[200px] overflow-y-auto">
+                      {programs.length > 0 ? (
+                        programs.map((program) => (
+                          <button
+                            key={program}
+                            type="button"
+                            onClick={() => selectProgram(program)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                              formData.currentProgram === program
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            }`}
+                          >
+                            {formData.currentProgram === program && (
+                              <Check className="w-3 h-3 inline mr-1" />
+                            )}
+                            {program}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No programs available</p>
+                      )}
+                    </div>
+                  )}
+                  {formData.currentProgram && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Selected: <span className="font-medium text-card-foreground">{formData.currentProgram}</span>
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </form>
 
