@@ -642,32 +642,12 @@ export default function WorkoutHistory() {
           />
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <button className="flex items-center gap-2 px-4 h-10 text-sm font-semibold text-card-foreground bg-card border border-border rounded-lg hover:bg-accent transition-colors">
-            <Filter className="w-4 h-4" />
-            Filter
-          </button>
+
           <button className="flex items-center gap-2 px-4 h-10 text-sm font-semibold text-card-foreground bg-card border border-border rounded-lg hover:bg-accent transition-colors">
             <Download className="w-4 h-4" />
             Export
           </button>
-          <div className="flex bg-card border border-border rounded-lg p-1 h-10 items-center">
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === "list" ? "bg-accent text-card-foreground" : "text-muted-foreground hover:text-card-foreground"
-              }`}
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === "calendar" ? "bg-accent text-card-foreground" : "text-muted-foreground hover:text-card-foreground"
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-          </div>
+
         </div>
       </div>
 

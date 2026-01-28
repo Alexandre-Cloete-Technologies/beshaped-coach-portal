@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, AlertTriangle, Check, Target } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export interface ClientData {
   id: string;
@@ -104,6 +105,7 @@ function ProgressBar({ current, total }: ProgressBarProps) {
 }
 
 export default function ClientCard({ client }: { client: ClientData }) {
+  const router = useRouter();
   const colors = statusColors[client.status];
   const isAlert = client.status === "low" || client.status === "critical";
   const programProgress = Math.round((client.week / client.totalWeeks) * 100);
@@ -125,7 +127,8 @@ export default function ClientCard({ client }: { client: ClientData }) {
 
   return (
     <div 
-      className={`bg-card rounded-2xl border ${isAlert ? 'border-red-300 dark:border-red-800 shadow-red-100 dark:shadow-red-900/20' : 'border-border'} p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4`}
+      onClick={() => router.push(`/clients/${client.id}`)}
+      className={`bg-card rounded-2xl border ${isAlert ? 'border-red-300 dark:border-red-800 shadow-red-100 dark:shadow-red-900/20' : 'border-border'} p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4 cursor-pointer`}
     >
       {/* Header: Photo, Name, Status */}
       <div className="flex items-start justify-between">

@@ -201,9 +201,7 @@ export default function ClientDetailPage() {
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400">
                       📅 Member since {String(client.memberSince)}
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400">
-                      🔥 {Number(client.streak)} Day Streak
-                    </span>
+
                   </div>
                 </div>
               </div>
