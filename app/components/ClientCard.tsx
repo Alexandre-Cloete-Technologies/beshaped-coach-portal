@@ -17,7 +17,8 @@ export interface ClientData {
   totalWorkouts: number;
   completedWorkouts: number;
   totalWorkoutsInProgram?: number;
-  weight: number;
+  weight: number | null;
+  weightUnit?: string;
   weightChange: number;
   lastWorkout: string;
   status: "high" | "medium" | "low" | "critical" | "perfect";
@@ -150,7 +151,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
 
       {/* Main Content: Circular Progress + Stats */}
       <div className="flex gap-4">
-        <CircularProgress percentage={client.compliance} status={client.status} />
+        {/* <CircularProgress percentage={client.compliance} status={client.status} /> */}
         
         <div className="flex-1 space-y-2">
           {/* Program Progress */}
@@ -169,10 +170,10 @@ export default function ClientCard({ client }: { client: ClientData }) {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Bodyweight</span>
               <span className="font-medium text-card-foreground">
-                {client.weight} kg 
-                {client.weightChange !== 0 && (
+                {client.weight !== null ? `${client.weight} ${client.weightUnit || "kg"}` : "N/A"}
+                {client.weight !== null && client.weightChange !== 0 && (
                   <span className={client.weightChange < 0 ? "text-emerald-500" : "text-red-500"}>
-                    {" "}({client.weightChange > 0 ? "+" : ""}{client.weightChange} kg)
+                    {" "}({client.weightChange > 0 ? "+" : ""}{client.weightChange} {client.weightUnit || "kg"})
                   </span>
                 )}
               </span>
@@ -189,7 +190,6 @@ export default function ClientCard({ client }: { client: ClientData }) {
             </div>
             {client.goals && (
               <div className="flex items-start gap-1.5 pt-1">
-                <Target className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <span className="text-muted-foreground">Goals: </span>
                   <span className="font-medium text-card-foreground">{client.goals}</span>

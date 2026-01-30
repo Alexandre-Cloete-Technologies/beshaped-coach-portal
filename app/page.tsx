@@ -5,7 +5,6 @@ import Sidebar from "./components/Sidebar";
 import StatsCard from "./components/StatsCard";
 import SearchBar from "./components/SearchBar";
 import ClientCard, { ClientData } from "./components/ClientCard";
-import AddClientCard from "./components/AddClientCard";
 import Pagination from "./components/Pagination";
 import AddClientModal from "./components/AddClientModal";
 import { useEffect, useState, useMemo } from "react";
@@ -147,11 +146,11 @@ export default function Home() {
   const [isPopulating, setIsPopulating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const populateWeightLogs = async () => {
+  const populateBodyWeightLogs = async () => {
     try {
       setIsPopulating(true);
       
-      const weightLogsCollection = collection(db, "weightLogs");
+      const bodyWeightLogsCollection = collection(db, "bodyWeightLogs");
       
       // Get some users to create references
       const usersSnapshot = await getDocs(collection(db, "users"));
@@ -162,19 +161,26 @@ export default function Home() {
       }
       
       const userDocs = usersSnapshot.docs;
-      const addDoc = (await import("firebase/firestore")).addDoc;
+      const { addDoc, Timestamp } = await import("firebase/firestore");
       
       // Create sample weight logs for multiple users over time
-      const sampleWeightLogs = [];
+      const sampleBodyWeightLogs = [];
       
       // For first user - progressive weight loss journey
       for (let i = 0; i < 5; i++) {
-        sampleWeightLogs.push({
+        const date = new Date(Date.now() - (30 * i) * 24 * 60 * 60 * 1000);
+        sampleBodyWeightLogs.push({
           userId: userDocs[0].ref,
-          photoTakenDate: new Date(Date.now() - (30 * i) * 24 * 60 * 60 * 1000), // Every 30 days
-          weight: 85 - (i * 1.5), // Gradual weight loss
+          photoTakenDate: date,
+          weight: 85 - (i * 1.5),
           weightUnit: "kg" as const,
-          photos: i === 0 ? ["https://example.com/photo1.jpg", "https://example.com/photo2.jpg"] : [],
+          photos: i === 0 || i === 4 ? [{
+            url: `https://example.com/photo${i}.jpg`,
+            dateTaken: date.toISOString().split('T')[0], // "YYYY-MM-DD"
+            timestampTaken: Timestamp.fromDate(date),
+            notes: i === 0 ? "Initial starting point" : "Check-in photo",
+            type: "front" as const
+          }] : [],
           notes: i === 0 ? "Starting my fitness journey!" : i === 4 ? "Feeling great!" : null,
           measurements: {
             waist: 95 - (i * 2),
@@ -183,19 +189,26 @@ export default function Home() {
             arms: 35 - (i * 0.5),
             unit: "cm" as const,
           },
-          createdAt: new Date(Date.now() - (30 * i) * 24 * 60 * 60 * 1000),
+          createdAt: Timestamp.fromDate(date),
         });
       }
       
       // For second user - muscle gain journey (if exists)
       if (userDocs.length > 1) {
         for (let i = 0; i < 4; i++) {
-          sampleWeightLogs.push({
+          const date = new Date(Date.now() - (21 * i) * 24 * 60 * 60 * 1000);
+          sampleBodyWeightLogs.push({
             userId: userDocs[1].ref,
-            photoTakenDate: new Date(Date.now() - (21 * i) * 24 * 60 * 60 * 1000), // Every 3 weeks
-            weight: 165 + (i * 3), // Gradual weight gain
+            photoTakenDate: date,
+            weight: 165 + (i * 3),
             weightUnit: "lbs" as const,
-            photos: i === 3 ? ["https://example.com/progress1.jpg"] : [],
+             photos: i === 3 ? [{
+              url: "https://example.com/progress1.jpg",
+              dateTaken: date.toISOString().split('T')[0],
+              timestampTaken: Timestamp.fromDate(date),
+              notes: "Flexing",
+              type: "front" as const
+            }] : [],
             notes: i === 3 ? "New PR on deadlift!" : null,
             measurements: {
               waist: 32,
@@ -203,7 +216,7 @@ export default function Home() {
               arms: 15 + (i * 0.3),
               unit: "inches" as const,
             },
-            createdAt: new Date(Date.now() - (21 * i) * 24 * 60 * 60 * 1000),
+            createdAt: Timestamp.fromDate(date),
           });
         }
       }
@@ -211,27 +224,28 @@ export default function Home() {
       // For third user - maintenance (if exists)
       if (userDocs.length > 2) {
         for (let i = 0; i < 3; i++) {
-          sampleWeightLogs.push({
+          const date = new Date(Date.now() - (14 * i) * 24 * 60 * 60 * 1000);
+          sampleBodyWeightLogs.push({
             userId: userDocs[2].ref,
-            photoTakenDate: new Date(Date.now() - (14 * i) * 24 * 60 * 60 * 1000), // Every 2 weeks
-            weight: 70 + (Math.random() * 0.5 - 0.25), // Slight fluctuation
+            photoTakenDate: date,
+            weight: 70 + (Math.random() * 0.5 - 0.25),
             weightUnit: "kg" as const,
             photos: [],
             notes: null,
-            createdAt: new Date(Date.now() - (14 * i) * 24 * 60 * 60 * 1000),
+            createdAt: Timestamp.fromDate(date),
           });
         }
       }
       
       // Add all documents to Firestore
-      for (const weightLog of sampleWeightLogs) {
-        await addDoc(weightLogsCollection, weightLog);
+      for (const log of sampleBodyWeightLogs) {
+        await addDoc(bodyWeightLogsCollection, log);
       }
       
-      alert(`Successfully created ${sampleWeightLogs.length} weight logs!`);
+      alert(`Successfully created ${sampleBodyWeightLogs.length} bodyWeightLogs!`);
     } catch (error) {
-      console.error("Error populating weight logs:", error);
-      alert("Error creating weight logs. Check console for details.");
+      console.error("Error populating bodyWeightLogs:", error);
+      alert("Error creating bodyWeightLogs. Check console for details.");
     } finally {
       setIsPopulating(false);
     }
@@ -435,6 +449,7 @@ export default function Home() {
         setLoading(true);
         const usersCollection = collection(db, "users");
         const usersSnapshot = await getDocs(usersCollection);
+        const { query, where, orderBy, limit } = await import("firebase/firestore");
         
         // Fetch all userPrograms
         const userProgramsCollection = collection(db, "userPrograms");
@@ -467,6 +482,34 @@ export default function Home() {
           usersSnapshot.docs.map(async (doc) => {
             const data = doc.data();
             
+            // Fetch latest body weight log
+            let weight: number | null = null;
+            let weightUnit = "kg";
+            try {
+              const bodyWeightLogsRef = collection(db, "bodyWeightLogs");
+              const weightQuery = query(
+                bodyWeightLogsRef,
+                where("userId", "==", doc.ref)
+              );
+              const weightSnapshot = await getDocs(weightQuery);
+              
+              if (!weightSnapshot.empty) {
+                // Client-side sort
+                const logs = weightSnapshot.docs.map(d => d.data());
+                logs.sort((a, b) => {
+                  const dateA = a.photoTakenDate?.toDate ? a.photoTakenDate.toDate() : new Date(a.photoTakenDate || 0);
+                  const dateB = b.photoTakenDate?.toDate ? b.photoTakenDate.toDate() : new Date(b.photoTakenDate || 0);
+                  return dateB.getTime() - dateA.getTime();
+                });
+                
+                const latestLog = logs[0];
+                weight = latestLog.weight !== undefined ? latestLog.weight : null;
+                weightUnit = latestLog.weightUnit || "kg";
+              }
+            } catch (err) {
+              console.error("Error fetching weight logs for user", doc.id, err);
+            }
+
             // Generate avatar gradient based on user ID
             const gradients = [
               "bg-gradient-to-br from-blue-500 to-indigo-600",
@@ -518,11 +561,13 @@ export default function Home() {
               totalWorkouts: userProgramData?.totalWorkoutsCompleted || 0,
               completedWorkouts: userProgramData?.totalWorkoutsCompleted || 0,
               totalWorkoutsInProgram: userProgramData?.totalWorkoutsInProgram || 0,
-              weight: 0,
+              weight: weight,
+              weightUnit: weightUnit,
               weightChange: 0,
               lastWorkout: "No activity",
               status: "medium",
               nextWorkout: "Not scheduled",
+              goals: data.goals || "",
             };
           })
         );
@@ -573,11 +618,11 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-3">
               <button 
-                onClick={populateWeightLogs}
+                onClick={populateBodyWeightLogs}
                 disabled={isPopulating}
                 className="h-11 px-5 rounded-xl bg-blue-600 text-white font-medium flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isPopulating ? "Populating..." : "Populate WeightLogs"}
+                {isPopulating ? "Populating..." : "populate BodyWeightLogs"}
               </button>
               <button 
                 onClick={populateWorkoutLogs}
@@ -596,12 +641,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
-            <StatsCard type="active" value={24} label="Total Active" />
-            <StatsCard type="attention" value={3} label="Needs Attention" />
-            <StatsCard type="compliance" value="87%" label="Avg. Compliance" />
-          </div>
 
           {/* Search Bar */}
           <div className="mb-8">
@@ -619,7 +658,6 @@ export default function Home() {
                 {filteredClients.map((client) => (
                   <ClientCard key={client.id} client={client} />
                 ))}
-                <AddClientCard onClick={() =>setIsModalOpen(true)} />
               </>
             ) : (
               <div className="col-span-full text-center py-12">
