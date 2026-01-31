@@ -6,7 +6,7 @@ import Pagination from "../components/Pagination";
 import AddClientModal from "../components/AddClientModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // Mock client data for the table
@@ -90,55 +90,82 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const usersCollection = collection(db, "users");
-        const usersSnapshot = await getDocs(usersCollection);
+    try {
+      setLoading(true);
+      const usersCollection = collection(db, "users");
+      const usersSnapshot = await getDocs(usersCollection);
+      
+      const fetchedUsers = await Promise.all(usersSnapshot.docs.map(async (doc) => {
+        const data = doc.data();
         
-        const fetchedUsers = usersSnapshot.docs.map((doc) => {
-          const data = doc.data();
-          
-          // Generate avatar gradient based on user ID
-          const gradients = [
-            "bg-gradient-to-br from-rose-400 to-pink-600",
-            "bg-gradient-to-br from-purple-400 to-purple-600",
-            "bg-gradient-to-br from-emerald-400 to-teal-600",
-            "bg-gradient-to-br from-amber-400 to-orange-600",
-            "bg-gradient-to-br from-blue-400 to-indigo-600",
-          ];
-          const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
-          
-          return {
-            id: doc.id,
-            name: data.displayName || data.username || "Unknown User",
-            email: data.email || "No email",
-            avatarGradient: gradients[gradientIndex],
-            status: "Active", // Default for now
-            currentProgram: "No Program", // Will be updated when we integrate programs
-            programProgress: 0,
-            lastActive: "Recently",
-            engagement: "Medium",
-          };
-        });
+        // Generate avatar gradient based on user ID
+        const gradients = [
+          "bg-gradient-to-br from-rose-400 to-pink-600",
+          "bg-gradient-to-br from-purple-400 to-purple-600",
+          "bg-gradient-to-br from-emerald-400 to-teal-600",
+          "bg-gradient-to-br from-amber-400 to-orange-600",
+          "bg-gradient-to-br from-blue-400 to-indigo-600",
+        ];
+        const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
+        
+        // Resolve current program name if it's a reference
+        let programName = "No Program";
+        if (data.currentProgram) {
+          if (typeof data.currentProgram === 'string') {
+            programName = data.currentProgram;
+          } else if (typeof data.currentProgram === 'object' && data.currentProgram.path) {
+            // It's a reference
+            try {
+              const programDoc = await getDoc(data.currentProgram);
+              if (programDoc.exists()) {
+                programName = (programDoc.data() as any)?.name || "Unknown Program";
+              }
+            } catch (err) {
+              console.error("Error fetching program name:", err);
+            }
+          }
+        }
 
-        // Combine Firebase users with mock clients (keeping mock clients for now)
-        setClients([...fetchedUsers, ...mockClients]);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching users:", err);
-        setError("Failed to load users from database");
-        // Keep using mock clients on error
-        setClients(mockClients);
-      } finally {
-        setLoading(false);
-      }
-    };
+        return {
+          id: doc.id,
+          name: data.displayName || data.username || "Unknown User",
+          email: data.email || "No email",
+          avatarGradient: gradients[gradientIndex],
+          status: "Active", // Default for now
+          currentProgram: programName,
+          programProgress: 0,
+          lastActive: "Recently",
+          engagement: "Medium",
+        };
+      }));
+
+      // Combine Firebase users with mock clients (keeping mock clients for now)
+      setClients([...fetchedUsers, ...mockClients]);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setError("Failed to load users from database");
+      // Keep using mock clients on error
+      setClients(mockClients);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const filteredClients = clients.filter(client => {
+    const query = searchQuery.toLowerCase();
+    const name = client.name ? client.name.toString().toLowerCase() : "";
+    const program = client.currentProgram ? client.currentProgram.toString().toLowerCase() : "";
+    
+    return name.includes(query) || program.includes(query);
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -167,6 +194,8 @@ export default function ClientsPage() {
                 <input
                   type="text"
                   placeholder="Search clients..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full h-10 pl-10 pr-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                 />
               </div>
@@ -226,14 +255,14 @@ export default function ClientsPage() {
                       {error}
                     </td>
                   </tr>
-                ) : clients.length === 0 ? (
+                ) : filteredClients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                       No clients found
                     </td>
                   </tr>
                 ) : (
-                  clients.map((client, index) => {
+                  filteredClients.map((client, index) => {
                   const engagement = engagementConfig[client.engagement as keyof typeof engagementConfig];
                   const initials = client.avatarInitials || client.name.split(' ').map(n => n[0]).join('');
                   
@@ -291,12 +320,12 @@ export default function ClientsPage() {
                               {client.currentProgram}
                             </p>
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              {/* <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-blue-500 rounded-full transition-all"
                                   style={{ width: `${client.programProgress}%` }}
                                 />
-                              </div>
+                              </div> */}
                             </div>
                           </div>
                         </Link>
