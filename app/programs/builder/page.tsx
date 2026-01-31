@@ -7,6 +7,7 @@ import {
   Info, 
   Plus, 
   ChevronDown, 
+  ChevronRight,
   X, 
   Clock, 
   Hotel,
@@ -17,6 +18,9 @@ import {
   Dumbbell
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useMemo } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // Mock template data
 const mockTemplates = [
@@ -43,10 +47,204 @@ interface Phase {
   isExpanded: boolean;
 }
 
+interface Exercise {
+  id: string;
+  name: string;
+  muscleGroup: string;
+  equipment: string;
+  difficulty: "beginner" | "intermediate" | "advanced";
+  description?: string;
+  instructions?: string[];
+  videoUrl?: string;
+  createdAt?: Date;
+}
+
+// Define muscle group order
+const muscleGroupOrder = [
+  "Chest",
+  "Back", 
+  "Shoulders",
+  "Arms",
+  "Legs",
+  "Core",
+  "Full Body",
+  "Cardio",
+  "Other"
+];
+
+const mockExercises: Exercise[] = [
+  { id: "1", name: "Barbell Bench Press", muscleGroup: "Chest", equipment: "Barbell", difficulty: "intermediate", description: "Compound chest exercise" },
+  { id: "2", name: "Incline Dumbbell Press", muscleGroup: "Chest", equipment: "Dumbbells", difficulty: "intermediate", description: "Upper chest focus" },
+  { id: "3", name: "Cable Flyes", muscleGroup: "Chest", equipment: "Cable Machine", difficulty: "beginner", description: "Chest isolation movement" },
+  { id: "4", name: "Push-ups", muscleGroup: "Chest", equipment: "Bodyweight", difficulty: "beginner", description: "Classic bodyweight exercise" },
+  { id: "5", name: "Pull-ups", muscleGroup: "Back", equipment: "Pull-up Bar", difficulty: "intermediate", description: "Lat-focused compound movement" },
+  { id: "6", name: "Barbell Rows", muscleGroup: "Back", equipment: "Barbell", difficulty: "intermediate", description: "Horizontal pulling movement" },
+  { id: "7", name: "Lat Pulldowns", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner", description: "Machine lat exercise" },
+  { id: "8", name: "Seated Cable Rows", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner", description: "Back thickness builder" },
+  { id: "9", name: "Deadlift", muscleGroup: "Back", equipment: "Barbell", difficulty: "advanced", description: "Full posterior chain" },
+  { id: "10", name: "Overhead Press", muscleGroup: "Shoulders", equipment: "Barbell", difficulty: "intermediate", description: "Compound shoulder press" },
+  { id: "11", name: "Lateral Raises", muscleGroup: "Shoulders", equipment: "Dumbbells", difficulty: "beginner", description: "Side delt isolation" },
+  { id: "12", name: "Face Pulls", muscleGroup: "Shoulders", equipment: "Cable Machine", difficulty: "beginner", description: "Rear delt and rotator cuff" },
+  { id: "13", name: "Barbell Curl", muscleGroup: "Arms", equipment: "Barbell", difficulty: "beginner", description: "Bicep builder" },
+  { id: "14", name: "Tricep Pushdowns", muscleGroup: "Arms", equipment: "Cable Machine", difficulty: "beginner", description: "Tricep isolation" },
+  { id: "15", name: "Hammer Curls", muscleGroup: "Arms", equipment: "Dumbbells", difficulty: "beginner", description: "Brachialis focus" },
+  { id: "16", name: "Barbell Back Squat", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate", description: "King of leg exercises" },
+  { id: "17", name: "Romanian Deadlift", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate", description: "Hamstring focus" },
+  { id: "18", name: "Leg Press", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Quad-focused machine" },
+  { id: "19", name: "Leg Curls", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Hamstring isolation" },
+  { id: "20", name: "Calf Raises", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Calf development" },
+  { id: "21", name: "Plank", muscleGroup: "Core", equipment: "Bodyweight", difficulty: "beginner", description: "Core stability" },
+  { id: "22", name: "Cable Crunches", muscleGroup: "Core", equipment: "Cable Machine", difficulty: "beginner", description: "Weighted ab exercise" },
+  { id: "23", name: "Hanging Leg Raises", muscleGroup: "Core", equipment: "Pull-up Bar", difficulty: "intermediate", description: "Lower ab focus" },
+];
+
+// Map specific muscles to broader categories
+const muscleToCategory: Record<string, string> = {
+  // Chest
+  "chest": "Chest", "pectorals": "Chest", "pecs": "Chest", "upper chest": "Chest", "lower chest": "Chest",
+  // Back
+  "back": "Back", "lats": "Back", "latissimus dorsi": "Back", "rhomboids": "Back", "traps": "Back", "trapezius": "Back", "lower back": "Back", "erector spinae": "Back", "rear delts": "Back", "upper back": "Back", "mid back": "Back",
+  // Shoulders
+  "shoulders": "Shoulders", "delts": "Shoulders", "deltoids": "Shoulders", "front delts": "Shoulders", "side delts": "Shoulders", "lateral delts": "Shoulders", "anterior deltoid": "Shoulders", "posterior deltoid": "Shoulders", "rotator cuff": "Shoulders",
+  // Arms
+  "arms": "Arms", "biceps": "Arms", "triceps": "Arms", "forearms": "Arms", "brachialis": "Arms", "bicep": "Arms", "tricep": "Arms", "forearm": "Arms", "wrists": "Arms",
+  // Legs
+  "legs": "Legs", "quads": "Legs", "quadriceps": "Legs", "hamstrings": "Legs", "glutes": "Legs", "gluteus": "Legs", "calves": "Legs", "calf": "Legs", "hip flexors": "Legs", "adductors": "Legs", "abductors": "Legs", "thighs": "Legs", "lower body": "Legs",
+  // Core
+  "core": "Core", "abs": "Core", "abdominals": "Core", "obliques": "Core", "lower abs": "Core", "upper abs": "Core", "transverse abdominis": "Core", "hip": "Core", "pelvis": "Core",
+  // Full Body
+  "full body": "Full Body", "compound": "Full Body", "total body": "Full Body", "whole body": "Full Body",
+  // Cardio
+  "cardio": "Cardio", "cardiovascular": "Cardio", "heart": "Cardio", "conditioning": "Cardio", "endurance": "Cardio",
+};
+
+// Function to get category from muscle name
+const getCategoryFromMuscle = (muscle: string): string => {
+  if (!muscle) return "Other";
+  const normalized = muscle.toLowerCase().trim();
+  if (muscleToCategory[normalized]) return muscleToCategory[normalized];
+  for (const [key, category] of Object.entries(muscleToCategory)) {
+    if (normalized.includes(key) || key.includes(normalized)) return category;
+  }
+  for (const category of muscleGroupOrder) {
+    if (normalized.includes(category.toLowerCase())) return category;
+  }
+  return "Other";
+};
+
 export default function ProgramBuilderPage() {
   const [programName, setProgramName] = useState("Summer Shred 2024");
   const [sidebarTab, setSidebarTab] = useState<"templates" | "exercises">("templates");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Exercises State
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [loadingExercises, setLoadingExercises] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Fetch exercises from Firebase on mount
+  useEffect(() => {
+    const fetchExercises = async () => {
+      try {
+        setLoadingExercises(true);
+        const exercisesCollection = collection(db, "exercises");
+        const exercisesSnapshot = await getDocs(exercisesCollection);
+        
+        if (!exercisesSnapshot.empty) {
+          const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            let rawMuscle = data.muscleGroup || 
+                           data.muscle_group || 
+                           data.muscle || 
+                           data.muscles || 
+                           data.target || 
+                           data.bodyPart || 
+                           data.primaryMuscle || 
+                           data.primary_muscle || 
+                           data.musclesInvolved ||
+                           data.muscles_involved ||
+                           data.muscleGroups ||
+                           data.muscle_groups ||
+                           data.category ||
+                           data.primaryGroup ||
+                           "";
+            
+            if (Array.isArray(rawMuscle) && rawMuscle.length > 0) rawMuscle = rawMuscle[0];
+            else if (rawMuscle && typeof rawMuscle === 'object') {
+              const muscleObj = rawMuscle as any;
+              rawMuscle = muscleObj.name || muscleObj.title || muscleObj.slug || "";
+            }
+            
+            return {
+              id: doc.id,
+              name: data.name || "Unnamed Exercise",
+              muscleGroup: getCategoryFromMuscle(String(rawMuscle)),
+              equipment: data.equipment || "None",
+              difficulty: data.difficulty || "intermediate",
+              description: data.description,
+              instructions: data.instructions,
+              videoUrl: data.videoUrl,
+            };
+          });
+          setExercises(fetchedExercises.length > 0 ? fetchedExercises : mockExercises);
+        } else {
+            setExercises(mockExercises);
+        }
+      } catch (error) {
+        console.error("Error fetching exercises:", error);
+        setExercises(mockExercises);
+      } finally {
+        setLoadingExercises(false);
+      }
+    };
+
+    fetchExercises();
+  }, []);
+
+  // Group exercises by muscle group
+  const groupedExercises = useMemo(() => {
+    const groups: Record<string, Exercise[]> = {};
+    muscleGroupOrder.forEach(group => { groups[group] = []; });
+    
+    // Filter exercises if search query exists and tab is exercises
+    // Note: We use the same search query for both tabs, which is fine
+    const filtered = (sidebarTab === "exercises" && searchQuery.trim())
+      ? exercises.filter(ex => 
+          ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          ex.muscleGroup.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : exercises;
+    
+    filtered.forEach(exercise => {
+      const group = muscleGroupOrder.includes(exercise.muscleGroup) ? exercise.muscleGroup : "Other";
+      groups[group].push(exercise);
+    });
+    
+    return groups;
+  }, [exercises, searchQuery, sidebarTab]);
+
+  // Auto-expand groups when searching
+  useEffect(() => {
+    if (searchQuery.trim() && sidebarTab === "exercises") {
+      // Expand all groups that have matching exercises
+      const groupsWithMatches = new Set<string>();
+      Object.entries(groupedExercises).forEach(([group, exs]) => {
+        if (exs.length > 0) {
+          groupsWithMatches.add(group);
+        }
+      });
+      setExpandedGroups(groupsWithMatches);
+    }
+  }, [searchQuery, groupedExercises, sidebarTab]);
+
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  };
   
   const [phases, setPhases] = useState<Phase[]>([
     {
@@ -162,48 +360,114 @@ export default function ProgramBuilderPage() {
 
           {/* Draggable List */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {recentTemplates.length > 0 && (
+            {sidebarTab === "templates" ? (
               <>
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">Recent</div>
-                {recentTemplates.map((template) => (
-                  <div 
-                    key={template.id}
-                    className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
-                    draggable
-                  >
-                    <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{template.exercises} Exercises • {template.duration} min</p>
-                    </div>
-                    <button className="text-muted-foreground hover:text-foreground">
-                      <Info className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                {recentTemplates.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">Recent</div>
+                    {recentTemplates.map((template) => (
+                      <div 
+                        key={template.id}
+                        className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
+                        draggable
+                      >
+                        <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{template.exercises} Exercises • {template.duration} min</p>
+                        </div>
+                        <button className="text-muted-foreground hover:text-foreground">
+                          <Info className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+                
+                {strengthTemplates.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-4">Strength</div>
+                    {strengthTemplates.map((template) => (
+                      <div 
+                        key={template.id}
+                        className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
+                        draggable
+                      >
+                        <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{template.exercises} Exercises • {template.duration} min</p>
+                        </div>
+                        <button className="text-muted-foreground hover:text-foreground">
+                          <Info className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+                
+                {recentTemplates.length === 0 && strengthTemplates.length === 0 && (
+                   <div className="text-center py-8 text-muted-foreground text-sm">
+                     No templates found matching "{searchQuery}"
+                   </div>
+                )}
               </>
-            )}
-            
-            {strengthTemplates.length > 0 && (
-              <>
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-4">Strength</div>
-                {strengthTemplates.map((template) => (
-                  <div 
-                    key={template.id}
-                    className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
-                    draggable
-                  >
-                    <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{template.exercises} Exercises • {template.duration} min</p>
-                    </div>
-                    <button className="text-muted-foreground hover:text-foreground">
-                      <Info className="w-4 h-4" />
-                    </button>
+            ) : (
+              // Exercises View
+              <div className="space-y-1">
+                {loadingExercises ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Loading exercises...
                   </div>
-                ))}
-              </>
+                ) : (
+                  muscleGroupOrder.map((group) => {
+                    const groupExercises = groupedExercises[group];
+                    if (groupExercises.length === 0) return null;
+                    const isExpanded = expandedGroups.has(group);
+                    
+                    return (
+                      <div key={group} className="border border-border rounded-lg overflow-hidden bg-card">
+                        <button
+                          onClick={() => toggleGroup(group)}
+                          className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors text-xs font-semibold text-card-foreground uppercase tracking-wider"
+                        >
+                          <div className="flex items-center gap-2">
+                             {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                             {group}
+                          </div>
+                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                            {groupExercises.length}
+                          </span>
+                        </button>
+                        
+                        {isExpanded && (
+                          <div className="divide-y divide-border/50">
+                            {groupExercises.map((exercise) => (
+                              <div 
+                                key={exercise.id}
+                                className="group flex items-center gap-2 px-3 py-2 hover:bg-muted/30 cursor-grab active:cursor-grabbing"
+                                draggable
+                              >
+                                <GripVertical className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary" />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-card-foreground truncate">{exercise.name}</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">{exercise.equipment} • {exercise.difficulty}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+                
+                {!loadingExercises && Object.values(groupedExercises).every(g => g.length === 0) && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No exercises found
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

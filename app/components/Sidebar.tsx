@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
   { icon: <Users size={20} />, label: "Clients", href: "/clients" },
   { icon: <Calendar size={20} />, label: "Programs", href: "/programs" },
   { icon: <Library size={20} />, label: "Exercises", href: "/exercises" },
-  { icon: <CreditCard size={20} />, label: "Billing", href: "/billing" },
+  // { icon: <CreditCard size={20} />, label: "Billing", href: "/billing" },
 ];
 
 export default function Sidebar() {
@@ -80,7 +80,7 @@ export default function Sidebar() {
             <span className="text-white text-sm font-medium">JC</span>
           </div>
           <div>
-            <p className="text-sm font-medium text-sidebar-foreground">Jane Cooper</p>
+            <p className="text-sm font-medium text-sidebar-foreground">Dewald</p>
             <p className="text-xs text-muted-foreground">Head Coach</p>
           </div>
         </div>
