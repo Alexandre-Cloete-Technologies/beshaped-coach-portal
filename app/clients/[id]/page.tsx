@@ -93,6 +93,33 @@ export default function ClientDetailPage() {
             }
           }
           
+          // Fetch user program progress
+          let programProgress = {
+            currentDay: 0,
+            currentWeek: 0,
+            currentPhase: 0
+          };
+          
+          try {
+            const { collection, query, where, getDocs, limit } = await import("firebase/firestore");
+            const q = query(
+              collection(db, "userPrograms"), 
+              where("userId", "==", clientDoc.ref),
+              limit(1)
+            );
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+              const progData = querySnapshot.docs[0].data();
+              programProgress = {
+                currentDay: progData.currentDay || 0,
+                currentWeek: progData.currentWeek || 0,
+                currentPhase: progData.currentPhase || 0
+              };
+            }
+          } catch (err) {
+            console.error("Error fetching user program progress:", err);
+          }
+          
           setClient({
             id: clientDoc.id,
             name: serializedData.displayName || serializedData.username || "Unknown User",
@@ -104,6 +131,8 @@ export default function ClientDetailPage() {
             streak: stats.currentStreak,
             currentProgram: programName,
             stats: stats,
+            goals: serializedData.goals || null,
+            ...programProgress,
           });
           setError(null);
         } else {
@@ -196,12 +225,11 @@ export default function ClientDetailPage() {
                       <Phone className="w-4 h-4" />
                       {String(client.phone)}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400">
-                      📅 Member since {String(client.memberSince)}
-                    </span>
-
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="inline-flex items-center   ">
+                        Member since {String(client.memberSince)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -243,7 +271,7 @@ export default function ClientDetailPage() {
           {activeTab === "workout-history" ? (
             <WorkoutHistory />
           ) : activeTab === "progress" ? (
-            <Progress />
+            <Progress clientId={clientId} />
           ) : activeTab === "overview" ? (
             /* Main Content Grid */
             <div className="grid grid-cols-3 gap-6">
@@ -263,9 +291,22 @@ export default function ClientDetailPage() {
                       <h3 className="text-lg font-semibold text-foreground mb-1">
                         {String(client.currentProgram)}
                       </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {Number(client.stats.totalWorkouts)} workouts completed
-                      </p>
+                      {client.goals && (
+                        <div className="mt-2 text-sm">
+                           <span className="text-muted-foreground">Goals: </span>
+                           <span className="font-medium text-foreground">{client.goals}</span>
+                         </div>
+                      )}
+                      
+                      {(client.currentDay || client.currentWeek || client.currentPhase) && (
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {[
+                            client.currentPhase && `Phase ${client.currentPhase}`,
+                            client.currentWeek && `Week ${client.currentWeek}`,
+                            client.currentDay && `Day ${client.currentDay}`
+                          ].filter(Boolean).join(" • ")}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -484,6 +484,7 @@ export default function Home() {
             
             // Fetch latest body weight log
             let weight: number | null = null;
+            let weightChange: number = 0;
             let weightUnit = "kg";
             try {
               const bodyWeightLogsRef = collection(db, "bodyWeightLogs");
@@ -505,6 +506,17 @@ export default function Home() {
                 const latestLog = logs[0];
                 weight = latestLog.weight !== undefined ? latestLog.weight : null;
                 weightUnit = latestLog.weightUnit || "kg";
+
+                if (logs.length > 1) {
+                  const previousLog = logs[1];
+                  const previousWeight = previousLog.weight !== undefined ? previousLog.weight : null;
+                  if (weight !== null && previousWeight !== null) {
+                     // Calculate change: current - previous
+                     // If user lost weight: 80 - 82 = -2
+                     // If user gained weight: 82 - 80 = +2
+                     weightChange = Number((weight - previousWeight).toFixed(1));
+                  }
+                }
               }
             } catch (err) {
               console.error("Error fetching weight logs for user", doc.id, err);
@@ -563,7 +575,7 @@ export default function Home() {
               totalWorkoutsInProgram: userProgramData?.totalWorkoutsInProgram || 0,
               weight: weight,
               weightUnit: weightUnit,
-              weightChange: 0,
+              weightChange: weightChange,
               lastWorkout: "No activity",
               status: "medium",
               nextWorkout: "Not scheduled",

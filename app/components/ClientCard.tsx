@@ -168,20 +168,15 @@ export default function ClientCard({ client }: { client: ClientData }) {
           {/* Stats */}
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Bodyweight</span>
+              <span className="text-muted-foreground">Current Bodyweight</span>
               <span className="font-medium text-card-foreground">
                 {client.weight !== null ? `${client.weight} ${client.weightUnit || "kg"}` : "N/A"}
-                {client.weight !== null && client.weightChange !== 0 && (
-                  <span className={client.weightChange < 0 ? "text-emerald-500" : "text-red-500"}>
-                    {" "}({client.weightChange > 0 ? "+" : ""}{client.weightChange} {client.weightUnit || "kg"})
-                  </span>
-                )}
               </span>
             </div>
-            <div className="flex justify-between">
+            {/* <div className="flex justify-between">
               <span className="text-muted-foreground">Last Workout</span>
               <span className="font-medium text-card-foreground">{formatLastWorkout(client.lastWorkout)}</span>
-            </div>
+            </div> */}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Compliance</span>
               <span className={`font-medium ${colors.labelColor}`}>
@@ -189,7 +184,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
               </span>
             </div>
             {client.goals && (
-              <div className="flex items-start gap-1.5 pt-1">
+              <div className="flex items-start">
                 <div className="flex-1">
                   <span className="text-muted-foreground">Goals: </span>
                   <span className="font-medium text-card-foreground">{client.goals}</span>
@@ -224,7 +219,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
       )}
 
       {/* Footer: Next Workout or Alert */}
-      <div className="flex items-center justify-between pt-1 border-t border-border">
+      {/* <div className="flex items-center justify-between pt-1 border-t border-border">
         {isAlert ? (
           <button className="flex items-center gap-2 text-red-500 text-sm font-medium hover:text-red-600 transition-colors">
             <AlertTriangle className="w-4 h-4" />
@@ -238,7 +233,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
         <button className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
           <ArrowRight className="w-4 h-4" />
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }

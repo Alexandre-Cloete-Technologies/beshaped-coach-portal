@@ -1,103 +1,130 @@
 "use client";
 
 import { ArrowRight, Award, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { collection, query, where, getDocs, orderBy, limit, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-export default function Progress() {
+interface ProgressProps {
+  clientId: string;
+}
+
+export default function Progress({ clientId }: ProgressProps) {
   const [selectedLift, setSelectedLift] = useState("Back Squat");
+  const [weightLogs, setWeightLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWeightLogs = async () => {
+        if (!clientId) return;
+        try {
+            // Using logic from page.tsx: fetch all and sort client-side to avoid index issues
+            const logsRef = collection(db, "bodyWeightLogs");
+            const q = query(logsRef, where("userId", "==", doc(db, "users", clientId)));
+            const snapshot = await getDocs(q);
+            
+            const logs: any[] = snapshot.docs.map(d => ({...d.data(), id: d.id}));
+            
+            // Sort by date ascending
+            logs.sort((a, b) => {
+                const dateA = a.photoTakenDate?.toDate ? a.photoTakenDate.toDate() : new Date(a.photoTakenDate || 0);
+                const dateB = b.photoTakenDate?.toDate ? b.photoTakenDate.toDate() : new Date(b.photoTakenDate || 0);
+                return dateA.getTime() - dateB.getTime();
+            });
+            
+            setWeightLogs(logs);
+        } catch (err) {
+            console.error("Error fetching weight logs:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchWeightLogs();
+  }, [clientId]);
+
+  const { currentWeight, weightChange, weightUnit, weightParams } = useMemo(() => {
+      if (weightLogs.length === 0) return { currentWeight: null, weightChange: null, weightUnit: "kg", weightParams: null };
+
+      const currentLog = weightLogs[weightLogs.length - 1];
+      const current = currentLog.weight;
+      const unit = currentLog.weightUnit || "kg"; // Default to kg if missing.
+      // Actually, let's just use what's in the db.
+      
+      // Compare with oldest log in the set
+      const initial = weightLogs[0].weight;
+      const change = current - initial;
+
+      // Prepare Chart Data
+      // We want to map the logs to SVG coordinates (600x100)
+      // X axis: Time
+      // Y axis: Weight
+      
+      const weights = weightLogs.map(l => l.weight);
+      const minWeight = Math.min(...weights) - 2; // Buffer
+      const maxWeight = Math.max(...weights) + 2; // Buffer
+      const weightRange = maxWeight - minWeight || 1; // Avoid division by zero
+
+      const startTime = weightLogs[0].photoTakenDate?.toDate ? weightLogs[0].photoTakenDate.toDate().getTime() : new Date(weightLogs[0].photoTakenDate || 0).getTime();
+      const endTime = weightLogs[weightLogs.length - 1].photoTakenDate?.toDate ? weightLogs[weightLogs.length - 1].photoTakenDate.toDate().getTime() : new Date(weightLogs[weightLogs.length - 1].photoTakenDate || 0).getTime();
+      const timeRange = endTime - startTime || 1;
+
+      const points = weightLogs.map(log => {
+          const time = log.photoTakenDate?.toDate ? log.photoTakenDate.toDate().getTime() : new Date(log.photoTakenDate || 0).getTime();
+          
+          // X coordinate (0 to 600)
+          const x = ((time - startTime) / timeRange) * 600;
+          
+          // Y coordinate (0 to 100), Note: SVG Y is inverted (0 is top)
+          // Value normalized 0-1: (val - min) / range
+          // SVG Y: 100 - (normalized * 100)
+          const y = 100 - (((log.weight - minWeight) / weightRange) * 100);
+          
+          const d = log.photoTakenDate?.toDate ? log.photoTakenDate.toDate() : new Date(log.photoTakenDate || 0);
+          return { x, y, val: log.weight, date: d.toLocaleDateString(), unit: log.weightUnit || unit };
+      });
+
+      // Generate Line Path
+      const linePath = points.length > 1 
+        ? `M${points[0].x},${points[0].y} ` + points.slice(1).map(p => `L${p.x},${p.y}`).join(" ")
+        : points.length === 1 ? `M0,${points[0].y} L600,${points[0].y}` : "";
+
+      // Area Path is essentially line path
+       const areaPath = linePath;
+      
+      // Generate Labels (approximate distribution)
+      // Pick ~5 labels evenly distributed
+      const labels = [];
+      if (weightLogs.length > 0) {
+        // Just take simple approach: Start, 25%, 50%, 75%, End
+        const steps = 5;
+        for (let i = 0; i < steps; i++) {
+             const t = startTime + (timeRange * (i / (steps - 1)));
+             labels.push(new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric'}));
+        }
+      }
+
+      return {
+          currentWeight: current,
+          weightChange: change,
+          weightUnit: unit,
+          weightParams: {
+              min: minWeight,
+              max: maxWeight,
+              points,
+              linePath,
+              areaPath,
+              labels
+          }
+      };
+
+  }, [weightLogs]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Left Column - Main Content */}
       <div className="lg:col-span-2 flex flex-col gap-6">
-        {/* Bodyweight History Chart */}
-        <div className="bg-card rounded-xl p-6 border border-border">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-            <div>
-              <h3 className="text-card-foreground text-lg font-bold">Bodyweight History</h3>
-              <p className="text-sm text-muted-foreground">Past 6 months</p>
-            </div>
-            <div className="flex gap-4">
-              <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground font-medium uppercase">Current</span>
-                <span className="text-xl font-bold text-card-foreground">
-                  142.5 <span className="text-sm font-medium text-muted-foreground">lbs</span>
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground font-medium uppercase">Change</span>
-                <span className="text-xl font-bold text-green-600">
-                  -8.4 <span className="text-sm font-medium text-muted-foreground">lbs</span>
-                </span>
-              </div>
-            </div>
-          </div>
 
-          {/* Chart */}
-          <div className="w-full h-64 relative">
-            <div className="absolute left-0 top-0 bottom-8 w-10 flex flex-col justify-between text-xs text-muted-foreground text-right pr-2">
-              <span>160</span>
-              <span>155</span>
-              <span>150</span>
-              <span>145</span>
-              <span>140</span>
-            </div>
-            <div className="absolute left-12 right-0 top-0 bottom-8">
-              <div className="w-full h-full flex flex-col justify-between">
-                <div className="w-full h-px bg-border"></div>
-                <div className="w-full h-px bg-border"></div>
-                <div className="w-full h-px bg-border"></div>
-                <div className="w-full h-px bg-border"></div>
-                <div className="w-full h-px bg-border"></div>
-              </div>
-              <svg
-                className="absolute inset-0 w-full h-full"
-                viewBox="0 0 600 100"
-                preserveAspectRatio="xMidYMid meet"
-              >
-                <defs>
-                  <linearGradient id="bodyweight-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {/* Area fill */}
-                <path
-                  d="M0,20 L100,30 L200,45 L300,65 L400,75 L500,85 L600,85 L600,100 L0,100 Z"
-                  fill="url(#bodyweight-gradient)"
-                />
-                {/* Line */}
-                <path
-                  d="M0,20 L100,30 L200,45 L300,65 L400,75 L500,85 L600,85"
-                  fill="none"
-                  stroke="rgb(59, 130, 246)"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="3"
-                />
-                {/* Data points */}
-                <circle className="fill-card stroke-primary" cx="0" cy="20" r="4" strokeWidth="2.5" />
-                <circle className="fill-card stroke-primary" cx="100" cy="30" r="4" strokeWidth="2.5" />
-                <circle className="fill-card stroke-primary" cx="200" cy="45" r="4" strokeWidth="2.5" />
-                <circle className="fill-card stroke-primary" cx="300" cy="65" r="4" strokeWidth="2.5" />
-                <circle className="fill-card stroke-primary" cx="400" cy="75" r="4" strokeWidth="2.5" />
-                <circle className="fill-card stroke-primary" cx="500" cy="85" r="4" strokeWidth="2.5" />
-                <circle className="fill-card stroke-primary" cx="600" cy="85" r="4" strokeWidth="2.5" />
-              </svg>
-            </div>
-            <div className="absolute left-12 right-0 bottom-0 flex justify-between text-xs text-muted-foreground">
-              <span>Jan</span>
-              <span>Feb</span>
-              <span>Mar</span>
-              <span>Apr</span>
-              <span>May</span>
-              <span>Jun</span>
-              <span>Jul</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Progress Photos */}
+                {/* Progress Photos */}
         <div className="bg-card rounded-xl p-6 border border-border">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-card-foreground text-lg font-bold">Progress Photos</h3>
@@ -143,6 +170,97 @@ export default function Progress() {
             </div>
           </div>
         </div>
+        {/* Bodyweight History Chart */}
+        <div className="bg-card rounded-xl p-6 border border-border">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+            <div>
+              <h3 className="text-card-foreground text-lg font-bold">Bodyweight History</h3>
+              <p className="text-sm text-muted-foreground">Recent progress</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground font-medium uppercase">Current</span>
+                <span className="text-xl font-bold text-card-foreground">
+                  {currentWeight !== null ? currentWeight : "N/A"} <span className="text-sm font-medium text-muted-foreground">{weightUnit || "kg"}</span>
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground font-medium uppercase">Change</span>
+                {weightChange !== null ? (
+                    <span className={`text-xl font-bold ${weightChange > 0 ? "text-red-500" : "text-emerald-600"}`}>
+                    {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} <span className="text-sm font-medium text-muted-foreground">{weightUnit || "kg"}</span>
+                    </span>
+                ) : (
+                    <span className="text-xl font-bold text-muted-foreground">-</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Chart */}
+          <div className="w-full h-64 relative">
+             {weightParams ? (
+                 <>
+                    <div className="absolute left-0 top-0 bottom-8 w-10 flex flex-col justify-between text-xs text-muted-foreground text-right pr-2">
+                    {/* Y-axis labels dynamically generated */}
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i}>{(weightParams.max - (i * (weightParams.max - weightParams.min) / 4)).toFixed(0)}</span>
+                    ))}
+                    </div>
+                    <div className="absolute left-12 right-0 top-0 bottom-8">
+                    <div className="w-full h-full flex flex-col justify-between">
+                        {[...Array(5)].map((_, i) => (
+                            <div key={i} className="w-full h-px bg-border"></div>
+                        ))}
+                    </div>
+                    <svg
+                        className="absolute inset-0 w-full h-full"
+                        viewBox="0 0 600 100"
+                        preserveAspectRatio="none"
+                    >
+                        <defs>
+                        <linearGradient id="bodyweight-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.2" />
+                            <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
+                        </linearGradient>
+                        </defs>
+                        {/* Area fill */}
+                        <path
+                        d={`${weightParams.areaPath} L600,100 L0,100 Z`}
+                        fill="url(#bodyweight-gradient)"
+                        />
+                        {/* Line */}
+                        <path
+                        d={weightParams.linePath}
+                        fill="none"
+                        stroke="rgb(59, 130, 246)"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="3"
+                        />
+                        {/* Data points */}
+                        {weightParams.points.map((p, i) => (
+                             <circle key={i} className="fill-card stroke-primary transition-all duration-300 hover:r-6" cx={p.x} cy={p.y} r="4" strokeWidth="2.5">
+                                 <title>{p.date} - {p.val} lbs</title>
+                             </circle>
+                        ))}
+                    </svg>
+                    </div>
+                    <div className="absolute left-12 right-0 bottom-0 flex justify-between text-xs text-muted-foreground px-2">
+                        {weightParams.labels.map((label, i) => (
+                            <span key={i}>{label}</span>
+                        ))}
+                    </div>
+                 </>
+             ) : (
+                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                     No bodyweight data available
+                 </div>
+             )}
+          </div>
+        </div>
+
+
 
         {/* Key Lifts Performance */}
         <div className="bg-card rounded-xl p-6 border border-border">
@@ -229,7 +347,7 @@ export default function Progress() {
         {/* Bottom Row: Volume Load & Personal Records */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Volume Load */}
-          <div className="bg-card rounded-xl p-6 border border-border flex flex-col">
+          {/* <div className="bg-card rounded-xl p-6 border border-border flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-card-foreground text-lg font-bold">Volume Load</h3>
               <span className="text-xs text-muted-foreground">Weekly Total (lbs)</span>
@@ -260,7 +378,7 @@ export default function Progress() {
                 <span className="text-xs text-card-foreground font-semibold">W5</span>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Personal Records */}
           <div className="bg-card rounded-xl p-6 border border-border">
@@ -329,7 +447,7 @@ export default function Progress() {
       {/* Right Column - Sidebar (same as overview) */}
       <div className="flex flex-col gap-6">
         {/* Quick Actions */}
-        <div className="bg-card rounded-xl p-5 border border-border sticky top-24">
+        {/* <div className="bg-card rounded-xl p-5 border border-border sticky top-24">
           <h3 className="text-card-foreground text-lg font-bold mb-4">Quick Actions</h3>
           <div className="flex flex-col gap-3">
             <button className="flex items-center justify-center gap-2 w-full h-11 bg-primary hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">
@@ -342,10 +460,10 @@ export default function Progress() {
               ✅ Assign Workout
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Upcoming */}
-        <div className="bg-card rounded-xl p-5 border border-border">
+        {/* <div className="bg-card rounded-xl p-5 border border-border">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-card-foreground text-lg font-bold">Upcoming</h3>
             <a className="text-xs font-semibold text-primary hover:underline" href="#">
@@ -384,7 +502,7 @@ export default function Progress() {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Coach Note */}
         <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-5 border border-yellow-100 dark:border-yellow-900/30">
