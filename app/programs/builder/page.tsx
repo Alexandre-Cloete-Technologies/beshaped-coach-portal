@@ -36,6 +36,7 @@ interface PhaseDay {
   workoutName?: string;
   duration?: number;
   label?: string;
+  exercises?: Exercise[];
 }
 
 interface Phase {
@@ -45,6 +46,13 @@ interface Phase {
   weeks: string;
   days: PhaseDay[];
   isExpanded: boolean;
+  durationWeeks: number;
+}
+
+interface SelectedWorkout {
+  phaseId: string;
+  dayIndex: number;
+  workout: PhaseDay;
 }
 
 interface Exercise {
@@ -133,7 +141,7 @@ const getCategoryFromMuscle = (muscle: string): string => {
 };
 
 export default function ProgramBuilderPage() {
-  const [programName, setProgramName] = useState("Summer Shred 2024");
+  const [programName, setProgramName] = useState("Name your program");
   const [sidebarTab, setSidebarTab] = useState<"templates" | "exercises">("templates");
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -141,6 +149,14 @@ export default function ProgramBuilderPage() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loadingExercises, setLoadingExercises] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  
+  // Modal State
+  const [selectedWorkout, setSelectedWorkout] = useState<SelectedWorkout | null>(null);
+  const [modalExercises, setModalExercises] = useState<Exercise[]>([]);
+  const [draggedExerciseIndex, setDraggedExerciseIndex] = useState<number | null>(null);
+  const [modalExpandedGroups, setModalExpandedGroups] = useState<Set<string>>(new Set());
+  const [modalSearchQuery, setModalSearchQuery] = useState("");
+  const [modalWorkoutName, setModalWorkoutName] = useState("");
 
   // Fetch exercises from Firebase on mount
   useEffect(() => {
@@ -237,6 +253,24 @@ export default function ProgramBuilderPage() {
     }
   }, [searchQuery, groupedExercises, sidebarTab]);
 
+  // Auto-expand modal groups when searching in modal
+  useEffect(() => {
+    if (modalSearchQuery.trim()) {
+      // Expand all groups that have matching exercises
+      const groupsWithMatches = new Set<string>();
+      Object.entries(groupedExercises).forEach(([group, exs]) => {
+        const hasMatch = exs.some(ex =>
+          ex.name.toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+          ex.equipment.toLowerCase().includes(modalSearchQuery.toLowerCase())
+        );
+        if (hasMatch) {
+          groupsWithMatches.add(group);
+        }
+      });
+      setModalExpandedGroups(groupsWithMatches);
+    }
+  }, [modalSearchQuery, groupedExercises]);
+
   const toggleGroup = (group: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
@@ -246,13 +280,137 @@ export default function ProgramBuilderPage() {
     });
   };
   
+  const handleDragStart = (e: React.DragEvent, template: any) => {
+    e.dataTransfer.setData("template", JSON.stringify(template));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, phaseId: string, dayIndex: number) => {
+    e.preventDefault();
+    const templateData = e.dataTransfer.getData("template");
+    
+    if (templateData) {
+      const template = JSON.parse(templateData);
+      setPhases(phases.map(p => {
+        if (p.id === phaseId) {
+          const newDays = [...p.days];
+          newDays[dayIndex] = {
+            type: "workout",
+            workoutName: template.name,
+            duration: template.duration,
+            label: `Workout ${String.fromCharCode(65 + (dayIndex % 7))}`, // A, B, C based on day index
+            exercises: [] // Initialize empty exercises array
+          };
+          return { ...p, days: newDays };
+        }
+        return p;
+      }));
+    }
+  };
+
+  // Modal Handlers
+  const openWorkoutModal = (phaseId: string, dayIndex: number, workout: PhaseDay) => {
+    setSelectedWorkout({ phaseId, dayIndex, workout });
+    setModalExercises(workout.exercises || []);
+    setModalWorkoutName(workout.workoutName || "New Workout");
+  };
+
+  const closeWorkoutModal = () => {
+    if (selectedWorkout) {
+      // Save exercises back to phase
+      setPhases(phases.map(p => {
+        if (p.id === selectedWorkout.phaseId) {
+          const newDays = [...p.days];
+          const currentDay = newDays[selectedWorkout.dayIndex];
+          
+          // If this was an empty day and exercises were added, convert to workout
+          if (currentDay.type === "empty" && modalExercises.length > 0) {
+            newDays[selectedWorkout.dayIndex] = {
+              type: "workout",
+              workoutName: modalWorkoutName || "New Workout",
+              duration: modalExercises.length * 5, // Estimate 5 min per exercise
+              exercises: modalExercises
+            };
+          } else if (currentDay.type === "workout") {
+            // Update existing workout
+            newDays[selectedWorkout.dayIndex] = {
+              ...currentDay,
+              workoutName: modalWorkoutName,
+              exercises: modalExercises
+            };
+          }
+          return { ...p, days: newDays };
+        }
+        return p;
+      }));
+    }
+    setSelectedWorkout(null);
+    setModalExercises([]);
+    setModalExpandedGroups(new Set());
+    setModalSearchQuery("");
+    setModalWorkoutName("");
+  };
+
+  const addExerciseToWorkout = (exercise: Exercise) => {
+    setModalExercises(prev => [...prev, { ...exercise }]);
+  };
+
+  const removeExerciseFromWorkout = (index: number) => {
+    setModalExercises(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleModalExerciseDragStart = (index: number) => {
+    setDraggedExerciseIndex(index);
+  };
+
+  const handleModalExerciseDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedExerciseIndex === null || draggedExerciseIndex === index) return;
+    
+    const newExercises = [...modalExercises];
+    const [draggedItem] = newExercises.splice(draggedExerciseIndex, 1);
+    newExercises.splice(index, 0, draggedItem);
+    setModalExercises(newExercises);
+    setDraggedExerciseIndex(index);
+  };
+
+  const handleModalExerciseDragEnd = () => {
+    setDraggedExerciseIndex(null);
+  };
+
+  const clearDay = (phaseId: string, dayIndex: number) => {
+    setPhases(phases.map(p => {
+      if (p.id === phaseId) {
+        const newDays = [...p.days];
+        newDays[dayIndex] = { type: "empty" };
+        return { ...p, days: newDays };
+      }
+      return p;
+    }));
+  };
+
+  const setRestDay = (phaseId: string, dayIndex: number) => {
+    setPhases(phases.map(p => {
+      if (p.id === phaseId) {
+        const newDays = [...p.days];
+        newDays[dayIndex] = { type: "rest" };
+        return { ...p, days: newDays };
+      }
+      return p;
+    }));
+  };
+
   const [phases, setPhases] = useState<Phase[]>([
     {
       id: "1",
-      name: "Phase 1: Accumulation",
-      description: "Weeks 1-2 • Focus on volume and technique",
+      name: "Phase 1",
+      description: "Define the focus for this phase",
       weeks: "1-2",
       isExpanded: true,
+      durationWeeks: 2,
       days: [
         { type: "workout", workoutName: "Upper Body Power", duration: 45, label: "Workout A" },
         { type: "workout", workoutName: "Leg Day Hypertrophy", duration: 60, label: "Workout B" },
@@ -261,6 +419,8 @@ export default function ProgramBuilderPage() {
         { type: "empty" },
         { type: "empty" },
         { type: "rest" },
+        // Week 2 (Empty for now)
+        { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }
       ],
     },
   ]);
@@ -272,15 +432,47 @@ export default function ProgramBuilderPage() {
       phase.id === phaseId ? { ...phase, isExpanded: !phase.isExpanded } : phase
     ));
   };
+  
+  const updatePhaseDuration = (phaseId: string, duration: number) => {
+    setPhases(phases.map(p => {
+      if (p.id !== phaseId) return p;
+      
+      const currentDaysCount = p.days.length;
+      const targetDaysCount = duration * 7;
+      
+      let newDays = [...p.days];
+      
+      if (targetDaysCount > currentDaysCount) {
+        // Add more days
+        const daysToAdd = targetDaysCount - currentDaysCount;
+        const emptyDays = Array(daysToAdd).fill({ type: "empty" });
+        newDays = [...newDays, ...emptyDays];
+      } else if (targetDaysCount < currentDaysCount) {
+        // Remove days
+        newDays = newDays.slice(0, targetDaysCount);
+      }
+      
+      return { ...p, durationWeeks: duration, days: newDays };
+    }));
+  };
+
+  const updatePhaseName = (phaseId: string, name: string) => {
+    setPhases(phases.map(p => p.id === phaseId ? { ...p, name } : p));
+  };
+
+  const updatePhaseDescription = (phaseId: string, description: string) => {
+    setPhases(phases.map(p => p.id === phaseId ? { ...p, description } : p));
+  };
 
   const addPhase = () => {
     const newPhase: Phase = {
       id: `${phases.length + 1}`,
-      name: `Phase ${phases.length + 1}: New Phase`,
-      description: "Define your phase focus",
-      weeks: `${phases.length * 2 + 1}-${phases.length * 2 + 2}`,
+      name: `Phase ${phases.length + 1}`,
+      description: "Define the focus for this phase",
+      weeks: `${phases.length + 1}`,
       isExpanded: true,
-      days: Array(7).fill({ type: "empty" }),
+      durationWeeks: 1,
+      days: Array(1 * 7).fill({ type: "empty" }),
     };
     setPhases([...phases, newPhase]);
   };
@@ -310,7 +502,7 @@ export default function ProgramBuilderPage() {
           </div>
           <div className="flex gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center ring-2 ring-card">
-              <span className="text-white text-sm font-medium">JC</span>
+              <span className="text-white text-sm font-medium">D</span>
             </div>
           </div>
         </div>
@@ -343,7 +535,7 @@ export default function ProgramBuilderPage() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Templates
+                Workouts
               </button>
               <button 
                 onClick={() => setSidebarTab("exercises")}
@@ -366,11 +558,12 @@ export default function ProgramBuilderPage() {
                   <>
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">Recent</div>
                     {recentTemplates.map((template) => (
-                      <div 
-                        key={template.id}
-                        className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
-                        draggable
-                      >
+                  <div 
+                    key={template.id}
+                    className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, template)}
+                  >
                         <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
@@ -388,11 +581,12 @@ export default function ProgramBuilderPage() {
                   <>
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-4">Strength</div>
                     {strengthTemplates.map((template) => (
-                      <div 
-                        key={template.id}
-                        className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
-                        draggable
-                      >
+                  <div 
+                    key={template.id}
+                    className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, template)}
+                  >
                         <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
@@ -439,14 +633,13 @@ export default function ProgramBuilderPage() {
                             {groupExercises.length}
                           </span>
                         </button>
-                        
+
                         {isExpanded && (
                           <div className="divide-y divide-border/50">
                             {groupExercises.map((exercise) => (
-                              <div 
+                              <div
                                 key={exercise.id}
-                                className="group flex items-center gap-2 px-3 py-2 hover:bg-muted/30 cursor-grab active:cursor-grabbing"
-                                draggable
+                                className="group flex items-center gap-2 px-3 py-2 hover:bg-muted/30"
                               >
                                 <GripVertical className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary" />
                                 <div className="min-w-0">
@@ -501,7 +694,7 @@ export default function ProgramBuilderPage() {
                   <div className="flex flex-wrap gap-4">
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                       <span className="text-xs text-blue-100">Duration</span>
-                      <span className="font-medium">4 Weeks</span>
+                      <span className="font-medium">{phases.reduce((acc, phase) => acc + phase.durationWeeks, 0)} Weeks</span>
                     </div>
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                       <span className="text-xs text-blue-100">Difficulty</span>
@@ -534,15 +727,41 @@ export default function ProgramBuilderPage() {
                     >
                       <ChevronDown className={`w-5 h-5 transition-transform ${phase.isExpanded ? "" : "-rotate-90"}`} />
                     </button>
-                    <div>
-                      <h3 className="text-lg font-bold text-card-foreground">{phase.name}</h3>
-                      <p className="text-sm text-muted-foreground">{phase.description}</p>
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={phase.name}
+                        onChange={(e) => updatePhaseName(phase.id, e.target.value)}
+                        className="text-lg font-bold text-card-foreground bg-transparent border-none p-0 focus:ring-0 w-full"
+                        placeholder="Phase Name"
+                      />
+                      <input
+                        type="text"
+                        value={phase.description}
+                        onChange={(e) => updatePhaseDescription(phase.id, e.target.value)}
+                        className="text-sm text-muted-foreground bg-transparent border-none p-0 focus:ring-0 w-full"
+                        placeholder="Phase description"
+                      />
                     </div>
                   </div>
-                  <button className="text-muted-foreground hover:text-foreground">
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
-                </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5 border border-border">
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        <select
+                          value={phase.durationWeeks}
+                          onChange={(e) => updatePhaseDuration(phase.id, parseInt(e.target.value))}
+                          className="bg-transparent text-sm font-medium text-card-foreground border-none focus:ring-0 p-0 cursor-pointer"
+                        >
+                          {[1, 2, 3, 4, 5, 6].map(num => (
+                            <option key={num} value={num}>{num} Weeks</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button className="text-muted-foreground hover:text-foreground">
+                        <MoreHorizontal className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
 
                 {/* Weekly Grid */}
                 {phase.isExpanded && (
@@ -558,34 +777,66 @@ export default function ProgramBuilderPage() {
 
                         {/* Days */}
                         {phase.days.map((day, idx) => (
-                          <div key={idx} className="flex flex-col gap-2">
+                          <div 
+                            key={idx} 
+                            className="flex flex-col gap-2"
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, phase.id, idx)}
+                          >
                             {day.type === "workout" ? (
-                              <div className="group relative flex flex-col gap-2 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-900/20 p-3 hover:shadow-md transition-shadow cursor-pointer">
-                                <div className="flex justify-between items-start">
-                                  <span className="inline-flex items-center rounded bg-indigo-100 dark:bg-indigo-900 px-1.5 py-0.5 text-[10px] font-medium text-indigo-800 dark:text-indigo-200">
-                                    {day.label}
-                                  </span>
-                                  <button className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity">
+                              <div 
+                                className="group relative flex flex-col gap-2 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-900/20 p-3 hover:shadow-md transition-shadow cursor-pointer h-full"
+                                onClick={() => openWorkoutModal(phase.id, idx, day)}
+                              >
+                                <div className="flex justify-end">
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); clearDay(phase.id, idx); }}
+                                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity"
+                                  >
                                     <X className="w-4 h-4" />
                                   </button>
                                 </div>
                                 <p className="text-sm font-semibold text-card-foreground leading-tight">{day.workoutName}</p>
-                                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                  <Clock className="w-3 h-3" />
-                                  {day.duration} min
+                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-auto">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {day.duration} min
+                                  </div>
+                                  {day.exercises && day.exercises.length > 0 && (
+                                    <span className="bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                      {day.exercises.length} exercises
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             ) : day.type === "rest" ? (
-                              <div className="flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 text-muted-foreground">
+                              <div className="group relative flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 text-muted-foreground hover:border-amber-400 transition-colors">
+                                <button 
+                                  onClick={() => clearDay(phase.id, idx)}
+                                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity"
+                                  title="Remove rest day"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
                                 <Hotel className="w-5 h-5 mb-1" />
                                 <span className="text-xs font-medium">Rest Day</span>
                               </div>
                             ) : (
-                              <div className="flex h-full min-h-[120px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-all cursor-pointer group">
+                              <div 
+                                className="flex h-full min-h-[120px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-all cursor-pointer group bg-card relative"
+                                onClick={() => openWorkoutModal(phase.id, idx, { type: "empty" })}
+                              >
                                 <div className="size-8 rounded-full bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-card flex items-center justify-center mb-2 transition-colors">
                                   <Plus className="w-5 h-5" />
                                 </div>
-                                <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Drop Workout</span>
+                                <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Add Workout</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setRestDay(phase.id, idx); }}
+                                  className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 px-2 py-1 text-[10px] font-medium rounded bg-muted hover:bg-amber-100 dark:hover:bg-amber-900/30 text-muted-foreground hover:text-amber-700 dark:hover:text-amber-400 transition-all flex items-center gap-1"
+                                >
+                                  <Hotel className="w-3 h-3" />
+                                  Rest Day
+                                </button>
                               </div>
                             )}
                           </div>
@@ -637,6 +888,215 @@ export default function ProgramBuilderPage() {
             </div>
           </div>
         </div>
+
+        {/* Workout Editor Modal */}
+        {selectedWorkout && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-xl shadow-2xl border border-border w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
+                <div className="flex-1 mr-4">
+                  <input
+                    type="text"
+                    value={modalWorkoutName}
+                    onChange={(e) => setModalWorkoutName(e.target.value)}
+                    className="w-full bg-transparent border-none text-xl font-bold text-white placeholder-blue-200 focus:ring-0 px-0 leading-tight focus:outline-none"
+                    placeholder="Enter workout name"
+                  />
+                  <p className="text-sm text-blue-100">{modalExercises.length} exercises</p>
+                </div>
+                <button 
+                  onClick={closeWorkoutModal}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body - Two Columns */}
+              <div className="flex flex-1 overflow-hidden">
+                {/* Left: Current Workout Exercises */}
+                <div className="w-1/2 border-r border-border flex flex-col">
+                  <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                    <h3 className="text-sm font-semibold text-card-foreground">Workout Exercises</h3>
+                    <p className="text-xs text-muted-foreground">Drag to reorder</p>
+                  </div>
+                  <div 
+                    className="flex-1 overflow-y-auto p-4 space-y-2"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add('bg-primary/5');
+                    }}
+                    onDragLeave={(e) => {
+                      e.currentTarget.classList.remove('bg-primary/5');
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('bg-primary/5');
+                      const exerciseData = e.dataTransfer.getData("exercise");
+                      if (exerciseData) {
+                        const exercise = JSON.parse(exerciseData);
+                        addExerciseToWorkout(exercise);
+                      }
+                    }}
+                  >
+                    {modalExercises.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12 border-2 border-dashed border-border rounded-lg">
+                        <Dumbbell className="w-12 h-12 mb-3 opacity-30" />
+                        <p className="text-sm font-medium">No exercises yet</p>
+                        <p className="text-xs">Drag exercises here or use + button →</p>
+                      </div>
+                    ) : (
+                      modalExercises.map((exercise, index) => (
+                        <div
+                          key={`${exercise.id}-${index}`}
+                          draggable
+                          onDragStart={() => handleModalExerciseDragStart(index)}
+                          onDragOver={(e) => handleModalExerciseDragOver(e, index)}
+                          onDragEnd={handleModalExerciseDragEnd}
+                          className={`group flex items-center gap-3 p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                            draggedExerciseIndex === index 
+                              ? "border-primary bg-primary/10 shadow-lg scale-[1.02]" 
+                              : "border-border bg-card hover:border-primary/50 hover:shadow-md"
+                          }`}
+                        >
+                          <div className="flex items-center justify-center w-6 h-6 rounded bg-muted text-xs font-bold text-muted-foreground">
+                            {index + 1}
+                          </div>
+                          <GripVertical className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-card-foreground truncate">{exercise.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{exercise.muscleGroup} • {exercise.equipment}</p>
+                          </div>
+                          <button
+                            onClick={() => removeExerciseFromWorkout(index)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-muted-foreground hover:text-red-500 transition-all"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Exercise Library */}
+                <div className="w-1/2 flex flex-col bg-muted/20">
+                  <div className="px-4 py-3 bg-muted/30 border-b border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-card-foreground">Exercise Library</h3>
+                      <span className="text-xs text-muted-foreground">Drag or +</span>
+                    </div>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={modalSearchQuery}
+                        onChange={(e) => setModalSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-sm border border-border rounded-lg bg-card placeholder-muted-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                        placeholder="Search exercises..."
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                    {loadingExercises ? (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        Loading exercises...
+                      </div>
+                    ) : (
+                      muscleGroupOrder.map((group) => {
+                        // Filter exercises based on modal search
+                        let groupExercises = groupedExercises[group];
+                        if (modalSearchQuery.trim()) {
+                          groupExercises = groupExercises.filter(ex =>
+                            ex.name.toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+                            ex.equipment.toLowerCase().includes(modalSearchQuery.toLowerCase())
+                          );
+                        }
+                        if (groupExercises.length === 0) return null;
+                        
+                        return (
+                          <div key={group} className="border border-border rounded-lg overflow-hidden bg-card">
+                            <button
+                              onClick={() => {
+                                setModalExpandedGroups(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(group)) next.delete(group);
+                                  else next.add(group);
+                                  return next;
+                                });
+                              }}
+                              className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors text-xs font-semibold text-card-foreground uppercase tracking-wider"
+                            >
+                              <div className="flex items-center gap-2">
+                                {modalExpandedGroups.has(group) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                {group}
+                              </div>
+                              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                {groupExercises.length}
+                              </span>
+                            </button>
+                            
+                            {modalExpandedGroups.has(group) && (
+                              <div className="divide-y divide-border/50">
+                                {groupExercises.map((exercise) => (
+                                  <div 
+                                    key={exercise.id}
+                                    className="group flex items-center gap-2 px-3 py-2 hover:bg-muted/30 cursor-grab active:cursor-grabbing"
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.dataTransfer.setData("exercise", JSON.stringify(exercise));
+                                    }}
+                                  >
+                                    <GripVertical className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-card-foreground truncate">{exercise.name}</p>
+                                      <p className="text-[10px] text-muted-foreground truncate">{exercise.equipment} • {exercise.difficulty}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => addExerciseToWorkout(exercise)}
+                                      className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {modalExercises.length} exercise{modalExercises.length !== 1 ? "s" : ""} in workout
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      // TODO: Implement save as template functionality
+                      alert("Save as template - Coming soon!");
+                    }}
+                    className="px-4 py-2 border border-border text-card-foreground rounded-lg font-semibold hover:bg-muted transition-colors"
+                  >
+                    Save as Template
+                  </button>
+                  <button
+                    onClick={closeWorkoutModal}
+                    className="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
