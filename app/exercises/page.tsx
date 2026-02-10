@@ -1,9 +1,9 @@
 "use client";
 
-import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Dumbbell, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Dumbbell, ChevronsUpDown, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface Exercise {
@@ -17,6 +17,55 @@ interface Exercise {
   videoUrl?: string;
   createdAt?: Date;
 }
+
+interface ExerciseFormData {
+  name: string;
+  description: string;
+  instructions: {
+    setup: string;
+    posture: string;
+    execution: string;
+    breathing: string;
+    control: string;
+  };
+  videoUrl: string;
+  thumbnailUrl: string;
+  anatomicalIllustration: string;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  equipment: string;
+  category: string;
+  tips: string[];
+}
+
+const emptyFormData: ExerciseFormData = {
+  name: "",
+  description: "",
+  instructions: {
+    setup: "",
+    posture: "",
+    execution: "",
+    breathing: "",
+    control: "",
+  },
+  videoUrl: "",
+  thumbnailUrl: "",
+  anatomicalIllustration: "",
+  primaryMuscles: [],
+  secondaryMuscles: [],
+  equipment: "",
+  category: "",
+  tips: [],
+};
+
+const equipmentOptions = [
+  "Barbell", "Dumbbells", "Cable Machine", "Machine", "Bodyweight", 
+  "Kettlebell", "Resistance Bands", "Medicine Ball", "Pull-up Bar", "Bench", "Other"
+];
+
+const categoryOptions = [
+  "Strength", "Hypertrophy", "Power", "Endurance", "Flexibility", "Cardio", "Rehabilitation"
+];
 
 // Define muscle group order and icons
 const muscleGroupOrder = [
@@ -175,6 +224,12 @@ export default function ExercisesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  
+  // Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState<ExerciseFormData>(emptyFormData);
+  const [newTip, setNewTip] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Fetch exercises from Firebase
   useEffect(() => {
@@ -311,6 +366,89 @@ export default function ExercisesPage() {
 
   const allExpanded = expandedGroups.size === muscleGroupOrder.length;
 
+  // Form handlers
+  const handleInputChange = (field: keyof ExerciseFormData, value: string | string[]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleInstructionChange = (field: keyof ExerciseFormData["instructions"], value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      instructions: { ...prev.instructions, [field]: value }
+    }));
+  };
+
+  const addTip = () => {
+    if (newTip.trim()) {
+      setFormData(prev => ({ ...prev, tips: [...prev.tips, newTip.trim()] }));
+      setNewTip("");
+    }
+  };
+
+  const removeTip = (index: number) => {
+    setFormData(prev => ({ ...prev, tips: prev.tips.filter((_, i) => i !== index) }));
+  };
+
+  const toggleMuscle = (muscle: string, isPrimary: boolean) => {
+    const field = isPrimary ? "primaryMuscles" : "secondaryMuscles";
+    setFormData(prev => {
+      const current = prev[field];
+      if (current.includes(muscle)) {
+        return { ...prev, [field]: current.filter(m => m !== muscle) };
+      } else {
+        return { ...prev, [field]: [...current, muscle] };
+      }
+    });
+  };
+
+  const closeModal = () => {
+    setShowAddModal(false);
+    setFormData(emptyFormData);
+    setNewTip("");
+  };
+
+  const handleSaveExercise = async () => {
+    if (!formData.name.trim()) {
+      alert("Please enter an exercise name");
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      await addDoc(collection(db, "exercises"), {
+        ...formData,
+        createdAt: serverTimestamp(),
+        createdBy: "coach",
+      });
+      
+      // Refresh exercises list
+      const exercisesSnapshot = await getDocs(collection(db, "exercises"));
+      const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        let rawMuscle = data.primaryMuscles?.[0] || data.muscleGroup || "";
+        const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
+        return {
+          id: doc.id,
+          name: data.name || "Unnamed Exercise",
+          muscleGroup: muscleCategory,
+          equipment: data.equipment || "None",
+          difficulty: data.difficulty || "intermediate",
+          description: data.description,
+          instructions: data.instructions,
+          videoUrl: data.videoUrl,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+        };
+      });
+      setExercises(fetchedExercises);
+      closeModal();
+    } catch (error) {
+      console.error("Error saving exercise:", error);
+      alert("Failed to save exercise. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getDifficultyBadge = (difficulty: string) => {
     switch (difficulty) {
       case "beginner":
@@ -368,7 +506,10 @@ export default function ExercisesPage() {
               </button>
               
               {/* Add Button */}
-              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all">
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+              >
                 <Plus className="w-5 h-5" />
                 Add Exercise
               </button>
@@ -496,6 +637,251 @@ export default function ExercisesPage() {
           )}
         </div>
       </main>
+
+      {/* Add Exercise Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-card rounded-xl shadow-2xl border border-border w-full max-w-3xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-xl">
+              <div>
+                <h2 className="text-xl font-bold">Add New Exercise</h2>
+                <p className="text-sm text-blue-100">Fill in the details below</p>
+              </div>
+              <button 
+                onClick={closeModal}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Basic Info */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Basic Information</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Exercise Name *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                    placeholder="e.g., Barbell Bench Press"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => handleInputChange("description", e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
+                    rows={3}
+                    placeholder="Brief description of the exercise..."
+                  />
+                </div>
+              </div>
+
+              {/* Muscles */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Target Muscles</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Primary Muscles</label>
+                  <div className="flex flex-wrap gap-2">
+                    {muscleGroupOrder.filter(m => m !== "Other").map(muscle => (
+                      <button
+                        key={muscle}
+                        onClick={() => toggleMuscle(muscle, true)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          formData.primaryMuscles.includes(muscle)
+                            ? "bg-blue-600 text-white"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {muscle}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Secondary Muscles</label>
+                  <div className="flex flex-wrap gap-2">
+                    {muscleGroupOrder.filter(m => m !== "Other").map(muscle => (
+                      <button
+                        key={muscle}
+                        onClick={() => toggleMuscle(muscle, false)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          formData.secondaryMuscles.includes(muscle)
+                            ? "bg-indigo-600 text-white"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {muscle}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Instructions</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Setup</label>
+                    <textarea
+                      value={formData.instructions.setup}
+                      onChange={(e) => handleInstructionChange("setup", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
+                      rows={2}
+                      placeholder="How to set up for the exercise..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Posture</label>
+                    <textarea
+                      value={formData.instructions.posture}
+                      onChange={(e) => handleInstructionChange("posture", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
+                      rows={2}
+                      placeholder="Correct posture and form..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Execution</label>
+                    <textarea
+                      value={formData.instructions.execution}
+                      onChange={(e) => handleInstructionChange("execution", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
+                      rows={2}
+                      placeholder="How to perform the movement..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Breathing</label>
+                    <textarea
+                      value={formData.instructions.breathing}
+                      onChange={(e) => handleInstructionChange("breathing", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
+                      rows={2}
+                      placeholder="Breathing pattern..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Control</label>
+                    <textarea
+                      value={formData.instructions.control}
+                      onChange={(e) => handleInstructionChange("control", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
+                      rows={2}
+                      placeholder="Control and tempo..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Media */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Media</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Video URL</label>
+                    <input
+                      type="url"
+                      value={formData.videoUrl}
+                      onChange={(e) => handleInputChange("videoUrl", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Thumbnail URL</label>
+                    <input
+                      type="url"
+                      value={formData.thumbnailUrl}
+                      onChange={(e) => handleInputChange("thumbnailUrl", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Anatomical Illustration URL</label>
+                    <input
+                      type="url"
+                      value={formData.anatomicalIllustration}
+                      onChange={(e) => handleInputChange("anatomicalIllustration", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tips */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Tips & Notes</h3>
+                
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTip}
+                    onChange={(e) => setNewTip(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTip())}
+                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                    placeholder="Add a tip..."
+                  />
+                  <button
+                    onClick={addTip}
+                    className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {formData.tips.length > 0 && (
+                  <div className="space-y-2">
+                    {formData.tips.map((tip, index) => (
+                      <div key={index} className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-lg">
+                        <span className="flex-1 text-sm text-card-foreground">{tip}</span>
+                        <button
+                          onClick={() => removeTip(index)}
+                          className="text-muted-foreground hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between rounded-b-xl">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-muted-foreground hover:text-card-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveExercise}
+                disabled={saving}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "Saving..." : "Save Exercise"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
