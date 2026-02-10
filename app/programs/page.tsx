@@ -68,7 +68,20 @@ export default function ProgramsPage() {
       try {
         setLoading(true);
         const programsCollection = collection(db, "programs");
-        const programsSnapshot = await getDocs(programsCollection);
+        const usersCollection = collection(db, "users");
+        
+        // Fetch programs and users in parallel
+        const [programsSnapshot, usersSnapshot] = await Promise.all([
+          getDocs(programsCollection),
+          getDocs(usersCollection),
+        ]);
+        
+        // Build userId -> username lookup map
+        const userMap: Record<string, string> = {};
+        usersSnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          userMap[doc.id] = data.displayName || data.username || "Unknown";
+        });
         
         if (!programsSnapshot.empty) {
           const fetchedPrograms: ProgramData[] = programsSnapshot.docs.map((doc) => {
@@ -85,7 +98,7 @@ export default function ProgramsPage() {
               activeClients: data.activeClients || 0,
               clientAvatars: data.clientAvatars || [],
               updatedAt: data.updatedAt ? `Updated ${formatDate(data.updatedAt)}` : undefined,
-              createdBy: data.createdBy,
+              createdBy: data.createdBy ? (userMap[data.createdBy] || data.createdBy) : undefined,
             };
           });
           
