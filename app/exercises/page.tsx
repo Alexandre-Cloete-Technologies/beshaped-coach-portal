@@ -244,7 +244,8 @@ export default function ExercisesPage() {
             const data = doc.data();
             
             // Check multiple potential fields for muscle data
-            let rawMuscle = data.muscleGroup || 
+            let rawMuscle = data.primaryMuscles ||
+                           data.muscleGroup || 
                            data.muscle_group || 
                            data.muscle || 
                            data.muscles || 
