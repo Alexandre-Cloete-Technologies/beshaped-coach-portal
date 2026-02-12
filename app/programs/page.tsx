@@ -7,6 +7,7 @@ import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Mock programs for fallback
 const mockPrograms: ProgramData[] = [
@@ -141,9 +142,10 @@ export default function ProgramsPage() {
     );
   }, [programs, searchQuery]);
 
+  const router = useRouter();
+
   const handleView = (id: string) => {
-    console.log("View program:", id);
-    // TODO: Navigate to program details
+    router.push(`/programs/${id}`);
   };
 
   const handleEdit = (id: string) => {

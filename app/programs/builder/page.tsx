@@ -66,6 +66,8 @@ interface Exercise {
   instructions?: string[];
   videoUrl?: string;
   createdAt?: Date;
+  sets?: number;
+  repsRange?: string;
 }
 
 // Define muscle group order
@@ -358,7 +360,11 @@ export default function ProgramBuilderPage() {
   };
 
   const addExerciseToWorkout = (exercise: Exercise) => {
-    setModalExercises(prev => [...prev, { ...exercise }]);
+    setModalExercises(prev => [...prev, { ...exercise, sets: exercise.sets || 3, repsRange: exercise.repsRange || "8-12" }]);
+  };
+
+  const updateExerciseInWorkout = (index: number, field: keyof Exercise, value: any) => {
+    setModalExercises(prev => prev.map((ex, i) => i === index ? { ...ex, [field]: value } : ex));
   };
 
   const removeExerciseFromWorkout = (index: number) => {
@@ -508,8 +514,8 @@ export default function ProgramBuilderPage() {
               exerciseId: exercise.id,
               exerciseName: exercise.name,
               order: exIndex,
-              sets: 3,
-              repsRange: "8-12",
+              sets: exercise.sets || 3,
+              repsRange: exercise.repsRange || "8-12",
               tempo: "",
               restPeriod: "60s",
               notes: null,
@@ -1008,26 +1014,56 @@ export default function ProgramBuilderPage() {
                           onDragStart={() => handleModalExerciseDragStart(index)}
                           onDragOver={(e) => handleModalExerciseDragOver(e, index)}
                           onDragEnd={handleModalExerciseDragEnd}
-                          className={`group flex items-center gap-3 p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                          className={`group rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
                             draggedExerciseIndex === index 
                               ? "border-primary bg-primary/10 shadow-lg scale-[1.02]" 
                               : "border-border bg-card hover:border-primary/50 hover:shadow-md"
                           }`}
                         >
-                          <div className="flex items-center justify-center w-6 h-6 rounded bg-muted text-xs font-bold text-muted-foreground">
-                            {index + 1}
+                          {/* Exercise Header Row */}
+                          <div className="flex items-center gap-3 p-3">
+                            <div className="flex items-center justify-center w-6 h-6 rounded bg-muted text-xs font-bold text-muted-foreground">
+                              {index + 1}
+                            </div>
+                            <GripVertical className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-card-foreground truncate">{exercise.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{exercise.muscleGroup} • {exercise.equipment}</p>
+                            </div>
+                            <button
+                              onClick={() => removeExerciseFromWorkout(index)}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-muted-foreground hover:text-red-500 transition-all"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                          <GripVertical className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-card-foreground truncate">{exercise.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{exercise.muscleGroup} • {exercise.equipment}</p>
+                          {/* Sets & Reps Row */}
+                          <div className="flex items-center gap-3 px-3 pb-3 pt-0">
+                            <div className="flex items-center gap-1.5">
+                              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Sets</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={exercise.sets || 3}
+                                onChange={(e) => updateExerciseInWorkout(index, "sets", parseInt(e.target.value) || 1)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-12 px-1.5 py-1 text-center text-sm font-medium border border-border rounded-md bg-muted/50 focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                              />
+                            </div>
+                            <span className="text-muted-foreground text-sm">×</span>
+                            <div className="flex items-center gap-1.5">
+                              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Reps</label>
+                              <input
+                                type="text"
+                                value={exercise.repsRange || "8-12"}
+                                onChange={(e) => updateExerciseInWorkout(index, "repsRange", e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="8-12"
+                                className="w-16 px-1.5 py-1 text-center text-sm font-medium border border-border rounded-md bg-muted/50 focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                              />
+                            </div>
                           </div>
-                          <button
-                            onClick={() => removeExerciseFromWorkout(index)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-muted-foreground hover:text-red-500 transition-all"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
                         </div>
                       ))
                     )}
