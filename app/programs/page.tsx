@@ -218,7 +218,7 @@ export default function ProgramsPage() {
               </div>
               
               {/* Filters */}
-              <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+              {/* <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
                 <button className="flex items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent whitespace-nowrap transition-colors">
                   Focus
                   <ChevronDown className="w-4 h-4" />
@@ -231,7 +231,7 @@ export default function ProgramsPage() {
                   Difficulty
                   <ChevronDown className="w-4 h-4" />
                 </button>
-              </div>
+              </div> */}
             </div>
             
             {/* Create Button */}
@@ -279,14 +279,14 @@ export default function ProgramsPage() {
           )}
 
           {/* Load More */}
-          {filteredPrograms.length > 0 && (
+          {/* {filteredPrograms.length > 0 && (
             <div className="flex justify-center mt-10">
               <button className="text-muted-foreground hover:text-primary text-sm font-semibold transition-colors flex items-center gap-2">
                 Load more programs
                 <ChevronDown className="w-4 h-4" />
               </button>
             </div>
-          )}
+          )} */}
         </div>
       </main>
     </div>

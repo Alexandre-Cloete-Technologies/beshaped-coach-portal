@@ -18,8 +18,9 @@ import {
   Dumbbell
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // Mock template data
@@ -141,7 +142,9 @@ const getCategoryFromMuscle = (muscle: string): string => {
 };
 
 export default function ProgramBuilderPage() {
+  const router = useRouter();
   const [programName, setProgramName] = useState("Name your program");
+  const [isSaving, setIsSaving] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"templates" | "exercises">("templates");
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -412,14 +415,8 @@ export default function ProgramBuilderPage() {
       isExpanded: true,
       durationWeeks: 2,
       days: [
-        { type: "workout", workoutName: "Upper Body Power", duration: 45, label: "Workout A" },
-        { type: "workout", workoutName: "Leg Day Hypertrophy", duration: 60, label: "Workout B" },
-        { type: "rest" },
-        { type: "workout", workoutName: "Upper Body Power", duration: 45, label: "Workout A" },
-        { type: "empty" },
-        { type: "empty" },
-        { type: "rest" },
-        // Week 2 (Empty for now)
+        { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" },
+        // Week 2
         { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }
       ],
     },
@@ -477,6 +474,62 @@ export default function ProgramBuilderPage() {
     setPhases([...phases, newPhase]);
   };
 
+  const handleSaveProgram = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+
+    try {
+      const programData = {
+        name: programName,
+        description: phases[0]?.description || "",
+        totalDuration: phases.reduce((acc, phase) => acc + phase.durationWeeks, 0),
+        daysPerWeek: 7,
+        difficulty: "intermediate",
+        coverImage: "",
+        createdBy: "coach",
+        createdAt: serverTimestamp(),
+        isActive: true,
+        phases: phases.map((phase, phaseIndex) => ({
+          phaseId: phase.id,
+          name: phase.name,
+          description: phase.description,
+          order: phaseIndex,
+          durationWeeks: phase.durationWeeks,
+          focusAreas: [],
+          workouts: phase.days.map((day, dayIndex) => ({
+            dayNumber: dayIndex + 1,
+            dayName: dayNames[dayIndex % 7],
+            isRestDay: day.type === "rest",
+            workoutId: day.type === "workout" ? `workout_${phaseIndex}_${dayIndex}` : null,
+            workoutName: day.type === "workout" ? (day.workoutName || "Unnamed Workout") : null,
+            description: "",
+            estimatedDuration: day.duration || 0,
+            exercises: (day.exercises || []).map((exercise, exIndex) => ({
+              exerciseId: exercise.id,
+              exerciseName: exercise.name,
+              order: exIndex,
+              sets: 3,
+              repsRange: "8-12",
+              tempo: "",
+              restPeriod: "60s",
+              notes: null,
+              isSuperset: false,
+              supersetGroup: "",
+            })),
+          })),
+        })),
+      };
+
+      await addDoc(collection(db, "programs"), programData);
+      router.push("/programs");
+    } catch (error) {
+      console.error("Error saving program:", error);
+      alert("Failed to save program. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const filteredTemplates = mockTemplates.filter(t => 
     t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -497,13 +550,11 @@ export default function ProgramBuilderPage() {
           </Link>
         </div>
         <div className="flex flex-1 justify-end gap-6 items-center">
-          <div className="text-sm text-muted-foreground hidden md:block">
-            Auto-saved 2 mins ago
-          </div>
+
           <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center ring-2 ring-card">
+            {/* <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center ring-2 ring-card">
               <span className="text-white text-sm font-medium">D</span>
-            </div>
+            </div> */}
           </div>
         </div>
       </header>
@@ -696,21 +747,21 @@ export default function ProgramBuilderPage() {
                       <span className="text-xs text-blue-100">Duration</span>
                       <span className="font-medium">{phases.reduce((acc, phase) => acc + phase.durationWeeks, 0)} Weeks</span>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
+                    {/* <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                       <span className="text-xs text-blue-100">Difficulty</span>
                       <span className="font-medium">Intermediate</span>
                     </div>
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                       <span className="text-xs text-blue-100">Focus</span>
                       <span className="font-medium">Hypertrophy</span>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors flex items-center gap-2">
+                  {/* <button className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors flex items-center gap-2">
                     <Edit className="w-4 h-4" />
                     Edit Details
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>
@@ -874,12 +925,15 @@ export default function ProgramBuilderPage() {
         <div className="absolute bottom-0 right-0 left-0 md:left-[280px] bg-card/90 backdrop-blur-md border-t border-border px-8 py-4 z-20">
           <div className="flex items-center justify-between mx-auto max-w-[1280px]">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle className="w-4 h-4 text-green-500" />
-              All changes saved
+
             </div>
             <div className="flex gap-4">
-              <button className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors">
-                Save as Draft
+              <button 
+                onClick={handleSaveProgram}
+                disabled={isSaving}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? "Saving..." : "Save"}
               </button>
               <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
                 <span>Assign to Clients</span>
