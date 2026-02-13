@@ -50,9 +50,6 @@ export default function ProgramCard({
               {program.updatedAt || (program.createdBy ? `Created by ${program.createdBy}` : "")}
             </p>
           </div>
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getBadgeStyle()}`}>
-            {program.isTemplate ? "Template" : "Custom"}
-          </span>
         </div>
 
         {/* Meta Data Grid */}
@@ -69,26 +66,7 @@ export default function ProgramCard({
 
         {/* Focus & Stats */}
         <div className="mb-6 space-y-3">
-          <div>
-            <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Focus</span>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              {program.focusAreas.length > 0 ? (
-                program.focusAreas.slice(0, 3).map((focus, idx) => (
-                  <span 
-                    key={idx} 
-                    className="px-2 py-1 rounded-md bg-muted text-xs font-medium text-muted-foreground"
-                  >
-                    {focus}
-                  </span>
-                ))
-              ) : (
-                <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium text-muted-foreground">
-                  General
-                </span>
-              )}
-            </div>
-          </div>
-          
+
           <div>
             <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Active Clients</span>
             <div className="flex items-center mt-1 gap-2">

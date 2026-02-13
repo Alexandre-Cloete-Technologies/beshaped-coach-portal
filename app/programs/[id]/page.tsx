@@ -256,11 +256,7 @@ export default function ProgramDetailPage() {
             <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div className="flex-1 space-y-4">
                 <div>
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border mb-3 ${getDifficultyColor(program.difficulty)}`}
-                  >
-                    {program.difficulty.charAt(0).toUpperCase() + program.difficulty.slice(1)}
-                  </span>
+
                   <h1 className="text-4xl font-bold text-white leading-tight">
                     {program.name}
                   </h1>
