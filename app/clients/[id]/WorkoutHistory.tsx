@@ -643,10 +643,7 @@ export default function WorkoutHistory() {
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
 
-          <button className="flex items-center gap-2 px-4 h-10 text-sm font-semibold text-card-foreground bg-card border border-border rounded-lg hover:bg-accent transition-colors">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
+
 
         </div>
       </div>

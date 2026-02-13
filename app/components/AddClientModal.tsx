@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Check } from "lucide-react";
+import { X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { collection, addDoc, Timestamp, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -26,6 +26,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
   const [formData, setFormData] = useState({
     username: "",
     email: "",
+    phoneNumber: "",
     currentProgram: "",
     role: "client",
     assignedCoach: "",
@@ -66,14 +67,13 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const selectProgram = (program: string) => {
-    setFormData(prev => ({ ...prev, currentProgram: program }));
-  };
+
 
   const resetForm = () => {
     setFormData({
       username: "",
       email: "",
+      phoneNumber: "",
       currentProgram: "",
       role: "client",
       assignedCoach: "",
@@ -90,6 +90,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
       await addDoc(collection(db, "users"), {
         displayName: formData.username,
         email: formData.email,
+        phoneNumber: formData.phoneNumber,
         username: formData.username,
         profilePhoto: "",
         role: formData.role,
@@ -117,6 +118,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
       setFormData({
         username: "",
         email: "",
+        phoneNumber: "",
         currentProgram: "",
         role: "client",
         assignedCoach: "",
@@ -141,26 +143,27 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-border">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-border">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="text-2xl font-bold text-card-foreground">Add New Client</h2>
-            <p className="text-sm text-muted-foreground mt-1">Create a new client profile</p>
+            <h2 className="text-lg font-semibold text-card-foreground">Add New Client</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Create a new client profile</p>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
           >
-            <X className="w-5 h-5 text-muted-foreground" />
+            <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="space-y-5">
+        <form onSubmit={handleSubmit} className="px-6 py-6">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-5">
+            {/* Username */}
             <div>
-              <label className="block text-sm font-medium text-card-foreground mb-2">
+              <label className="block text-xs font-medium text-card-foreground mb-2">
                 Username *
               </label>
               <input
@@ -169,13 +172,14 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 value={formData.username}
                 onChange={handleInputChange}
                 required
-                className="w-full h-11 px-4 rounded-lg border border-border bg-background text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="johndoe"
               />
             </div>
 
+            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-card-foreground mb-2">
+              <label className="block text-xs font-medium text-card-foreground mb-2">
                 Email Address *
               </label>
               <input
@@ -184,104 +188,100 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                className="w-full h-11 px-4 rounded-lg border border-border bg-background text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="john@example.com"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-card-foreground mb-2">
-                  Role
-                </label>
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full h-11 px-4 rounded-lg border border-border bg-background text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
-                >
-                  <option value="client">Client</option>
-                  <option value="coach">Coach</option>
-                </select>
-              </div>
-
-              {formData.role === "client" && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-card-foreground mb-2">
-                      Assigned Coach
-                    </label>
-                    <select
-                      name="assignedCoach"
-                      value={formData.assignedCoach}
-                      onChange={(e) => setFormData(prev => ({ ...prev, assignedCoach: e.target.value }))}
-                      className="w-full h-11 px-4 rounded-lg border border-border bg-background text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
-                    >
-                      <option value="">Select a Coach</option>
-                      {staticCoaches.map((coach) => (
-                        <option key={coach.id} value={coach.name}>
-                          {coach.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
+            {/* Phone Number */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                name="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                placeholder="+264 81 234 5678"
+              />
             </div>
 
+            {/* Role */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Role
+              </label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+              >
+                <option value="client">Client</option>
+                <option value="coach">Coach</option>
+              </select>
+            </div>
+
+            {/* Assigned Coach */}
+            {formData.role === "client" ? (
+              <div>
+                <label className="block text-xs font-medium text-card-foreground mb-2">
+                  Assigned Coach
+                </label>
+                <select
+                  name="assignedCoach"
+                  value={formData.assignedCoach}
+                  onChange={(e) => setFormData(prev => ({ ...prev, assignedCoach: e.target.value }))}
+                  className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                >
+                  <option value="">Select a Coach</option>
+                  {staticCoaches.map((coach) => (
+                    <option key={coach.id} value={coach.name}>
+                      {coach.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : <div />}
+
+            {/* Goals & Program - only for clients */}
             {formData.role === "client" && (
               <>
+                {/* Goals */}
                 <div>
-                  <label className="block text-sm font-medium text-card-foreground mb-2">
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
                     Goals
                   </label>
                   <textarea
                     name="goals"
                     value={formData.goals}
                     onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
-                    className="w-full h-24 px-4 py-3 rounded-lg border border-border bg-background text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                    className="w-full h-28 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
                     placeholder="e.g. Lose 5kg, Improve squat form..."
                   />
                 </div>
 
+                {/* Training Program */}
                 <div>
-                  <label className="block text-sm font-medium text-card-foreground mb-2">
-                    Assign the client a training program
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Training Program
                   </label>
-                  {loadingPrograms ? (
-                    <div className="flex items-center justify-center p-3 rounded-lg border border-border bg-background min-h-[100px]">
-                      <p className="text-sm text-muted-foreground">Loading programs...</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-border bg-background min-h-[100px] max-h-[200px] overflow-y-auto">
-                      {programs.length > 0 ? (
-                        programs.map((program) => (
-                          <button
-                            key={program}
-                            type="button"
-                            onClick={() => selectProgram(program)}
-                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                              formData.currentProgram === program
-                                ? "bg-primary text-primary-foreground shadow-sm"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            }`}
-                          >
-                            {formData.currentProgram === program && (
-                              <Check className="w-3 h-3 inline mr-1" />
-                            )}
-                            {program}
-                          </button>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No programs available</p>
-                      )}
-                    </div>
-                  )}
-                  {formData.currentProgram && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Selected: <span className="font-medium text-card-foreground">{formData.currentProgram}</span>
-                    </p>
-                  )}
+                  <select
+                    name="currentProgram"
+                    value={formData.currentProgram}
+                    onChange={(e) => setFormData(prev => ({ ...prev, currentProgram: e.target.value }))}
+                    disabled={loadingPrograms}
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                  >
+                    <option value="">{loadingPrograms ? "Loading programs..." : "Select a Program"}</option>
+                    {programs.map((program) => (
+                      <option key={program} value={program}>
+                        {program}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}
@@ -289,30 +289,28 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         </form>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-border bg-muted/20">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-muted/20">
           <button
             type="button"
             onClick={resetForm}
-            className="h-11 px-6 rounded-lg text-muted-foreground font-medium hover:text-card-foreground hover:bg-accent transition-colors"
+            className="h-10 px-4 rounded-lg text-xs text-muted-foreground font-medium hover:text-card-foreground hover:bg-accent transition-colors"
           >
             Reset
           </button>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-11 px-6 rounded-lg border border-border bg-background text-card-foreground font-medium hover:bg-accent transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !formData.username || !formData.email}
-              className="h-11 px-6 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Adding..." : "Add Client"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !formData.username || !formData.email}
+            className="h-10 px-5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Adding..." : "Add Client"}
+          </button>
         </div>
       </div>
     </div>

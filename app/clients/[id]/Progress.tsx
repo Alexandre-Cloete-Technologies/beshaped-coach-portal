@@ -568,7 +568,7 @@ export default function Progress({ clientId }: ProgressProps) {
           </div> */}
   
           {/* Coach Note */}
-          <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-5 border border-yellow-100 dark:border-yellow-900/30">
+          {/* <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-5 border border-yellow-100 dark:border-yellow-900/30">
             <div className="flex items-center gap-2 mb-2 text-yellow-800 dark:text-yellow-500">
               <span className="text-xl">📋</span>
               <h3 className="text-sm font-bold uppercase tracking-wide">Coach Note</h3>
@@ -576,7 +576,7 @@ export default function Progress({ clientId }: ProgressProps) {
             <p className="text-sm text-card-foreground italic">
               "Client is experiencing mild knee pain. Monitor squat depth in next session."
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
   

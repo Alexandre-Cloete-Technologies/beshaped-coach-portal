@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+// import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {
   currentPage: number;
@@ -12,23 +12,23 @@ interface PaginationProps {
 
 export default function Pagination({ 
   currentPage, 
-  totalPages, 
+  // totalPages, 
   totalItems, 
   itemsPerPage,
-  onPageChange 
+  // onPageChange 
 }: PaginationProps) {
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
     <div className="flex items-center justify-between py-4">
-      <p className="text-sm text-muted-foreground">
+      {/* <p className="text-sm text-muted-foreground">
         Showing <span className="font-medium text-card-foreground">{startItem}-{endItem}</span> of{" "}
         <span className="font-medium text-card-foreground">{totalItems}</span> clients
-      </p>
+      </p> */}
       
       <div className="flex items-center gap-2">
-        <button
+        {/* <button
           onClick={() => onPageChange?.(currentPage - 1)}
           disabled={currentPage === 1}
           className="h-10 px-4 rounded-lg border border-border bg-card text-sm font-medium text-card-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
@@ -43,7 +43,7 @@ export default function Pagination({
         >
           Next
           <ChevronRight className="w-4 h-4" />
-        </button>
+        </button> */}
       </div>
     </div>
   );

@@ -9,68 +9,7 @@ import { useEffect, useState } from "react";
 import { collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Mock client data for the table
-const mockClients = [
-  {
-    id: "1",
-    name: "Jane Doe",
-    email: "janedoe@email.com",
-    photo: "/avatars/jane.jpg",
-    avatarGradient: "bg-gradient-to-br from-rose-400 to-pink-600",
-    status: "Active",
-    currentProgram: "Hypertrophy Phase 2",
-    programProgress: 65,
-    lastActive: "2 hours ago",
-    engagement: "High",
-  },
-  {
-    id: "2",
-    name: "Marcus Reid",
-    email: "marcusr@gmail.com",
-    avatarInitials: "MR",
-    avatarGradient: "bg-gradient-to-br from-purple-400 to-purple-600",
-    status: "Onboarding",
-    currentProgram: "Foundation Start",
-    programProgress: 25,
-    lastActive: "1 day ago",
-    engagement: "Medium",
-  },
-  {
-    id: "3",
-    name: "Sarah Connor",
-    email: "s.connor@outlook.com",
-    avatarGradient: "bg-gradient-to-br from-emerald-400 to-teal-600",
-    status: "Active",
-    currentProgram: "Endurance Master",
-    programProgress: 80,
-    lastActive: "5 mins ago",
-    engagement: "Very High",
-  },
-  {
-    id: "4",
-    name: "David Kim",
-    email: "davidkim@webmail.com",
-    avatarInitials: "DK",
-    avatarGradient: "bg-gradient-to-br from-amber-400 to-orange-600",
-    status: "Inactive",
-    currentProgram: "Weight Loss Basic",
-    programProgress: 15,
-    lastActive: "2 weeks ago",
-    engagement: "Low",
-  },
-  {
-    id: "5",
-    name: "Emily Blunt",
-    email: "emilyb@studio.com",
-    avatarInitials: "EB",
-    avatarGradient: "bg-gradient-to-br from-blue-400 to-indigo-600",
-    status: "Active",
-    currentProgram: "Powerlifting 101",
-    programProgress: 45,
-    lastActive: "12 hours ago",
-    engagement: "High",
-  },
-];
+
 
 const statusColors = {
   Active: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
@@ -86,7 +25,7 @@ const engagementConfig = {
 };
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState(mockClients);
+  const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -142,14 +81,11 @@ export default function ClientsPage() {
         };
       }));
 
-      // Combine Firebase users with mock clients (keeping mock clients for now)
-      setClients([...fetchedUsers, ...mockClients]);
+      setClients(fetchedUsers);
       setError(null);
     } catch (err) {
       console.error("Error fetching users:", err);
       setError("Failed to load users from database");
-      // Keep using mock clients on error
-      setClients(mockClients);
     } finally {
       setLoading(false);
     }
@@ -201,15 +137,15 @@ export default function ClientsPage() {
               </div>
 
               {/* Filter Button */}
-              <button className="h-10 px-4 rounded-lg border border-border bg-card flex items-center gap-2 text-sm font-medium text-card-foreground hover:bg-accent transition-colors">
+              {/* <button className="h-10 px-4 rounded-lg border border-border bg-card flex items-center gap-2 text-sm font-medium text-card-foreground hover:bg-accent transition-colors">
                 <SlidersHorizontal className="w-4 h-4" />
                 Filter
-              </button>
+              </button> */}
 
               {/* Add New Client Button */}
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm"
+                className="h-10 px-4 rounded-lg bg-blue-600 text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 Add New Client
@@ -231,7 +167,7 @@ export default function ClientsPage() {
                   <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Current Program
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {/* <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Last Active
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -239,7 +175,7 @@ export default function ClientsPage() {
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Actions
-                  </th>
+                  </th> */}
                 </tr>
               </thead>
               <tbody>
@@ -264,7 +200,7 @@ export default function ClientsPage() {
                 ) : (
                   filteredClients.map((client, index) => {
                   const engagement = engagementConfig[client.engagement as keyof typeof engagementConfig];
-                  const initials = client.avatarInitials || client.name.split(' ').map(n => n[0]).join('');
+                  const initials = client.avatarInitials || client.name.split(' ').map((n: string) => n[0]).join('');
                   
                   return (
                     <tr
@@ -332,16 +268,16 @@ export default function ClientsPage() {
                       </td>
 
                       {/* Last Active */}
-                      <td className="py-3 px-4">
+                      {/* <td className="py-3 px-4">
                         <Link href={`/clients/${client.id}`} className="block">
                           <span className="text-xs text-muted-foreground">
                             {client.lastActive}
                           </span>
                         </Link>
-                      </td>
+                      </td> */}
 
                       {/* Engagement */}
-                      <td className="py-3 px-4">
+                      {/* <td className="py-3 px-4">
                         <Link href={`/clients/${client.id}`} className="block">
                           <div className="flex items-center gap-1">
                             {Array.from({ length: engagement.dots }).map((_, i) => (
@@ -352,17 +288,17 @@ export default function ClientsPage() {
                             ))}
                           </div>
                         </Link>
-                      </td>
+                      </td> */}
 
                       {/* Actions */}
-                      <td className="py-3 px-4">
+                      {/* <td className="py-3 px-4">
                         <button 
                           onClick={(e) => e.preventDefault()}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
-                      </td>
+                      </td> */}
                     </tr>
                   );
                 }))

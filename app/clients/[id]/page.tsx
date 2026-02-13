@@ -5,24 +5,12 @@ import {
   Mail, 
   Phone, 
   Edit, 
-  Archive,
   LayoutGrid,
   History,
   TrendingUp,
   Apple,
   Settings,
-  ArrowRight,
-  Weight,
-  Moon,
-  Droplet,
   Dumbbell,
-  Utensils,
-  Scale,
-  MessageSquare,
-  FileText,
-  Calendar,
-  Filter,
-  Flame
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Link from "next/link";
@@ -236,10 +224,7 @@ export default function ClientDetailPage() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <button className="h-9 px-4 rounded-lg border border-border bg-card flex items-center gap-2 text-sm font-medium text-card-foreground hover:bg-accent transition-colors">
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </button>
+
 
               </div>
             </div>
@@ -312,35 +297,15 @@ export default function ClientDetailPage() {
                 </div>
 
                 {/* Stats Row - Placeholder */}
-                <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+                {/* <div className="bg-card rounded-xl border border-border shadow-sm p-5">
                   <h2 className="text-lg font-semibold text-foreground mb-4">Stats & Activity</h2>
                   <p className="text-sm text-muted-foreground">
                     Workout stats, nutrition logs, and activity tracking coming soon...
                   </p>
-                </div>
+                </div> */}
               </div>
 
-              {/* Right Column - Sidebar */}
-              <div className="space-y-6">
-                {/* Quick Actions */}
-                <div className="bg-card rounded-xl border border-border shadow-sm p-5">
-                  <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
-                  <div className="space-y-2">
-                    <button className="w-full h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors">
-                      <MessageSquare className="w-4 h-4" />
-                      Send Message
-                    </button>
-                    <button className="w-full h-10 px-4 rounded-lg border border-border bg-card text-sm font-medium text-card-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      Log Note
-                    </button>
-                    <button className="w-full h-10 px-4 rounded-lg border border-border bg-card text-sm font-medium text-card-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Assign Workout
-                    </button>
-                  </div>
-                </div>
-              </div>
+              
             </div>
           ) : (
             /* Placeholder for other tabs */
