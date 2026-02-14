@@ -1,10 +1,10 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, AlertTriangle } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import ProgramCard, { ProgramData } from "../components/ProgramCard";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -61,7 +61,10 @@ export default function ProgramsPage() {
   const [programs, setPrograms] = useState<ProgramData[]>(mockPrograms);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"library" | "builder">("library");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [programToDelete, setProgramToDelete] = useState<ProgramData | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  // const [viewMode, setViewMode] = useState<"library" | "builder">("library");
 
   // Fetch programs from Firebase
   useEffect(() => {
@@ -159,8 +162,26 @@ export default function ProgramsPage() {
   };
 
   const handleDelete = (id: string) => {
-    console.log("Delete program:", id);
-    // TODO: Delete program with confirmation
+    const program = programs.find((p) => p.id === id);
+    if (program) {
+      setProgramToDelete(program);
+      setDeleteModalOpen(true);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!programToDelete) return;
+    try {
+      setDeleting(true);
+      await deleteDoc(doc(db, "programs", programToDelete.id));
+      setPrograms((prev) => prev.filter((p) => p.id !== programToDelete.id));
+      setDeleteModalOpen(false);
+      setProgramToDelete(null);
+    } catch (error) {
+      console.error("Error deleting program:", error);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -179,7 +200,7 @@ export default function ProgramsPage() {
             </div>
             
             {/* Segmented Control */}
-            <div className="bg-muted p-1 rounded-lg inline-flex">
+            {/* <div className="bg-muted p-1 rounded-lg inline-flex">
               <button 
                 onClick={() => setViewMode("library")}
                 className={`px-6 py-2 rounded-md text-sm font-semibold transition-all ${
@@ -200,7 +221,7 @@ export default function ProgramsPage() {
               >
                 Builder
               </button>
-            </div>
+            </div> */}
           </div>
 
           {/* Toolbar */}
@@ -290,6 +311,48 @@ export default function ProgramsPage() {
           )} */}
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => { if (!deleting) { setDeleteModalOpen(false); setProgramToDelete(null); } }}
+          />
+          {/* Modal */}
+          <div className="relative bg-card rounded-2xl shadow-2xl border border-border p-6 w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="text-lg font-bold text-card-foreground">Delete Program</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to delete <span className="font-semibold text-card-foreground">{programToDelete?.name}</span>?
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setDeleteModalOpen(false); setProgramToDelete(null); }}
+                disabled={deleting}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-muted text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

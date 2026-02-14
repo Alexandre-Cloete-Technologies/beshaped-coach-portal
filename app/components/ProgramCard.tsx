@@ -112,13 +112,13 @@ export default function ProgramCard({
             >
               <Edit className="w-5 h-5" />
             </button>
-            <button 
+            {/* <button 
               onClick={() => onDuplicate?.(program.id)}
               className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" 
               title="Duplicate"
             >
               <Copy className="w-5 h-5" />
-            </button>
+            </button> */}
             <button 
               onClick={() => onDelete?.(program.id)}
               className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" 
