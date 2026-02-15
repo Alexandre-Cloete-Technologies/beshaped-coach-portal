@@ -177,12 +177,13 @@ export default function ClientCard({ client }: { client: ClientData }) {
               <span className="text-muted-foreground">Last Workout</span>
               <span className="font-medium text-card-foreground">{formatLastWorkout(client.lastWorkout)}</span>
             </div> */}
-            <div className="flex justify-between">
+            {/* Compliance */}
+            {/* <div className="flex justify-between">
               <span className="text-muted-foreground">Compliance</span>
               <span className={`font-medium ${colors.labelColor}`}>
                 {client.completedWorkouts}/{client.totalWorkouts} ({client.compliance}%)
               </span>
-            </div>
+            </div> */}
             {client.goals && (
               <div className="flex items-start">
                 <div className="flex-1">

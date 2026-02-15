@@ -66,13 +66,13 @@ export default function Sidebar() {
       {/* Bottom Section */}
       <div className="p-3 border-t border-sidebar-border">
         {/* Settings */}
-        <a
+        {/* <a
           href="/settings"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
         >
           <Settings size={20} />
           Settings
-        </a>
+        </a> */}
 
         {/* User Profile */}
         <div className="flex items-center gap-3 px-3 py-3 mt-2">
