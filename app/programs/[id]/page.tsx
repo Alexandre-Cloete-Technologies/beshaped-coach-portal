@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Link from "next/link";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useParams } from "next/navigation";
 
@@ -79,6 +79,9 @@ export default function ProgramDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedProgram, setEditedProgram] = useState<ProgramDetail | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchProgram = async () => {
@@ -172,6 +175,54 @@ export default function ProgramDetailPage() {
     });
   };
 
+  const startEditing = () => {
+    setEditedProgram(JSON.parse(JSON.stringify(program)));
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditedProgram(null);
+    setIsEditing(false);
+  };
+
+  const saveChanges = async () => {
+    if (!editedProgram || !programId) return;
+    try {
+      setSaving(true);
+      await updateDoc(doc(db, "programs", programId), {
+        name: editedProgram.name,
+        phases: editedProgram.phases.map((phase) => ({
+          ...phase,
+          name: phase.name,
+          description: phase.description,
+        })),
+      });
+      setProgram(editedProgram);
+      setIsEditing(false);
+      setEditedProgram(null);
+    } catch (err) {
+      console.error("Error saving program:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updatePhaseName = (phaseIdx: number, value: string) => {
+    if (!editedProgram) return;
+    const updated = { ...editedProgram };
+    updated.phases = [...updated.phases];
+    updated.phases[phaseIdx] = { ...updated.phases[phaseIdx], name: value };
+    setEditedProgram(updated);
+  };
+
+  const updatePhaseDescription = (phaseIdx: number, value: string) => {
+    if (!editedProgram) return;
+    const updated = { ...editedProgram };
+    updated.phases = [...updated.phases];
+    updated.phases[phaseIdx] = { ...updated.phases[phaseIdx], description: value };
+    setEditedProgram(updated);
+  };
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "beginner":
@@ -256,11 +307,19 @@ export default function ProgramDetailPage() {
             <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div className="flex-1 space-y-4">
                 <div>
-
-                  <h1 className="text-4xl font-bold text-white leading-tight">
-                    {program.name}
-                  </h1>
-                  {program.description && (
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editedProgram?.name || ""}
+                      onChange={(e) => setEditedProgram(editedProgram ? { ...editedProgram, name: e.target.value } : null)}
+                      className="text-4xl font-bold text-white leading-tight bg-transparent border-none outline-none w-full focus:outline-none placeholder-white/50"
+                    />
+                  ) : (
+                    <h1 className="text-4xl font-bold text-white leading-tight">
+                      {program.name}
+                    </h1>
+                  )}
+                  {program.description && !isEditing && (
                     <p className="text-blue-100 mt-2 text-sm max-w-xl">
                       {program.description}
                     </p>
@@ -286,13 +345,31 @@ export default function ProgramDetailPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Link
-                  href={`/programs/builder?edit=${program.id}`}
-                  className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors flex items-center gap-2"
-                >
-                  <Edit className="w-4 h-4" />
-                  Edit Program
-                </Link>
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={cancelEditing}
+                      className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveChanges}
+                      disabled={saving}
+                      className="bg-white hover:bg-white/90 text-indigo-600 rounded-lg px-4 py-2 text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={startEditing}
+                    className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors flex items-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit Program
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -333,14 +410,42 @@ export default function ProgramDetailPage() {
                         ) : (
                           <ChevronRight className="w-5 h-5 text-muted-foreground" />
                         )}
-                        <div className="text-left">
-                          <h2 className="text-lg font-bold text-card-foreground">
-                            {phase.name}
-                          </h2>
-                          {phase.description && (
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                              {phase.description}
-                            </p>
+                        <div className="text-left flex-1">
+                          {isEditing ? (
+                            <>
+                              <input
+                                type="text"
+                                value={editedProgram?.phases[program.phases.findIndex(p => p.phaseId === phase.phaseId)]?.name || ""}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  updatePhaseName(program.phases.findIndex(p => p.phaseId === phase.phaseId), e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-lg font-bold text-card-foreground bg-transparent border-none outline-none w-full focus:outline-none"
+                              />
+                              <textarea
+                                value={editedProgram?.phases[program.phases.findIndex(p => p.phaseId === phase.phaseId)]?.description || ""}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  updatePhaseDescription(program.phases.findIndex(p => p.phaseId === phase.phaseId), e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Phase description..."
+                                rows={2}
+                                className="text-sm text-muted-foreground mt-1 bg-transparent border-none outline-none w-full focus:outline-none resize-none"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <h2 className="text-lg font-bold text-card-foreground">
+                                {phase.name}
+                              </h2>
+                              {phase.description && (
+                                <p className="text-sm text-muted-foreground mt-0.5">
+                                  {phase.description}
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
