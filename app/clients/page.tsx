@@ -117,7 +117,7 @@ export default function ClientsPage() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Clients</h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Manage your active clients, monitor progress, and onboarding.
+                  View your active clients.
                 </p>
               </div>
             </div>
