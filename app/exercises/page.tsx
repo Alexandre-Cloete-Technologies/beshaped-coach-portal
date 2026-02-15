@@ -641,61 +641,110 @@ export default function ExercisesPage() {
 
       {/* Add Exercise Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-card rounded-xl shadow-2xl border border-border w-full max-w-3xl max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-border max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
-                <h2 className="text-xl font-bold">Add New Exercise</h2>
-                <p className="text-sm text-blue-100">Fill in the details below</p>
+                <h2 className="text-lg font-semibold text-card-foreground">Add New Exercise</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Fill in the details below</p>
               </div>
-              <button 
+              <button
                 onClick={closeModal}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Basic Info */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Basic Information</h3>
-                
+            {/* Form Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="grid grid-cols-2 gap-x-5 gap-y-5">
+                {/* Exercise Name */}
                 <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Exercise Name *</label>
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Exercise Name *
+                  </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleInputChange("name", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                     placeholder="e.g., Barbell Bench Press"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                {/* Equipment */}
+                {/* <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Equipment
+                  </label>
+                  <select
+                    value={formData.equipment}
+                    onChange={(e) => handleInputChange("equipment", e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                  >
+                    <option value="">Select Equipment</option>
+                    {equipmentOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div> */}
+
+                {/* Category */}
+                {/* <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => handleInputChange("category", e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                  >
+                    <option value="">Select Category</option>
+                    {categoryOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div> */}
+
+                {/* Video URL */}
+                {/* <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Video URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.videoUrl}
+                    onChange={(e) => handleInputChange("videoUrl", e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    placeholder="https://..."
+                  />
+                </div> */}
+
+                {/* Description - full width */}
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Description
+                  </label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => handleInputChange("description", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
-                    rows={3}
+                    className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
                     placeholder="Brief description of the exercise..."
                   />
                 </div>
-              </div>
 
-              {/* Muscles */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Target Muscles</h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">Primary Muscles</label>
+                {/* Primary Muscles - full width */}
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Primary Muscles
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {muscleGroupOrder.filter(m => m !== "Other").map(muscle => (
                       <button
                         key={muscle}
+                        type="button"
                         onClick={() => toggleMuscle(muscle, true)}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                           formData.primaryMuscles.includes(muscle)
@@ -709,12 +758,16 @@ export default function ExercisesPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">Secondary Muscles</label>
+                {/* Secondary Muscles - full width */}
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Secondary Muscles
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {muscleGroupOrder.filter(m => m !== "Other").map(muscle => (
                       <button
                         key={muscle}
+                        type="button"
                         onClick={() => toggleMuscle(muscle, false)}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                           formData.secondaryMuscles.includes(muscle)
@@ -727,155 +780,151 @@ export default function ExercisesPage() {
                     ))}
                   </div>
                 </div>
-              </div>
 
-              {/* Instructions */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Instructions</h3>
-                
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Setup</label>
-                    <textarea
-                      value={formData.instructions.setup}
-                      onChange={(e) => handleInstructionChange("setup", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
-                      rows={2}
-                      placeholder="How to set up for the exercise..."
-                    />
+                {/* Instructions */}
+                {/* <div className="col-span-2">
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Instructions
+                  </label>
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground mb-1">Setup</label>
+                      <textarea
+                        value={formData.instructions.setup}
+                        onChange={(e) => handleInstructionChange("setup", e.target.value)}
+                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                        placeholder="How to set up..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground mb-1">Posture</label>
+                      <textarea
+                        value={formData.instructions.posture}
+                        onChange={(e) => handleInstructionChange("posture", e.target.value)}
+                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                        placeholder="Correct posture..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground mb-1">Execution</label>
+                      <textarea
+                        value={formData.instructions.execution}
+                        onChange={(e) => handleInstructionChange("execution", e.target.value)}
+                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                        placeholder="How to perform..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground mb-1">Breathing</label>
+                      <textarea
+                        value={formData.instructions.breathing}
+                        onChange={(e) => handleInstructionChange("breathing", e.target.value)}
+                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                        placeholder="Breathing pattern..."
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[11px] text-muted-foreground mb-1">Control</label>
+                      <textarea
+                        value={formData.instructions.control}
+                        onChange={(e) => handleInstructionChange("control", e.target.value)}
+                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                        placeholder="Control and tempo..."
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Posture</label>
-                    <textarea
-                      value={formData.instructions.posture}
-                      onChange={(e) => handleInstructionChange("posture", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
-                      rows={2}
-                      placeholder="Correct posture and form..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Execution</label>
-                    <textarea
-                      value={formData.instructions.execution}
-                      onChange={(e) => handleInstructionChange("execution", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
-                      rows={2}
-                      placeholder="How to perform the movement..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Breathing</label>
-                    <textarea
-                      value={formData.instructions.breathing}
-                      onChange={(e) => handleInstructionChange("breathing", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
-                      rows={2}
-                      placeholder="Breathing pattern..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Control</label>
-                    <textarea
-                      value={formData.instructions.control}
-                      onChange={(e) => handleInstructionChange("control", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none resize-none"
-                      rows={2}
-                      placeholder="Control and tempo..."
-                    />
-                  </div>
-                </div>
-              </div>
+                </div> */}
 
-              {/* Media */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Media</h3>
-                
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Video URL</label>
-                    <input
-                      type="url"
-                      value={formData.videoUrl}
-                      onChange={(e) => handleInputChange("videoUrl", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
-                      placeholder="https://..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Thumbnail URL</label>
-                    <input
-                      type="url"
-                      value={formData.thumbnailUrl}
-                      onChange={(e) => handleInputChange("thumbnailUrl", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
-                      placeholder="https://..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Anatomical Illustration URL</label>
-                    <input
-                      type="url"
-                      value={formData.anatomicalIllustration}
-                      onChange={(e) => handleInputChange("anatomicalIllustration", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
-                      placeholder="https://..."
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Tips */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wider">Tips & Notes</h3>
-                
-                <div className="flex gap-2">
+                {/* Thumbnail URL */}
+                {/* <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Thumbnail URL
+                  </label>
                   <input
-                    type="text"
-                    value={newTip}
-                    onChange={(e) => setNewTip(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTip())}
-                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-card-foreground focus:ring-2 focus:ring-ring focus:outline-none"
-                    placeholder="Add a tip..."
+                    type="url"
+                    value={formData.thumbnailUrl}
+                    onChange={(e) => handleInputChange("thumbnailUrl", e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    placeholder="https://..."
                   />
-                  <button
-                    onClick={addTip}
-                    className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
+                </div> */}
 
-                {formData.tips.length > 0 && (
-                  <div className="space-y-2">
-                    {formData.tips.map((tip, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-lg">
-                        <span className="flex-1 text-sm text-card-foreground">{tip}</span>
-                        <button
-                          onClick={() => removeTip(index)}
-                          className="text-muted-foreground hover:text-red-500 transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                {/* Anatomical Illustration URL */}
+                {/* <div>
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Anatomical Illustration URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.anatomicalIllustration}
+                    onChange={(e) => handleInputChange("anatomicalIllustration", e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    placeholder="https://..."
+                  />
+                </div> */}
+
+                {/* Tips - full width */}
+                {/* <div className="col-span-2">
+                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                    Tips & Notes
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newTip}
+                      onChange={(e) => setNewTip(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTip())}
+                      className="flex-1 h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                      placeholder="Add a tip..."
+                    />
+                    <button
+                      type="button"
+                      onClick={addTip}
+                      className="h-11 px-4 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
+                  {formData.tips.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {formData.tips.map((tip, index) => (
+                        <div key={index} className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-lg">
+                          <span className="flex-1 text-sm text-card-foreground">{tip}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTip(index)}
+                            className="text-muted-foreground hover:text-red-500 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div> */}
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between rounded-b-xl">
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-muted/20">
               <button
+                type="button"
+                onClick={() => setFormData(emptyFormData)}
+                className="h-10 px-4 rounded-lg text-xs text-muted-foreground font-medium hover:text-card-foreground hover:bg-accent transition-colors"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
                 onClick={closeModal}
-                className="px-4 py-2 text-muted-foreground hover:text-card-foreground transition-colors"
+                className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveExercise}
-                disabled={saving}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={saving || !formData.name.trim()}
+                className="h-10 px-5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Saving..." : "Save Exercise"}
               </button>
