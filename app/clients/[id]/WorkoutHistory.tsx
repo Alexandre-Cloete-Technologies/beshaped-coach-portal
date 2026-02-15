@@ -788,7 +788,7 @@ export default function WorkoutHistory() {
             </div>
 
             {/* Legend */}
-            <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground justify-center">
+            {/* <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground justify-center">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
                 <span>Completed</span>
@@ -801,11 +801,11 @@ export default function WorkoutHistory() {
                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
                 <span>Skipped</span>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Monthly Summary */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          {/* <div className="bg-card rounded-xl border border-border p-6">
             <h4 className="font-bold text-card-foreground mb-4">Monthly Summary</h4>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -826,7 +826,7 @@ export default function WorkoutHistory() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Right Content - Workout List */}

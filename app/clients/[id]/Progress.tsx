@@ -238,7 +238,6 @@ export default function Progress({ clientId }: ProgressProps) {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
               <div>
                 <h3 className="text-card-foreground text-lg font-bold">Bodyweight History</h3>
-                <p className="text-sm text-muted-foreground">Recent progress</p>
               </div>
               <div className="flex gap-4">
                 <div className="flex flex-col">
