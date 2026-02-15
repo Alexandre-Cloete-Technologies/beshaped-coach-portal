@@ -9,6 +9,7 @@ import {
   ChevronDown, 
   ChevronRight,
   X, 
+  ArrowLeft,
   Clock, 
   Hotel,
   Edit,
@@ -784,13 +785,15 @@ export default function ProgramBuilderPage() {
 
         {/* Center Canvas */}
         <main className="flex-1 overflow-y-auto bg-background scroll-smooth">
-          <Link
-              href="/programs"
-              className=" hover:text-blue-700 font-medium"
-            >
-              ← Back to Programs
-          </Link>
+
           <div className="mx-auto max-w-[1280px] p-8 flex flex-col gap-8 pb-32">
+            <Link
+              href="/programs"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground  transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Programs
+            </Link>
             {/* Program Header Card */}
             <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-8 shadow-lg text-white">
               <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/5 to-transparent"></div>
@@ -913,10 +916,6 @@ export default function ProgramBuilderPage() {
                                 </div>
                                 <p className="text-sm font-semibold text-card-foreground leading-tight">{day.workoutName}</p>
                                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-auto">
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    {day.duration} min
-                                  </div>
                                   {day.exercises && day.exercises.length > 0 && (
                                     <span className="bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-medium">
                                       {day.exercises.length} exercises
@@ -963,7 +962,7 @@ export default function ProgramBuilderPage() {
                     <div className="bg-muted/50 px-6 py-3 border-t border-border rounded-b-xl flex items-center justify-between">
                       <div className="flex gap-4 text-xs text-muted-foreground">
                         <span>Total Workouts: {phase.days.filter(d => d.type === "workout").length}</span>
-                        <span>Est. Time: {phase.days.filter(d => d.type === "workout").reduce((sum, d) => sum + (d.duration || 0), 0)} min</span>
+
                       </div>
                       <button className="text-xs font-medium text-primary hover:underline">Copy week to next week</button>
                     </div>

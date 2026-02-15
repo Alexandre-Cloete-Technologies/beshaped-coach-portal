@@ -864,12 +864,6 @@ export default function ProgramDetailPage() {
                                       <p className="text-sm font-semibold text-card-foreground leading-tight line-clamp-2">
                                         {workout.workoutName}
                                       </p>
-                                      {workout.estimatedDuration ? (
-                                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                          <Clock className="w-3 h-3" />
-                                          {workout.estimatedDuration} min
-                                        </div>
-                                      ) : null}
                                       {hasExercises && (
                                         <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
                                           <Dumbbell className="w-3 h-3" />
