@@ -367,7 +367,7 @@ export default function ProgramDetailPage() {
                             <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">
                               Week {weekIdx + 1}
                             </h3>
-                            <div className="grid grid-cols-7 gap-3">
+                            <div className="grid grid-cols-7 gap-3 items-start">
                               {/* Day Headers */}
                               {dayNames.map((day) => (
                                 <div key={day} className="text-center">

@@ -15,7 +15,12 @@ import {
   MoreHorizontal,
   CheckCircle,
   Send,
-  Dumbbell
+  Dumbbell,
+  LayoutDashboard,
+  Users,
+  Calendar,
+  Library,
+  Settings
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -545,22 +550,69 @@ export default function ProgramBuilderPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
-      {/* Top Navigation */}
+      {/* Top Navigation Bar */}
       <header className="flex shrink-0 items-center justify-between whitespace-nowrap border-b border-border bg-card px-6 py-3 z-20">
-        <div className="flex items-center gap-4 text-card-foreground">
-          <Link href="/programs" className="flex items-center gap-4 hover:opacity-80 transition-opacity">
-            <div className="size-8 flex items-center justify-center bg-primary/10 rounded-lg text-primary">
-              <Dumbbell className="w-5 h-5" />
+        <div className="flex items-center gap-6">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+              <Dumbbell className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h2 className="text-lg font-bold leading-tight tracking-tight">Program Builder</h2>
+            <div className="hidden sm:block">
+              <h1 className="font-semibold text-card-foreground text-sm leading-tight">BeShaped Fitness</h1>
+              <span className="text-[10px] text-muted-foreground">Coach Portal</span>
+            </div>
           </Link>
-        </div>
-        <div className="flex flex-1 justify-end gap-6 items-center">
 
-          <div className="flex gap-3">
-            {/* <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center ring-2 ring-card">
-              <span className="text-white text-sm font-medium">D</span>
-            </div> */}
+          {/* Divider */}
+          <div className="h-6 w-px bg-border" />
+
+          {/* Nav Links */}
+          <nav className="flex items-center gap-1">
+            {[
+              { icon: <LayoutDashboard size={18} />, label: "Dashboard", href: "/" },
+              { icon: <Users size={18} />, label: "Clients", href: "/clients" },
+              { icon: <Calendar size={18} />, label: "Programs", href: "/programs" },
+              { icon: <Library size={18} />, label: "Exercises", href: "/exercises" },
+            ].map((item) => {
+              const isActive = item.href === "/programs";
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  }`}
+                >
+                  {item.icon}
+                  <span className="hidden md:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {/* Settings */}
+          <Link
+            href="/settings"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <Settings size={18} />
+            <span className="hidden md:inline">Settings</span>
+          </Link>
+
+          {/* User Profile */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+              <span className="text-white text-xs font-medium">D</span>
+            </div>
+            <div className="hidden lg:block">
+              <p className="text-sm font-medium text-card-foreground leading-tight">Dewald</p>
+              <p className="text-[10px] text-muted-foreground">Head Coach</p>
+            </div>
           </div>
         </div>
       </header>
@@ -732,6 +784,12 @@ export default function ProgramBuilderPage() {
 
         {/* Center Canvas */}
         <main className="flex-1 overflow-y-auto bg-background scroll-smooth">
+          <Link
+              href="/programs"
+              className=" hover:text-blue-700 font-medium"
+            >
+              ← Back to Programs
+          </Link>
           <div className="mx-auto max-w-[1280px] p-8 flex flex-col gap-8 pb-32">
             {/* Program Header Card */}
             <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-8 shadow-lg text-white">
@@ -933,18 +991,15 @@ export default function ProgramBuilderPage() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
 
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-4 ">
               <button 
                 onClick={handleSaveProgram}
                 disabled={isSaving}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-lg border border-border  px-4 py-2 text-sm font-semibold text-white  bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>
-              <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
-                <span>Assign to Clients</span>
-                <Send className="w-4 h-4" />
-              </button>
+
             </div>
           </div>
         </div>
