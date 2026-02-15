@@ -146,7 +146,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
             </p>
           </div>
         </div>
-        <div className={`w-3 h-3 rounded-full ${colors.dot}`} />
+        {/* <div className={`w-3 h-3 rounded-full ${colors.dot}`} /> */}
       </div>
 
       {/* Main Content: Circular Progress + Stats */}
