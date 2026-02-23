@@ -2,7 +2,7 @@
 
 import { X, Users, BookOpen, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, addDoc, query, where, Timestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface AssignProgramModalProps {
@@ -105,6 +105,49 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
       await updateDoc(userRef, {
         currentProgram: programRef,
       });
+
+      // Check if a userPrograms doc already exists for this user
+      const userProgramsQuery = query(
+        collection(db, "userPrograms"),
+        where("userId", "==", userRef)
+      );
+      const existingDocs = await getDocs(userProgramsQuery);
+
+      // Only create a userPrograms entry on FIRST-TIME assignment
+      if (existingDocs.empty) {
+        // Fetch program doc to get extra details
+        const programSnap = await getDoc(programRef);
+        const programData = programSnap.data();
+        const totalDurationWeeks = programData?.totalDuration || programData?.phases?.length * 4 || 8;
+
+        const now = Timestamp.now();
+        const estimatedEnd = new Date();
+        estimatedEnd.setDate(estimatedEnd.getDate() + totalDurationWeeks * 7);
+
+        await addDoc(collection(db, "userPrograms"), {
+          userId: userRef,
+          programId: programRef,
+          programName: selectedProgram.name,
+          status: "active",
+          availablePrograms: [],
+          currentPhase: 1,
+          currentWeek: 1,
+          currentDay: 1,
+          nextWorkoutId: null,
+          nextWorkoutName: null,
+          createdAt: now,
+          estimatedEndDate: Timestamp.fromDate(estimatedEnd),
+          completedDate: null,
+          lastWorkoutDate: null,
+          totalWorkoutsCompleted: 0,
+          totalWorkoutsMissed: 0,
+          adherenceRate: 0,
+          totalWorkoutsInProgram: 0,
+          phasesCompleted: [],
+          notes: null,
+          trainerNotes: null,
+        });
+      }
 
       // Reset selections
       setSelectedUserId("");

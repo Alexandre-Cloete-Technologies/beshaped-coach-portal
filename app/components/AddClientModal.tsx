@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, addDoc, Timestamp, getDocs, doc } from "firebase/firestore";
+import { collection, addDoc, Timestamp, getDocs, doc, query, where, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface AddClientModalProps {
@@ -86,7 +86,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
 
     try {
       // Create user document in Firebase
-      await addDoc(collection(db, "users"), {
+      const userDocRef = await addDoc(collection(db, "users"), {
         displayName: formData.username,
         email: formData.email,
         phoneNumber: formData.phoneNumber,
@@ -112,6 +112,56 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         },
         currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
       });
+
+      // If a program was selected, create a userPrograms entry (only if none exists)
+      if (formData.currentProgram) {
+        const newUserRef = doc(db, "users", userDocRef.id);
+        const programRef = doc(db, "programs", formData.currentProgram);
+
+        // Check if a userPrograms doc already exists for this user
+        const userProgramsQuery = query(
+          collection(db, "userPrograms"),
+          where("userId", "==", newUserRef)
+        );
+        const existingDocs = await getDocs(userProgramsQuery);
+
+        if (existingDocs.empty) {
+          // Fetch program doc to get extra details
+          const programSnap = await getDoc(programRef);
+          const programData = programSnap.data();
+          const selectedProgramObj = programs.find((p) => p.id === formData.currentProgram);
+          const totalDurationWeeks = programData?.totalDuration || programData?.phases?.length * 4 || 8;
+
+          const now = Timestamp.now();
+          const estimatedEnd = new Date();
+          estimatedEnd.setDate(estimatedEnd.getDate() + totalDurationWeeks * 7);
+
+          await addDoc(collection(db, "userPrograms"), {
+            userId: newUserRef,
+            programId: programRef,
+            programName: selectedProgramObj?.name || programData?.name || "Unknown Program",
+            status: "active",
+            availablePrograms: [],
+            currentPhase: 1,
+            currentWeek: 1,
+            currentDay: 1,
+            nextWorkoutId: null,
+            nextWorkoutName: null,
+            createdAt: now,
+            estimatedEndDate: Timestamp.fromDate(estimatedEnd),
+            completedDate: null,
+            lastWorkoutDate: null,
+            totalWorkoutsCompleted: 0,
+            totalWorkoutsMissed: 0,
+            adherenceRate: 0,
+            totalWorkoutsInProgram: 0,
+            phasesCompleted: [],
+
+            notes: null,
+            trainerNotes: null,
+          });
+        }
+      }
 
       // Reset form
       setFormData({
