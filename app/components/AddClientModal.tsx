@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, addDoc, Timestamp, getDocs } from "firebase/firestore";
+import { collection, addDoc, Timestamp, getDocs, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface AddClientModalProps {
@@ -13,7 +13,7 @@ interface AddClientModalProps {
 
 export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddClientModalProps) {
   const [loading, setLoading] = useState(false);
-  const [programs, setPrograms] = useState<string[]>([]);
+  const [programs, setPrograms] = useState<{id: string; name: string}[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
   // Static coaches data
@@ -43,17 +43,16 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         const programsCollection = collection(db, "programs");
         const programsSnapshot = await getDocs(programsCollection);
         
-        const programNames = programsSnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return data.name || "Unnamed Program";
-        });
+        const programList = programsSnapshot.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name || "Unnamed Program",
+        }));
         
-        // Add "No Program" option at the end
-        setPrograms([...programNames, "No Program"]);
+        setPrograms(programList);
       } catch (error) {
         console.error("Error fetching programs:", error);
         // Fallback to just "No Program" if there's an error
-        setPrograms(["No Program"]);
+        setPrograms([]);
       } finally {
         setLoadingPrograms(false);
       }
@@ -111,7 +110,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           currentStreak: 0,
           longestStreak: 0,
         },
-        currentProgram: formData.currentProgram || "No Program",
+        currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
       });
 
       // Reset form
@@ -277,8 +276,8 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                   >
                     <option value="">{loadingPrograms ? "Loading programs..." : "Select a Program"}</option>
                     {programs.map((program) => (
-                      <option key={program} value={program}>
-                        {program}
+                      <option key={program.id} value={program.id}>
+                        {program.name}
                       </option>
                     ))}
                   </select>

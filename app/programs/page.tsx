@@ -1,8 +1,9 @@
 "use client";
 
-import { Search, AlertTriangle } from "lucide-react";
+import { Search, AlertTriangle, UserPlus } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import ProgramCard, { ProgramData } from "../components/ProgramCard";
+import AssignProgramModal from "../components/AssignProgramModal";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -64,6 +65,7 @@ export default function ProgramsPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<ProgramData | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   // const [viewMode, setViewMode] = useState<"library" | "builder">("library");
 
   // Fetch programs from Firebase
@@ -257,13 +259,22 @@ export default function ProgramsPage() {
               </div> */}
             </div>
             
-            {/* Create Button */}
-            <Link 
-              href="/programs/builder"
-              className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
-            >
-              Create New Program
-            </Link>
+            {/* Action Buttons */}
+            <div className="flex gap-3 w-full md:w-auto">
+              <button
+                onClick={() => setAssignModalOpen(true)}
+                className="flex items-center justify-center gap-2 bg-card hover:bg-accent border border-border text-card-foreground px-5 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all"
+              >
+                <UserPlus className="w-4 h-4" />
+                Assign Program
+              </button>
+              <Link 
+                href="/programs/builder"
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+              >
+                Create New Program
+              </Link>
+            </div>
           </div>
 
           {/* Programs Grid */}
@@ -353,6 +364,13 @@ export default function ProgramsPage() {
           </div>
         </div>
       )}
+
+      {/* Assign Program Modal */}
+      <AssignProgramModal
+        isOpen={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        onAssigned={() => console.log("Program assigned successfully")}
+      />
     </div>
   );
 }
