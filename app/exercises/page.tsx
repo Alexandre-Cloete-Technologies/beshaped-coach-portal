@@ -709,7 +709,7 @@ export default function ExercisesPage() {
                 </div> */}
 
                 {/* Video URL */}
-                {/* <div>
+                <div>
                   <label className="block text-xs font-medium text-card-foreground mb-2">
                     Video URL
                   </label>
@@ -720,7 +720,7 @@ export default function ExercisesPage() {
                     className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                     placeholder="https://..."
                   />
-                </div> */}
+                </div>
 
                 {/* Description - full width */}
                 <div className="col-span-2">
