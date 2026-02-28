@@ -3,8 +3,9 @@
 import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Dumbbell, ChevronsUpDown, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import ExerciseEditModal, { ExerciseEditValues } from "../components/ExerciseEditModal";
 
 interface Exercise {
   id: string;
@@ -224,12 +225,17 @@ export default function ExercisesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  
-  // Modal state
+
+  // Add exercise modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState<ExerciseFormData>(emptyFormData);
   const [newTip, setNewTip] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Edit exercise modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   // Fetch exercises from Firebase
   useEffect(() => {
@@ -406,6 +412,57 @@ export default function ExercisesPage() {
     setShowAddModal(false);
     setFormData(emptyFormData);
     setNewTip("");
+  };
+
+  const openEditModal = (exercise: Exercise) => {
+    setEditingExercise(exercise);
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingExercise(null);
+    setUpdating(false);
+  };
+
+  const handleUpdateExercise = async (values: ExerciseEditValues) => {
+    if (!editingExercise) return;
+
+    try {
+      setUpdating(true);
+      const exerciseRef = doc(db, "exercises", editingExercise.id);
+      await updateDoc(exerciseRef, {
+        name: values.name.trim(),
+        description: values.description.trim() || null,
+        equipment: values.equipment || "None",
+        difficulty: values.difficulty,
+        videoUrl: values.videoUrl.trim() || null,
+        muscleGroup: values.muscleGroup,
+        updatedAt: serverTimestamp(),
+      });
+
+      setExercises((prev) =>
+        prev.map((ex) =>
+          ex.id === editingExercise.id
+            ? {
+                ...ex,
+                name: values.name.trim(),
+                description: values.description.trim() || ex.description,
+                equipment: values.equipment || "None",
+                difficulty: values.difficulty,
+                videoUrl: values.videoUrl.trim() || undefined,
+                muscleGroup: values.muscleGroup,
+              }
+            : ex
+        )
+      );
+
+      closeEditModal();
+    } catch (error) {
+      console.error("Error updating exercise:", error);
+      alert("Failed to update exercise. Please try again.");
+      setUpdating(false);
+    }
   };
 
   const handleSaveExercise = async () => {
@@ -606,7 +663,11 @@ export default function ExercisesPage() {
                                 {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
                               </span>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded transition-colors">
+                                <button
+                                  className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded transition-colors"
+                                  type="button"
+                                  onClick={() => openEditModal(exercise)}
+                                >
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <button className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
@@ -932,6 +993,16 @@ export default function ExercisesPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Exercise Modal */}
+      <ExerciseEditModal
+        isOpen={showEditModal}
+        exercise={editingExercise}
+        muscleGroupOrder={muscleGroupOrder}
+        saving={updating}
+        onClose={closeEditModal}
+        onSave={handleUpdateExercise}
+      />
     </div>
   );
 }

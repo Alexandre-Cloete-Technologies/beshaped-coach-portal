@@ -261,7 +261,7 @@ export default function WorkoutEditorModal({
                         </label>
                         <input
                           type="text"
-                          value={exercise.repsRange || "8-12"}
+                          value={exercise.repsRange ?? ""}
                           onChange={(e) =>
                             updateExerciseInWorkout(
                               index,
