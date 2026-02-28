@@ -1,9 +1,10 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X, Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, addDoc, Timestamp, getDocs, doc, query, where, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { collection, addDoc, setDoc, Timestamp, getDocs, doc, query, where, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface AddClientModalProps {
 
 export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddClientModalProps) {
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [programs, setPrograms] = useState<{id: string; name: string}[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
@@ -26,6 +28,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
   const [formData, setFormData] = useState({
     username: "",
     email: "",
+    password: "",
     phoneNumber: "",
     currentProgram: "",
     role: "client",
@@ -72,6 +75,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     setFormData({
       username: "",
       email: "",
+      password: "",
       phoneNumber: "",
       currentProgram: "",
       role: "client",
@@ -85,15 +89,27 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     setLoading(true);
 
     try {
-      // Create user document in Firebase
-      const userDocRef = await addDoc(collection(db, "users"), {
+      // Create user in Firebase Auth first to get UID
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+      const uid = userCredential.user.uid;
+
+      // Update Auth profile with display name
+      await updateProfile(userCredential.user, { displayName: formData.username });
+
+      // Create user document in Firestore using Auth UID as document ID
+      const userDocRef = doc(db, "users", uid);
+      await setDoc(userDocRef, {
         displayName: formData.username,
         email: formData.email,
         phoneNumber: formData.phoneNumber,
         username: formData.username,
         profilePhoto: "",
         role: formData.role,
-        assignedCoachId: formData.assignedCoach || null, // Storing name as ID for now based on text input
+        assignedCoachId: formData.assignedCoach || null,
         goals: formData.goals,
         onboardingCompleted: false,
         createdAt: Timestamp.now(),
@@ -115,7 +131,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
 
       // If a program was selected, create a userPrograms entry (only if none exists)
       if (formData.currentProgram) {
-        const newUserRef = doc(db, "users", userDocRef.id);
+        const newUserRef = userDocRef;
         const programRef = doc(db, "programs", formData.currentProgram);
 
         // Check if a userPrograms doc already exists for this user
@@ -197,7 +213,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
 
               await addDoc(collection(db, "workoutLogs"), {
                 dateCompleted: null,
-                userId: userDocRef.id,
+                userId: uid,
                 programId: programRef,
                 programName,
                 phaseNumber: 1,
@@ -224,6 +240,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
       setFormData({
         username: "",
         email: "",
+        password: "",
         phoneNumber: "",
         currentProgram: "",
         role: "client",
@@ -297,6 +314,37 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="john@example.com"
               />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Password *
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                  minLength={6}
+                  className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                  placeholder="Min 6 characters"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Phone Number */}
@@ -412,7 +460,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading || !formData.username || !formData.email}
+            disabled={loading || !formData.username || !formData.email || !formData.password || formData.password.length < 6}
             className="h-10 px-5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Adding..." : "Add Client"}
