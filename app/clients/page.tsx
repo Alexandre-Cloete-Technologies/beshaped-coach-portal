@@ -1,9 +1,10 @@
 "use client";
 
-import { Plus, Search, SlidersHorizontal, MoreVertical } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, MoreVertical, UserPlus } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Pagination from "../components/Pagination";
 import AddClientModal from "../components/AddClientModal";
+import AssignProgramModal from "../components/AssignProgramModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { collection, getDocs, getDoc } from "firebase/firestore";
@@ -29,6 +30,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchUsers = async () => {
@@ -141,6 +143,14 @@ export default function ClientsPage() {
                 <SlidersHorizontal className="w-4 h-4" />
                 Filter
               </button> */}
+
+              <button
+                onClick={() => setAssignModalOpen(true)}
+                className="h-10 px-4 rounded-lg border border-border bg-card text-card-foreground text-sm font-medium flex items-center gap-2 hover:bg-accent transition-colors shadow-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                Assign Program
+              </button>
 
               {/* Add New Client Button */}
               <button 
@@ -325,6 +335,14 @@ export default function ClientsPage() {
         onClose={() => setIsModalOpen(false)}
         onClientAdded={() => {
           fetchUsers(); // Refresh the client list
+        }}
+      />
+
+      <AssignProgramModal
+        isOpen={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        onAssigned={() => {
+          fetchUsers(); // Refresh client program data after assignment
         }}
       />
     </div>

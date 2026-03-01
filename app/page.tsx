@@ -1,12 +1,13 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import StatsCard from "./components/StatsCard";
 import SearchBar from "./components/SearchBar";
 import ClientCard, { ClientData } from "./components/ClientCard";
 import Pagination from "./components/Pagination";
 import AddClientModal from "./components/AddClientModal";
+import AssignProgramModal from "./components/AssignProgramModal";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -16,6 +17,7 @@ export default function Home() {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchUsers = async () => {
@@ -201,6 +203,13 @@ export default function Home() {
               <p className="text-muted-foreground mt-1">View clients progress</p>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setAssignModalOpen(true)}
+                className="h-11 px-5 rounded-xl bg-card border border-border text-card-foreground font-medium flex items-center gap-2 hover:bg-accent transition-colors shadow-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                Assign Program
+              </button>
 
               <button 
                 onClick={() => setIsModalOpen(true)}
@@ -262,6 +271,14 @@ export default function Home() {
         onClose={() => setIsModalOpen(false)}
         onClientAdded={() => {
           fetchUsers(); // Refresh the client list
+        }}
+      />
+
+      <AssignProgramModal
+        isOpen={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        onAssigned={() => {
+          fetchUsers(); // Refresh client program data after assignment
         }}
       />
     </div>

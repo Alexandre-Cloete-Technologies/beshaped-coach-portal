@@ -90,6 +90,38 @@ const mockWorkouts: Workout[] = [
   },
 ];
 
+const normalizeWorkoutLogExercises = (
+  data: Record<string, unknown>
+): WorkoutLogExercise[] => {
+  const candidateCollections: unknown[] = [
+    data.exercises,
+    data.workoutExercises,
+    data.workout,
+    data.exerciseList,
+  ];
+
+  const rawExercises = candidateCollections.find((candidate) => Array.isArray(candidate));
+  if (!Array.isArray(rawExercises)) return [];
+
+  return rawExercises
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+    .map((exercise) => {
+      const rawSets = Array.isArray(exercise.sets) ? exercise.sets : [];
+      const normalizedSets: WorkoutLogExerciseSet[] = rawSets
+        .filter((set): set is Record<string, unknown> => Boolean(set && typeof set === "object"))
+        .map((set) => ({
+          done: Boolean(set.done ?? set.completed ?? false),
+          reps: String(set.reps ?? set.targetReps ?? ""),
+          weight: String(set.weight ?? set.weightKg ?? ""),
+        }));
+
+      return {
+        name: String(exercise.name ?? exercise.exerciseName ?? exercise.title ?? "Unknown Exercise"),
+        sets: normalizedSets,
+      };
+    });
+};
+
 
 
 export default function WorkoutHistory() {
@@ -243,27 +275,40 @@ export default function WorkoutHistory() {
         const querySnapshot = await getDocs(q);
         
         const logs: WorkoutLog[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
+          const data = doc.data() as Record<string, unknown>;
           // Use completedAt timestamp from Firebase
-          const completedAt = data.completedAt?.toDate 
-            ? data.completedAt.toDate() 
-            : (data.completedAt ? new Date(data.completedAt) : new Date());
+          const completedAtField = data.completedAt as { toDate?: () => Date } | Date | string | null | undefined;
+          let completedAt: Date;
+          if (
+            completedAtField &&
+            typeof completedAtField === "object" &&
+            "toDate" in completedAtField &&
+            typeof completedAtField.toDate === "function"
+          ) {
+            completedAt = completedAtField.toDate();
+          } else if (completedAtField instanceof Date) {
+            completedAt = completedAtField;
+          } else if (typeof completedAtField === "string" || typeof completedAtField === "number") {
+            completedAt = new Date(completedAtField);
+          } else {
+            completedAt = new Date();
+          }
           return {
             id: doc.id,
             completedAt,
-            userId: data.userId,
-            programName: data.programName || "",
-            phaseNumber: data.phaseNumber || 1,
-            workoutName: data.workoutName || "",
-            dayNumber: data.dayNumber || 0,
-            weekNumber: data.weekNumber || 0,
-            totalDuration: data.totalDuration || null,
-            status: data.status || "completed",
-            exercises: data.exercises || [],
-            totalVolume: data.totalVolume || 0,
-            totalSets: data.totalSets || 0,
-            totalReps: data.totalReps || 0,
-            notes: data.notes || null,
+            userId: String(data.userId || ""),
+            programName: String(data.programName || ""),
+            phaseNumber: Number(data.phaseNumber || 1),
+            workoutName: String(data.workoutName || ""),
+            dayNumber: Number(data.dayNumber || 0),
+            weekNumber: Number(data.weekNumber || 0),
+            totalDuration: (data.totalDuration as number | null) || null,
+            status: (data.status as "completed" | "in-progress" | "skipped") || "completed",
+            exercises: normalizeWorkoutLogExercises(data),
+            totalVolume: Number(data.totalVolume || 0),
+            totalSets: Number(data.totalSets || 0),
+            totalReps: Number(data.totalReps || 0),
+            notes: (data.notes as string | null) || null,
           };
         });
         
