@@ -4,6 +4,7 @@ import { X, Users, BookOpen, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { collection, getDocs, doc, updateDoc, addDoc, query, where, Timestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { buildProgramWorkoutSlots, seedMissingWorkoutLogsForUserProgram } from "@/lib/workoutLogSeed";
 
 interface AssignProgramModalProps {
   isOpen: boolean;
@@ -119,6 +120,7 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
         const programSnap = await getDoc(programRef);
         const programData = programSnap.data();
         const totalDurationWeeks = programData?.totalDuration || programData?.phases?.length * 4 || 8;
+        const workoutSlots = buildProgramWorkoutSlots(programData);
 
         const now = Timestamp.now();
         const estimatedEnd = new Date();
@@ -142,66 +144,19 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
           totalWorkoutsCompleted: 0,
           totalWorkoutsMissed: 0,
           adherenceRate: 0,
-          totalWorkoutsInProgram: 0,
+          totalWorkoutsInProgram: workoutSlots.length,
           phasesCompleted: [],
           notes: null,
           trainerNotes: null,
         });
 
-        // Create a workoutLog for the first non-rest workout in the program
-        const phases = programData?.phases || [];
-        if (phases.length > 0) {
-          const firstPhase = phases[0];
-          const workouts = firstPhase.workouts || firstPhase.days || [];
-          const firstWorkout = workouts.find(
-            (w: any) => !w.isRestDay && w.type !== "rest" && w.type !== "empty"
-          );
-
-          if (firstWorkout) {
-            const rawExercises = firstWorkout.exercises || [];
-            const exercises = rawExercises.map((ex: any, idx: number) => ({
-              exerciseId: ex.exerciseId || ex.id || "",
-              exerciseName: ex.exerciseName || ex.name || "Unknown Exercise",
-              order: ex.order ?? idx + 1,
-              targetSets: ex.sets || 0,
-              targetReps: ex.repsRange || "",
-              restPeriod: ex.restPeriod || "",
-              personalBest: false,
-              notes: ex.notes || null,
-              sets: Array.from({ length: ex.sets || 0 }, (_, i) => ({
-                setNumber: i + 1,
-                weight: 0,
-                weightUnit: "kg",
-                reps: 0,
-                completed: false,
-                rpe: null,
-                timestamp: null,
-                notes: null,
-              })),
-            }));
-
-            await addDoc(collection(db, "workoutLogs"), {
-              dateCompleted: null,
-              userId: selectedUserId,
-              programId: programRef,
-              programName: selectedProgram.name,
-              phaseNumber: 1,
-              workoutName: firstWorkout.workoutName || firstWorkout.label || "Workout 1",
-              dayNumber: firstWorkout.dayNumber || 1,
-              weekNumber: 1,
-              startedAt: now,
-              completedAt: null,
-              totalDuration: null,
-              status: "in-progress",
-              exercises,
-              totalVolume: 0,
-              totalSets: 0,
-              totalReps: 0,
-              personalBests: [],
-              notes: null,
-            });
-          }
-        }
+        await seedMissingWorkoutLogsForUserProgram({
+          userId: selectedUserId,
+          programRef,
+          programName: selectedProgram.name,
+          slots: workoutSlots,
+          startedAt: now,
+        });
       }
 
       // Reset selections
