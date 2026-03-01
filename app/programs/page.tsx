@@ -154,8 +154,7 @@ export default function ProgramsPage() {
   };
 
   const handleEdit = (id: string) => {
-    console.log("Edit program:", id);
-    // TODO: Open program editor
+    router.push(`/programs/${id}?mode=edit`);
   };
 
   const handleDuplicate = (id: string) => {

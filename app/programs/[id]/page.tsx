@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -35,7 +35,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
 
 // === Types ===
@@ -222,7 +222,10 @@ const buildWorkoutLogExercises = (exercises: ExerciseData[]) =>
 
 export default function ProgramDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const programId = params?.id as string;
+  const mode = searchParams.get("mode");
+  const autoEditTriggeredRef = useRef(false);
 
   // Core state
   const [program, setProgram] = useState<ProgramDetail | null>(null);
@@ -398,6 +401,7 @@ export default function ProgramDetailPage() {
 
   // === Edit mode functions ===
   const startEditing = () => {
+    if (!program) return;
     setEditedProgram(JSON.parse(JSON.stringify(program)));
     setIsEditing(true);
   };
@@ -406,6 +410,19 @@ export default function ProgramDetailPage() {
     setEditedProgram(null);
     setIsEditing(false);
   };
+
+  useEffect(() => {
+    autoEditTriggeredRef.current = false;
+  }, [programId, mode]);
+
+  useEffect(() => {
+    if (mode !== "edit") return;
+    if (!program || isEditing) return;
+    if (autoEditTriggeredRef.current) return;
+
+    startEditing();
+    autoEditTriggeredRef.current = true;
+  }, [mode, program, isEditing]);
 
   const saveChanges = async () => {
     if (!editedProgram || !programId) return;
