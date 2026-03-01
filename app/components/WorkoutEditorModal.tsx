@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { addDoc, collection, Timestamp } from "firebase/firestore";
 import {
   Search,
   ChevronDown,
@@ -10,6 +11,7 @@ import {
   Dumbbell,
   GripVertical,
 } from "lucide-react";
+import { db } from "@/lib/firebase";
 
 export interface ModalExercise {
   id: string;
@@ -52,6 +54,7 @@ export default function WorkoutEditorModal({
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [draggedExerciseIndex, setDraggedExerciseIndex] =
     useState<number | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -141,6 +144,57 @@ export default function WorkoutEditorModal({
       workoutName: localWorkoutName || "New Workout",
       exercises: localExercises,
     });
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (savingTemplate) return;
+
+    try {
+      setSavingTemplate(true);
+
+      const now = Timestamp.now();
+      const mappedExercises = localExercises.map((exercise, idx) => {
+        const targetSets = exercise.sets || 0;
+        const targetReps = exercise.repsRange || "";
+
+        const payload: {
+          exerciseId: string;
+          exerciseName: string;
+          order: number;
+          targetSets: number;
+          targetReps: string;
+          restPeriod?: string;
+          notes?: string | null;
+        } = {
+          exerciseId: exercise.id,
+          exerciseName: exercise.name,
+          order: idx + 1,
+          targetSets,
+          targetReps,
+        };
+
+        return payload;
+      });
+
+      await addDoc(collection(db, "workouts"), {
+        name: localWorkoutName?.trim() || "New Workout",
+        description: "",
+        createdBy: "admin",
+        createdByRole: "admin",
+        exercises: mappedExercises,
+        tags: [],
+        estimatedDuration: mappedExercises.length * 5,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      alert("Workout template saved.");
+    } catch (error) {
+      console.error("Error saving workout template:", error);
+      alert("Failed to save workout template. Please try again.");
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
   return (
@@ -400,12 +454,21 @@ export default function WorkoutEditorModal({
           {localExercises.length} exercise
           {localExercises.length !== 1 ? "s" : ""} in workout
         </p>
-        <button
-          onClick={handleDone}
-          className="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
-        >
-          Done
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSaveAsTemplate}
+            disabled={savingTemplate}
+            className="px-4 py-2 border border-border bg-card text-card-foreground rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {savingTemplate ? "Saving..." : "Save as Template"}
+          </button>
+          <button
+            onClick={handleDone}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   </div>

@@ -30,8 +30,30 @@ import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore
 import { db } from "@/lib/firebase";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
 
+type TemplateCategory = "recent" | "strength" | "saved";
+
+interface WorkoutTemplateExercise {
+  exerciseId?: string;
+  exerciseName: string;
+  targetSets?: number;
+  targetReps?: string;
+  restPeriod?: string;
+  notes?: string | null;
+}
+
+interface WorkoutTemplate {
+  id: string;
+  name: string;
+  exercises: number;
+  duration: number;
+  category: TemplateCategory;
+  description?: string;
+  tags?: string[];
+  templateExercises?: WorkoutTemplateExercise[];
+}
+
 // Mock template data
-const mockTemplates = [
+const mockTemplates: WorkoutTemplate[] = [
   { id: "1", name: "Upper Body Power", exercises: 4, duration: 45, category: "recent" },
   { id: "2", name: "Leg Day Hypertrophy", exercises: 6, duration: 60, category: "recent" },
   { id: "3", name: "Full Body Circuit", exercises: 8, duration: 30, category: "recent" },
@@ -161,6 +183,10 @@ export default function ProgramBuilderPage() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loadingExercises, setLoadingExercises] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [savedTemplates, setSavedTemplates] = useState<WorkoutTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [templateFetchError, setTemplateFetchError] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
   
   // Modal State
   const [selectedWorkout, setSelectedWorkout] = useState<SelectedWorkout | null>(null);
@@ -224,6 +250,85 @@ export default function ProgramBuilderPage() {
     fetchExercises();
   }, []);
 
+  // Fetch workout templates from Firestore on mount
+  useEffect(() => {
+    const fetchWorkoutTemplates = async () => {
+      try {
+        setLoadingTemplates(true);
+        setTemplateFetchError(null);
+
+        const workoutsSnapshot = await getDocs(collection(db, "workouts"));
+        if (workoutsSnapshot.empty) {
+          setSavedTemplates([]);
+          return;
+        }
+
+        const fetchedTemplates: WorkoutTemplate[] = workoutsSnapshot.docs.map((workoutDoc) => {
+          const data = workoutDoc.data() as Record<string, unknown>;
+          const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
+          const exercisesCount = rawExercises.length;
+          const mappedTemplateExercises: WorkoutTemplateExercise[] = rawExercises.map((exercise) => {
+            const exerciseData = (exercise && typeof exercise === "object" ? exercise : {}) as Record<string, unknown>;
+            return {
+              exerciseId: typeof exerciseData.exerciseId === "string" ? exerciseData.exerciseId : undefined,
+              exerciseName:
+                typeof exerciseData.exerciseName === "string" && exerciseData.exerciseName.trim()
+                  ? exerciseData.exerciseName.trim()
+                  : typeof exerciseData.name === "string" && exerciseData.name.trim()
+                    ? exerciseData.name.trim()
+                    : "Unnamed Exercise",
+              targetSets:
+                typeof exerciseData.targetSets === "number"
+                  ? exerciseData.targetSets
+                  : typeof exerciseData.sets === "number"
+                    ? exerciseData.sets
+                    : undefined,
+              targetReps:
+                typeof exerciseData.targetReps === "string"
+                  ? exerciseData.targetReps
+                  : typeof exerciseData.repsRange === "string"
+                    ? exerciseData.repsRange
+                    : undefined,
+              restPeriod: typeof exerciseData.restPeriod === "string" ? exerciseData.restPeriod : undefined,
+              notes:
+                typeof exerciseData.notes === "string" || exerciseData.notes === null
+                  ? (exerciseData.notes as string | null)
+                  : undefined,
+            };
+          });
+          const estimatedDuration =
+            typeof data.estimatedDuration === "number" && Number.isFinite(data.estimatedDuration)
+              ? data.estimatedDuration
+              : exercisesCount * 5;
+
+          return {
+            id: workoutDoc.id,
+            name:
+              typeof data.name === "string" && data.name.trim()
+                ? data.name.trim()
+                : "Untitled Workout",
+            exercises: exercisesCount,
+            duration: estimatedDuration,
+            category: "saved",
+            description: typeof data.description === "string" ? data.description : "",
+            tags: Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === "string") : [],
+            templateExercises: mappedTemplateExercises,
+          };
+        });
+
+        setSavedTemplates(fetchedTemplates);
+      } catch (error) {
+        console.error("Error fetching workout templates:", error);
+        setTemplateFetchError("Failed to load saved templates.");
+        setSavedTemplates([]);
+      } finally {
+        setLoadingTemplates(false);
+      }
+    };
+
+    fetchWorkoutTemplates();
+  }, []);
+
   // Group exercises by muscle group
   const groupedExercises = useMemo(() => {
     const groups: Record<string, Exercise[]> = {};
@@ -270,8 +375,12 @@ export default function ProgramBuilderPage() {
     });
   };
   
-  const handleDragStart = (e: React.DragEvent, template: any) => {
+  const handleDragStart = (e: React.DragEvent, template: WorkoutTemplate) => {
     e.dataTransfer.setData("template", JSON.stringify(template));
+  };
+
+  const openTemplateModal = (template: WorkoutTemplate) => {
+    setSelectedTemplate(template);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -283,21 +392,35 @@ export default function ProgramBuilderPage() {
     const templateData = e.dataTransfer.getData("template");
     
     if (templateData) {
-      const template = JSON.parse(templateData);
-      setPhases(phases.map(p => {
-        if (p.id === phaseId) {
-          const newDays = [...p.days];
-          newDays[dayIndex] = {
-            type: "workout",
-            workoutName: template.name,
-            duration: template.duration,
-            label: `Workout ${String.fromCharCode(65 + (dayIndex % 7))}`, // A, B, C based on day index
-            exercises: [] // Initialize empty exercises array
-          };
-          return { ...p, days: newDays };
-        }
-        return p;
-      }));
+      const template = JSON.parse(templateData) as WorkoutTemplate;
+      const droppedExercises: ModalExercise[] = Array.isArray(template.templateExercises)
+        ? template.templateExercises.map((exercise, index) => ({
+            id: exercise.exerciseId || `${template.id}-exercise-${index + 1}`,
+            name: exercise.exerciseName,
+            muscleGroup: "Other",
+            equipment: "Unknown",
+            difficulty: "intermediate",
+            sets: exercise.targetSets ?? 3,
+            repsRange: exercise.targetReps ?? "8-12",
+          }))
+        : [];
+
+      setPhases((prevPhases) =>
+        prevPhases.map((p) => {
+          if (p.id === phaseId) {
+            const newDays = [...p.days];
+            newDays[dayIndex] = {
+              type: "workout",
+              workoutName: template.name,
+              duration: template.duration,
+              label: `Workout ${String.fromCharCode(65 + (dayIndex % 7))}`, // A, B, C based on day index
+              exercises: droppedExercises,
+            };
+            return { ...p, days: newDays };
+          }
+          return p;
+        })
+      );
     }
   };
 
@@ -487,10 +610,13 @@ export default function ProgramBuilderPage() {
     }
   };
 
-  const filteredTemplates = mockTemplates.filter(t => 
+  const allTemplates = [...savedTemplates, ...mockTemplates];
+
+  const filteredTemplates = allTemplates.filter(t =>
     t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const savedTemplateResults = filteredTemplates.filter(t => t.category === "saved");
   const recentTemplates = filteredTemplates.filter(t => t.category === "recent");
   const strengthTemplates = filteredTemplates.filter(t => t.category === "strength");
 
@@ -609,6 +735,54 @@ export default function ProgramBuilderPage() {
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {sidebarTab === "templates" ? (
               <>
+                {loadingTemplates && (
+                  <div className="text-center py-3 text-muted-foreground text-sm">
+                    Loading saved templates...
+                  </div>
+                )}
+
+                {!loadingTemplates && templateFetchError && (
+                  <div className="text-center py-3 text-muted-foreground text-xs">
+                    {templateFetchError}
+                  </div>
+                )}
+
+                {!loadingTemplates && savedTemplateResults.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">Saved Templates</div>
+                    {savedTemplateResults.map((template) => (
+                  <div
+                    key={template.id}
+                    className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, template)}
+                    onClick={() => openTemplateModal(template)}
+                  >
+                        <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{template.exercises} Exercises • {template.duration} min</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTemplateModal(template);
+                          }}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <Info className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {!loadingTemplates && !searchQuery.trim() && savedTemplates.length === 0 && !templateFetchError && (
+                  <div className="text-center py-3 text-muted-foreground text-xs">
+                    No saved templates yet.
+                  </div>
+                )}
+
                 {recentTemplates.length > 0 && (
                   <>
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">Recent</div>
@@ -618,13 +792,20 @@ export default function ProgramBuilderPage() {
                     className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
                     draggable
                     onDragStart={(e) => handleDragStart(e, template)}
+                    onClick={() => openTemplateModal(template)}
                   >
                         <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{template.exercises} Exercises • {template.duration} min</p>
                         </div>
-                        <button className="text-muted-foreground hover:text-foreground">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTemplateModal(template);
+                          }}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
                           <Info className="w-4 h-4" />
                         </button>
                       </div>
@@ -641,13 +822,20 @@ export default function ProgramBuilderPage() {
                     className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
                     draggable
                     onDragStart={(e) => handleDragStart(e, template)}
+                    onClick={() => openTemplateModal(template)}
                   >
                         <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-card-foreground truncate">{template.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{template.exercises} Exercises • {template.duration} min</p>
                         </div>
-                        <button className="text-muted-foreground hover:text-foreground">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTemplateModal(template);
+                          }}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
                           <Info className="w-4 h-4" />
                         </button>
                       </div>
@@ -655,7 +843,7 @@ export default function ProgramBuilderPage() {
                   </>
                 )}
                 
-                {recentTemplates.length === 0 && strengthTemplates.length === 0 && (
+                {!loadingTemplates && recentTemplates.length === 0 && strengthTemplates.length === 0 && savedTemplateResults.length === 0 && (
                    <div className="text-center py-8 text-muted-foreground text-sm">
                      No templates found matching "{searchQuery}"
                    </div>
@@ -959,6 +1147,85 @@ export default function ProgramBuilderPage() {
             loadingExercises={loadingExercises}
             onClose={handleWorkoutModalClose}
           />
+        )}
+
+        {/* Workout Template Preview Modal */}
+        {selectedTemplate && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-2xl">
+              <div className="flex items-start justify-between border-b border-border px-6 py-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Workout Template</p>
+                  <h3 className="mt-1 text-xl font-bold text-card-foreground">{selectedTemplate.name}</h3>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{selectedTemplate.exercises} exercises</span>
+                    <span>•</span>
+                    <span>{selectedTemplate.duration} min</span>
+                    <span>•</span>
+                    <span className="capitalize">{selectedTemplate.category}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedTemplate(null)}
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  aria-label="Close template preview"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+                {selectedTemplate.description && selectedTemplate.description.trim() ? (
+                  <p className="mb-4 text-sm text-muted-foreground">{selectedTemplate.description}</p>
+                ) : null}
+
+                {selectedTemplate.tags && selectedTemplate.tags.length > 0 ? (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {selectedTemplate.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {selectedTemplate.templateExercises && selectedTemplate.templateExercises.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedTemplate.templateExercises.map((exercise, index) => (
+                      <div
+                        key={`${selectedTemplate.id}-${exercise.exerciseName}-${index}`}
+                        className="rounded-lg border border-border bg-muted/30 px-3 py-2"
+                      >
+                        <p className="text-sm font-semibold text-card-foreground">
+                          {index + 1}. {exercise.exerciseName}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {exercise.targetSets ?? "-"} sets • {exercise.targetReps || "-"} reps
+                          {exercise.restPeriod ? ` • rest ${exercise.restPeriod}` : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No exercise-level details saved for this template yet.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end border-t border-border px-6 py-4">
+                <button
+                  onClick={() => setSelectedTemplate(null)}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
