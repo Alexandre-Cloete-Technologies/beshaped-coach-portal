@@ -432,6 +432,7 @@ export default function ProgramDetailPage() {
 
       await updateDoc(doc(db, "programs", programId), {
         name: editedProgram.name,
+        description: editedProgram.description,
         phases: editedProgram.phases.map((phase) => ({
           ...phase,
         })),
@@ -616,6 +617,40 @@ export default function ProgramDetailPage() {
     const updated = { ...editedProgram };
     updated.phases = [...updated.phases];
     updated.phases[phaseIdx] = { ...updated.phases[phaseIdx], description: value };
+    setEditedProgram(updated);
+  };
+
+  const updatePhaseDuration = (phaseIdx: number, value: number) => {
+    if (!editedProgram) return;
+
+    const safeDuration = Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1;
+    const updated = { ...editedProgram };
+    updated.phases = [...updated.phases];
+
+    const phase = { ...updated.phases[phaseIdx] };
+    const requiredWorkouts = safeDuration * 7;
+    const currentWorkouts = [...phase.workouts];
+
+    if (currentWorkouts.length < requiredWorkouts) {
+      for (let i = currentWorkouts.length; i < requiredWorkouts; i += 1) {
+        currentWorkouts.push({
+          dayNumber: (i % 7) + 1,
+          dayName: dayNames[i % 7],
+          isRestDay: false,
+          workoutId: null,
+          workoutName: null,
+          description: "",
+          estimatedDuration: 0,
+          exercises: [],
+        });
+      }
+    } else if (currentWorkouts.length > requiredWorkouts) {
+      currentWorkouts.splice(requiredWorkouts);
+    }
+
+    phase.durationWeeks = safeDuration;
+    phase.workouts = currentWorkouts;
+    updated.phases[phaseIdx] = phase;
     setEditedProgram(updated);
   };
 
@@ -825,10 +860,26 @@ export default function ProgramDetailPage() {
                       {program.name}
                     </h1>
                   )}
-                  {program.description && !isEditing && (
-                    <p className="text-blue-100 mt-2 text-sm max-w-xl">
-                      {program.description}
-                    </p>
+                  {isEditing ? (
+                    <textarea
+                      value={editedProgram?.description || ""}
+                      onChange={(e) =>
+                        setEditedProgram(
+                          editedProgram
+                            ? { ...editedProgram, description: e.target.value }
+                            : null
+                        )
+                      }
+                      rows={3}
+                      placeholder="Program description..."
+                      className="text-blue-100 mt-2 text-sm max-w-xl w-full bg-transparent border border-white/30 rounded-lg px-3 py-2 outline-none placeholder:text-white/60 focus:border-white/60 resize-none"
+                    />
+                  ) : (
+                    program.description && (
+                      <p className="text-blue-100 mt-2 text-sm max-w-xl">
+                        {program.description}
+                      </p>
+                    )
                   )}
                 </div>
                 <div className="flex flex-wrap gap-4">
@@ -958,9 +1009,30 @@ export default function ProgramDetailPage() {
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5 border border-border">
                           <Clock className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-sm font-medium text-card-foreground">
-                            {phase.durationWeeks} {phase.durationWeeks === 1 ? "Week" : "Weeks"}
-                          </span>
+                          {isEditing ? (
+                            <div
+                              className="flex items-center gap-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="number"
+                                min={1}
+                                value={editedProgram?.phases[phaseIdx]?.durationWeeks ?? 1}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  updatePhaseDuration(phaseIdx, Number(e.target.value));
+                                }}
+                                className="w-16 h-7 px-2 rounded border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                              />
+                              <span className="text-sm font-medium text-card-foreground">
+                                {(editedProgram?.phases[phaseIdx]?.durationWeeks ?? 1) === 1 ? "Week" : "Weeks"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-sm font-medium text-card-foreground">
+                              {phase.durationWeeks} {phase.durationWeeks === 1 ? "Week" : "Weeks"}
+                            </span>
+                          )}
                         </div>
                         <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground">
                           <span>{phaseWorkoutCount} workouts</span>

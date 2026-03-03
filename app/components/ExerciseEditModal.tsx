@@ -65,11 +65,28 @@ export default function ExerciseEditModal({
     return fallback || "Other";
   };
 
-  const getDefaultMuscleForGroup = (group: string) => {
-    const matched = muscleCategoryDetails.find(
-      ({ category }) => category.toLowerCase() === group.toLowerCase()
-    );
-    return matched?.muscles[0] || "";
+  const canonicalMuscleMap = muscleCategoryDetails.reduce<Record<string, string>>(
+    (acc, { muscles }) => {
+      muscles.forEach((muscle) => {
+        acc[muscle.toLowerCase()] = muscle;
+      });
+      return acc;
+    },
+    {}
+  );
+
+  const sanitizeMuscles = (muscles?: string[]) => {
+    if (!Array.isArray(muscles)) return [];
+    const deduped = new Set<string>();
+
+    muscles.forEach((muscle) => {
+      const canonical = canonicalMuscleMap[String(muscle).toLowerCase().trim()];
+      if (canonical) {
+        deduped.add(canonical);
+      }
+    });
+
+    return Array.from(deduped);
   };
 
   const [form, setForm] = useState<ExerciseEditValues>({
@@ -90,18 +107,13 @@ export default function ExerciseEditModal({
       name: exercise.name || "",
       description: exercise.description || "",
       muscleGroup: exercise.muscleGroup || "Other",
-      primaryMuscles:
-        exercise.primaryMuscles && exercise.primaryMuscles.length > 0
-          ? exercise.primaryMuscles
-          : getDefaultMuscleForGroup(exercise.muscleGroup)
-            ? [getDefaultMuscleForGroup(exercise.muscleGroup)]
-            : [],
-      secondaryMuscles: exercise.secondaryMuscles || [],
+      primaryMuscles: sanitizeMuscles(exercise.primaryMuscles),
+      secondaryMuscles: sanitizeMuscles(exercise.secondaryMuscles),
       equipment: exercise.equipment || "",
       difficulty: exercise.difficulty || "intermediate",
       videoUrl: exercise.videoUrl || "",
     });
-  }, [isOpen, exercise]);
+  }, [isOpen, exercise, muscleCategoryDetails]);
 
   if (!isOpen || !exercise) return null;
 
@@ -161,43 +173,46 @@ export default function ExerciseEditModal({
         </div>
 
         {/* Form Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-card-foreground mb-2">
-              Exercise Name *
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-              className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-              placeholder="Exercise name"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-5">
             <div>
               <label className="block text-xs font-medium text-card-foreground mb-2">
-                Difficulty
+                Exercise Name *
               </label>
-              <select
-                value={form.difficulty}
-                onChange={(e) =>
-                  handleChange(
-                    "difficulty",
-                    e.target.value as Difficulty
-                  )
-                }
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-              >
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </select>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                placeholder="Exercise name"
+              />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-5">
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Video URL
+              </label>
+              <input
+                type="url"
+                value={form.videoUrl}
+                onChange={(e) => handleChange("videoUrl", e.target.value)}
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Description
+              </label>
+              <textarea
+                value={form.description}
+                onChange={(e) => handleChange("description", e.target.value)}
+                className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                placeholder="Brief description of the exercise..."
+              />
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-card-foreground mb-2">
                 Primary Muscles
@@ -259,44 +274,39 @@ export default function ExerciseEditModal({
                 ))}
               </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-medium text-card-foreground mb-2">
-              Equipment
-            </label>
-            <input
-              type="text"
-              value={form.equipment}
-              onChange={(e) => handleChange("equipment", e.target.value)}
-              className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-              placeholder="e.g., Barbell, Dumbbells"
-            />
-          </div>
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Equipment
+              </label>
+              <input
+                type="text"
+                value={form.equipment}
+                onChange={(e) => handleChange("equipment", e.target.value)}
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                placeholder="e.g., Barbell, Dumbbells"
+              />
+            </div>
 
-          <div>
-            <label className="block text-xs font-medium text-card-foreground mb-2">
-              Video URL
-            </label>
-            <input
-              type="url"
-              value={form.videoUrl}
-              onChange={(e) => handleChange("videoUrl", e.target.value)}
-              className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-              placeholder="https://..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-card-foreground mb-2">
-              Description
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-              className="w-full h-24 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-              placeholder="Brief description of the exercise..."
-            />
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Difficulty
+              </label>
+              <select
+                value={form.difficulty}
+                onChange={(e) =>
+                  handleChange(
+                    "difficulty",
+                    e.target.value as Difficulty
+                  )
+                }
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              >
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
           </div>
         </div>
 

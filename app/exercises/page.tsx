@@ -77,7 +77,7 @@ const muscleCategoryDetails: Array<{ category: string; muscles: string[] }> = [
   { category: "Arms", muscles: ["Biceps", "Triceps", "Forearms"] },
   { category: "Core", muscles: ["Abs"] },
   { category: "Cardio", muscles: ["Cardio"] },
-  { category: "Legs", muscles: ["Quads", "Hamstrings", "Calves"] },
+  { category: "Legs", muscles: ["Quads", "Hamstrings", "Calves", "Glutes"] },
   { category: "Neck", muscles: ["Neck"] },
 ];
 
@@ -727,7 +727,6 @@ export default function ExercisesPage() {
                             </div>
                             
                             <div className="flex items-center gap-4">
-                              <span className="text-xs text-muted-foreground hidden sm:block">{exercise.equipment}</span>
                               <span className={`text-xs font-medium px-2 py-1 rounded ${getDifficultyBadge(exercise.difficulty)}`}>
                                 {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
                               </span>
