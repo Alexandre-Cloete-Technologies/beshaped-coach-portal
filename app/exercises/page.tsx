@@ -3,7 +3,7 @@
 import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Dumbbell, ChevronsUpDown, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ExerciseEditModal, { ExerciseEditValues } from "../components/ExerciseEditModal";
 
@@ -11,6 +11,8 @@ interface Exercise {
   id: string;
   name: string;
   muscleGroup: string;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
   equipment: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   description?: string;
@@ -89,6 +91,7 @@ const muscleGroupOrder = [
   "Core",
   "Full Body",
   "Cardio",
+  "Neck",
   "Other"
 ];
 
@@ -110,6 +113,7 @@ const muscleToCategory: Record<string, string> = {
   "trapezius": "Back",
   "lower back": "Back",
   "erector spinae": "Back",
+  "erectors": "Back",
   "rear delts": "Back",
   "upper back": "Back",
   "mid back": "Back",
@@ -174,6 +178,10 @@ const muscleToCategory: Record<string, string> = {
   "heart": "Cardio",
   "conditioning": "Cardio",
   "endurance": "Cardio",
+
+  // Neck
+  "neck": "Neck",
+  "cervical": "Neck",
 };
 
 // Function to get category from muscle name
@@ -202,6 +210,42 @@ const getCategoryFromMuscle = (muscle: string): string => {
   }
   
   return "Other";
+};
+
+const getRawMuscleFromExerciseData = (data: any): string => {
+  let rawMuscle =
+    data.primaryMuscles?.[0] ||
+    data.secondaryMuscles?.[0] ||
+    data.muscleGroup ||
+    data.muscle_group ||
+    data.muscle ||
+    data.muscles ||
+    data.target ||
+    data.bodyPart ||
+    data.primaryMuscle ||
+    data.primary_muscle ||
+    data.musclesInvolved ||
+    data.muscles_involved ||
+    data.muscleGroups ||
+    data.muscle_groups ||
+    data.category ||
+    data.primaryGroup ||
+    "";
+
+  if (Array.isArray(rawMuscle) && rawMuscle.length > 0) {
+    rawMuscle = rawMuscle[0];
+  } else if (rawMuscle && typeof rawMuscle === "object") {
+    const muscleObj = rawMuscle as any;
+    rawMuscle =
+      muscleObj.name ||
+      muscleObj.title ||
+      muscleObj.slug ||
+      muscleObj.label ||
+      muscleObj.toString?.() ||
+      "";
+  }
+
+  return String(rawMuscle || "");
 };
 
 // Mock exercises for fallback
@@ -248,6 +292,11 @@ export default function ExercisesPage() {
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
   const [updating, setUpdating] = useState(false);
 
+  // Delete exercise modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingExercise, setDeletingExercise] = useState<Exercise | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   // Fetch exercises from Firebase
   useEffect(() => {
     const fetchExercises = async () => {
@@ -260,33 +309,7 @@ export default function ExercisesPage() {
           const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
             const data = doc.data();
             
-            // Check multiple potential fields for muscle data
-            let rawMuscle = data.primaryMuscles ||
-                           data.muscleGroup || 
-                           data.muscle_group || 
-                           data.muscle || 
-                           data.muscles || 
-                           data.target || 
-                           data.bodyPart || 
-                           data.primaryMuscle || 
-                           data.primary_muscle || 
-                           data.musclesInvolved ||
-                           data.muscles_involved ||
-                           data.muscleGroups ||
-                           data.muscle_groups ||
-                           data.category ||
-                           data.primaryGroup ||
-                           "";
-            
-            // Handle array of muscles (take the first one)
-            if (Array.isArray(rawMuscle) && rawMuscle.length > 0) {
-              rawMuscle = rawMuscle[0];
-            } else if (rawMuscle && typeof rawMuscle === 'object') {
-              // Handle valid object (non-array) that might contain the muscle name
-              // Use 'as any' to avoid TS errors when accessing dynamic properties
-              const muscleObj = rawMuscle as any;
-              rawMuscle = muscleObj.name || muscleObj.title || muscleObj.slug || muscleObj.label || muscleObj.toString() || "";
-            }
+            const rawMuscle = getRawMuscleFromExerciseData(data);
             
             // Use helper to categorize specific muscles (e.g. "Biceps" -> "Arms")
             const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
@@ -298,6 +321,8 @@ export default function ExercisesPage() {
               id: doc.id,
               name: data.name || "Unnamed Exercise",
               muscleGroup: muscleCategory, // Normalized category
+              primaryMuscles: Array.isArray(data.primaryMuscles) ? data.primaryMuscles : [],
+              secondaryMuscles: Array.isArray(data.secondaryMuscles) ? data.secondaryMuscles : [],
               equipment: data.equipment || "None",
               difficulty: data.difficulty || "intermediate",
               description: data.description,
@@ -436,6 +461,33 @@ export default function ExercisesPage() {
     setUpdating(false);
   };
 
+  const openDeleteModal = (exercise: Exercise) => {
+    setDeletingExercise(exercise);
+    setShowDeleteModal(true);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleting) return;
+    setShowDeleteModal(false);
+    setDeletingExercise(null);
+  };
+
+  const handleDeleteExercise = async () => {
+    if (!deletingExercise) return;
+
+    try {
+      setDeleting(true);
+      await deleteDoc(doc(db, "exercises", deletingExercise.id));
+      setExercises((prev) => prev.filter((ex) => ex.id !== deletingExercise.id));
+      closeDeleteModal();
+    } catch (error) {
+      console.error("Error deleting exercise:", error);
+      alert("Failed to delete exercise. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleUpdateExercise = async (values: ExerciseEditValues) => {
     if (!editingExercise) return;
 
@@ -449,6 +501,8 @@ export default function ExercisesPage() {
         difficulty: values.difficulty,
         videoUrl: values.videoUrl.trim() || null,
         muscleGroup: values.muscleGroup,
+        primaryMuscles: values.primaryMuscles,
+        secondaryMuscles: values.secondaryMuscles,
         updatedAt: serverTimestamp(),
       });
 
@@ -463,6 +517,8 @@ export default function ExercisesPage() {
                 difficulty: values.difficulty,
                 videoUrl: values.videoUrl.trim() || undefined,
                 muscleGroup: values.muscleGroup,
+                primaryMuscles: values.primaryMuscles,
+                secondaryMuscles: values.secondaryMuscles,
               }
             : ex
         )
@@ -494,12 +550,14 @@ export default function ExercisesPage() {
       const exercisesSnapshot = await getDocs(collection(db, "exercises"));
       const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
         const data = doc.data();
-        let rawMuscle = data.primaryMuscles?.[0] || data.muscleGroup || "";
+        const rawMuscle = getRawMuscleFromExerciseData(data);
         const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
         return {
           id: doc.id,
           name: data.name || "Unnamed Exercise",
           muscleGroup: muscleCategory,
+          primaryMuscles: Array.isArray(data.primaryMuscles) ? data.primaryMuscles : [],
+          secondaryMuscles: Array.isArray(data.secondaryMuscles) ? data.secondaryMuscles : [],
           equipment: data.equipment || "None",
           difficulty: data.difficulty || "intermediate",
           description: data.description,
@@ -681,7 +739,11 @@ export default function ExercisesPage() {
                                 >
                                   <Edit className="w-4 h-4" />
                                 </button>
-                                <button className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
+                                <button
+                                  type="button"
+                                  className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                  onClick={() => openDeleteModal(exercise)}
+                                >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
@@ -1019,11 +1081,46 @@ export default function ExercisesPage() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingExercise && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-border">
+            <div className="px-6 py-5 border-b border-border">
+              <h2 className="text-lg font-semibold text-card-foreground">Delete Exercise</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Are you sure you want to delete <span className="font-medium text-card-foreground">"{deletingExercise.name}"</span>?
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-muted/20">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={deleting}
+                className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteExercise}
+                disabled={deleting}
+                className="h-10 px-5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? "Deleting..." : "Delete Exercise"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Exercise Modal */}
       <ExerciseEditModal
         isOpen={showEditModal}
         exercise={editingExercise}
-        muscleGroupOrder={muscleGroupOrder}
+        muscleCategoryDetails={muscleCategoryDetails}
         saving={updating}
         onClose={closeEditModal}
         onSave={handleUpdateExercise}

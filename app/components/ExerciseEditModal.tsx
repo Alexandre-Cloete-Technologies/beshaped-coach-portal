@@ -9,6 +9,8 @@ export interface ExerciseEditValues {
   name: string;
   description: string;
   muscleGroup: string;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
   equipment: string;
   difficulty: Difficulty;
   videoUrl: string;
@@ -18,6 +20,8 @@ interface ExerciseSummary {
   id: string;
   name: string;
   muscleGroup: string;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
   equipment: string;
   difficulty: Difficulty;
   description?: string;
@@ -27,7 +31,7 @@ interface ExerciseSummary {
 interface ExerciseEditModalProps {
   isOpen: boolean;
   exercise: ExerciseSummary | null;
-  muscleGroupOrder: string[];
+  muscleCategoryDetails: Array<{ category: string; muscles: string[] }>;
   saving?: boolean;
   onClose: () => void;
   onSave: (values: ExerciseEditValues) => void;
@@ -36,15 +40,44 @@ interface ExerciseEditModalProps {
 export default function ExerciseEditModal({
   isOpen,
   exercise,
-  muscleGroupOrder,
+  muscleCategoryDetails,
   saving = false,
   onClose,
   onSave,
 }: ExerciseEditModalProps) {
+  const resolveMuscleGroup = (
+    primaryMuscles: string[],
+    secondaryMuscles: string[],
+    fallback: string
+  ) => {
+    const first = primaryMuscles[0] || secondaryMuscles[0] || "";
+    if (!first) return fallback || "Other";
+
+    const normalized = first.toLowerCase().trim();
+    for (const { category, muscles } of muscleCategoryDetails) {
+      if (
+        category.toLowerCase() === normalized ||
+        muscles.some((muscle) => muscle.toLowerCase() === normalized)
+      ) {
+        return category;
+      }
+    }
+    return fallback || "Other";
+  };
+
+  const getDefaultMuscleForGroup = (group: string) => {
+    const matched = muscleCategoryDetails.find(
+      ({ category }) => category.toLowerCase() === group.toLowerCase()
+    );
+    return matched?.muscles[0] || "";
+  };
+
   const [form, setForm] = useState<ExerciseEditValues>({
     name: "",
     description: "",
-    muscleGroup: muscleGroupOrder[0] || "Other",
+    muscleGroup: "Other",
+    primaryMuscles: [],
+    secondaryMuscles: [],
     equipment: "",
     difficulty: "intermediate",
     videoUrl: "",
@@ -56,14 +89,19 @@ export default function ExerciseEditModal({
     setForm({
       name: exercise.name || "",
       description: exercise.description || "",
-      muscleGroup: muscleGroupOrder.includes(exercise.muscleGroup)
-        ? exercise.muscleGroup
-        : "Other",
+      muscleGroup: exercise.muscleGroup || "Other",
+      primaryMuscles:
+        exercise.primaryMuscles && exercise.primaryMuscles.length > 0
+          ? exercise.primaryMuscles
+          : getDefaultMuscleForGroup(exercise.muscleGroup)
+            ? [getDefaultMuscleForGroup(exercise.muscleGroup)]
+            : [],
+      secondaryMuscles: exercise.secondaryMuscles || [],
       equipment: exercise.equipment || "",
       difficulty: exercise.difficulty || "intermediate",
       videoUrl: exercise.videoUrl || "",
     });
-  }, [isOpen, exercise, muscleGroupOrder]);
+  }, [isOpen, exercise]);
 
   if (!isOpen || !exercise) return null;
 
@@ -79,12 +117,30 @@ export default function ExerciseEditModal({
       alert("Please enter an exercise name");
       return;
     }
-    onSave(form);
+    onSave({
+      ...form,
+      muscleGroup: resolveMuscleGroup(
+        form.primaryMuscles,
+        form.secondaryMuscles,
+        form.muscleGroup
+      ),
+    });
+  };
+
+  const toggleMuscle = (muscle: string, isPrimary: boolean) => {
+    const field = isPrimary ? "primaryMuscles" : "secondaryMuscles";
+    setForm((prev) => {
+      const current = prev[field];
+      if (current.includes(muscle)) {
+        return { ...prev, [field]: current.filter((m) => m !== muscle) };
+      }
+      return { ...prev, [field]: [...current, muscle] };
+    });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden border border-border max-h-[90vh] flex flex-col">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-border max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
@@ -122,23 +178,6 @@ export default function ExerciseEditModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-card-foreground mb-2">
-                Muscle Group
-              </label>
-              <select
-                value={form.muscleGroup}
-                onChange={(e) => handleChange("muscleGroup", e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-              >
-                {muscleGroupOrder.map((group) => (
-                  <option key={group} value={group}>
-                    {group}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-card-foreground mb-2">
                 Difficulty
               </label>
               <select
@@ -155,6 +194,70 @@ export default function ExerciseEditModal({
                 <option value="intermediate">Intermediate</option>
                 <option value="advanced">Advanced</option>
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-5">
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Primary Muscles
+              </label>
+              <div className="space-y-3">
+                {muscleCategoryDetails.map(({ category, muscles }) => (
+                  <div key={`primary-${category}`}>
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">
+                      {category}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {muscles.map((muscle) => (
+                        <button
+                          key={`primary-${category}-${muscle}`}
+                          type="button"
+                          onClick={() => toggleMuscle(muscle, true)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            form.primaryMuscles.includes(muscle)
+                              ? "bg-blue-600 text-white"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          }`}
+                        >
+                          {muscle}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Secondary Muscles
+              </label>
+              <div className="space-y-3">
+                {muscleCategoryDetails.map(({ category, muscles }) => (
+                  <div key={`secondary-${category}`}>
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">
+                      {category}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {muscles.map((muscle) => (
+                        <button
+                          key={`secondary-${category}-${muscle}`}
+                          type="button"
+                          onClick={() => toggleMuscle(muscle, false)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            form.secondaryMuscles.includes(muscle)
+                              ? "bg-indigo-600 text-white"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          }`}
+                        >
+                          {muscle}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
