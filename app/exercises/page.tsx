@@ -68,6 +68,17 @@ const categoryOptions = [
   "Strength", "Hypertrophy", "Power", "Endurance", "Flexibility", "Cardio", "Rehabilitation"
 ];
 
+const muscleCategoryDetails: Array<{ category: string; muscles: string[] }> = [
+  { category: "Chest", muscles: ["Upper chest", "Chest"] },
+  { category: "Back", muscles: ["Back","Traps", "Upper back", "Mid back", "Lats", "Erectors" ] },
+  { category: "Shoulders", muscles: ["Front delts", "Side delts", "Rear delts"] },
+  { category: "Arms", muscles: ["Biceps", "Triceps", "Forearms"] },
+  { category: "Core", muscles: ["Abs"] },
+  { category: "Cardio", muscles: ["Cardio"] },
+  { category: "Legs", muscles: ["Quads", "Hamstrings", "Calves"] },
+  { category: "Neck", muscles: ["Neck"] },
+];
+
 // Define muscle group order and icons
 const muscleGroupOrder = [
   "Chest",
@@ -703,7 +714,7 @@ export default function ExercisesPage() {
       {/* Add Exercise Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-border max-h-[90vh] flex flex-col">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-border max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
@@ -796,48 +807,62 @@ export default function ExercisesPage() {
                   />
                 </div>
 
-                {/* Primary Muscles - full width */}
-                <div className="col-span-2">
+                {/* Primary Muscles */}
+                <div>
                   <label className="block text-xs font-medium text-card-foreground mb-2">
                     Primary Muscles
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {muscleGroupOrder.filter(m => m !== "Other").map(muscle => (
-                      <button
-                        key={muscle}
-                        type="button"
-                        onClick={() => toggleMuscle(muscle, true)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                          formData.primaryMuscles.includes(muscle)
-                            ? "bg-blue-600 text-white"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                      >
-                        {muscle}
-                      </button>
+                  <div className="space-y-3">
+                    {muscleCategoryDetails.map(({ category, muscles }) => (
+                      <div key={category}>
+                        <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">{category}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {muscles.map((muscle) => (
+                            <button
+                              key={`primary-${category}-${muscle}`}
+                              type="button"
+                              onClick={() => toggleMuscle(muscle, true)}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                formData.primaryMuscles.includes(muscle)
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
+                            >
+                              {muscle}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Secondary Muscles - full width */}
-                <div className="col-span-2">
+                {/* Secondary Muscles */}
+                <div>
                   <label className="block text-xs font-medium text-card-foreground mb-2">
                     Secondary Muscles
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {muscleGroupOrder.filter(m => m !== "Other").map(muscle => (
-                      <button
-                        key={muscle}
-                        type="button"
-                        onClick={() => toggleMuscle(muscle, false)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                          formData.secondaryMuscles.includes(muscle)
-                            ? "bg-indigo-600 text-white"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                      >
-                        {muscle}
-                      </button>
+                  <div className="space-y-3">
+                    {muscleCategoryDetails.map(({ category, muscles }) => (
+                      <div key={category}>
+                        <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">{category}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {muscles.map((muscle) => (
+                            <button
+                              key={`secondary-${category}-${muscle}`}
+                              type="button"
+                              onClick={() => toggleMuscle(muscle, false)}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                formData.secondaryMuscles.includes(muscle)
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
+                            >
+                              {muscle}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
