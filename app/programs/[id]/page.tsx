@@ -11,6 +11,9 @@ import {
   ChevronDown,
   ChevronRight,
   Users,
+  LayoutDashboard,
+  Library,
+  Settings,
   Edit,
   Copy,
   Trash2,
@@ -20,7 +23,6 @@ import {
   GripVertical,
   X,
 } from "lucide-react";
-import Sidebar from "../../components/Sidebar";
 import Link from "next/link";
 import {
   doc,
@@ -101,6 +103,15 @@ interface EditExercise {
 interface SelectedWorkoutEdit {
   phaseIdx: number;
   dayIdx: number;
+}
+
+interface WorkoutCard {
+  id: string;
+  workoutName: string;
+  workoutId: string | null;
+  description?: string;
+  estimatedDuration?: number;
+  exercises: ModalExercise[];
 }
 
 // === Muscle group helpers (same as builder) ===
@@ -245,6 +256,10 @@ export default function ProgramDetailPage() {
 
   // Workout modal state
   const [selectedWorkoutEdit, setSelectedWorkoutEdit] = useState<SelectedWorkoutEdit | null>(null);
+  const [selectedLibraryWorkout, setSelectedLibraryWorkout] = useState<WorkoutCard | null>(null);
+  const [workoutSearchQuery, setWorkoutSearchQuery] = useState("");
+  const [workoutLibrary, setWorkoutLibrary] = useState<WorkoutCard[]>([]);
+  const [loadingWorkoutLibrary, setLoadingWorkoutLibrary] = useState(false);
 
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -377,6 +392,98 @@ export default function ProgramDetailPage() {
     return groups;
   }, [exercises]);
 
+  useEffect(() => {
+    const fetchWorkoutLibrary = async () => {
+      try {
+        setLoadingWorkoutLibrary(true);
+        const workoutsSnapshot = await getDocs(collection(db, "workouts"));
+        if (workoutsSnapshot.empty) {
+          setWorkoutLibrary([]);
+          return;
+        }
+
+        const fetchedCards: WorkoutCard[] = workoutsSnapshot.docs.map((workoutDoc) => {
+          const data = workoutDoc.data() as Record<string, unknown>;
+          const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
+          const mappedExercises: ModalExercise[] = rawExercises.map((exercise, idx) => {
+            const ex = (exercise && typeof exercise === "object" ? exercise : {}) as Record<string, unknown>;
+            return {
+              id:
+                typeof ex.exerciseId === "string" && ex.exerciseId
+                  ? ex.exerciseId
+                  : typeof ex.id === "string" && ex.id
+                    ? ex.id
+                    : `${workoutDoc.id}-exercise-${idx + 1}`,
+              name:
+                typeof ex.exerciseName === "string" && ex.exerciseName.trim()
+                  ? ex.exerciseName.trim()
+                  : typeof ex.name === "string" && ex.name.trim()
+                    ? ex.name.trim()
+                    : "Unnamed Exercise",
+              muscleGroup:
+                typeof ex.muscleGroup === "string" && ex.muscleGroup
+                  ? ex.muscleGroup
+                  : "Other",
+              equipment:
+                typeof ex.equipment === "string" && ex.equipment
+                  ? ex.equipment
+                  : "Unknown",
+              difficulty:
+                typeof ex.difficulty === "string" && ex.difficulty
+                  ? ex.difficulty
+                  : "intermediate",
+              sets:
+                typeof ex.targetSets === "number"
+                  ? ex.targetSets
+                  : typeof ex.sets === "number"
+                    ? ex.sets
+                    : 3,
+              repsRange:
+                typeof ex.targetReps === "string"
+                  ? ex.targetReps
+                  : typeof ex.repsRange === "string"
+                    ? ex.repsRange
+                    : "8-12",
+            };
+          });
+
+          return {
+            id: workoutDoc.id,
+            workoutId: workoutDoc.id,
+            workoutName:
+              typeof data.name === "string" && data.name.trim()
+                ? data.name.trim()
+                : "Untitled Workout",
+            description: typeof data.description === "string" ? data.description : "",
+            estimatedDuration:
+              typeof data.estimatedDuration === "number" && Number.isFinite(data.estimatedDuration)
+                ? data.estimatedDuration
+                : mappedExercises.length * 5,
+            exercises: mappedExercises,
+          };
+        });
+
+        setWorkoutLibrary(fetchedCards);
+      } catch (err) {
+        console.error("Error fetching workout library:", err);
+        setWorkoutLibrary([]);
+      } finally {
+        setLoadingWorkoutLibrary(false);
+      }
+    };
+
+    fetchWorkoutLibrary();
+  }, []);
+
+  const filteredWorkoutCards = useMemo(() => {
+    const query = workoutSearchQuery.trim().toLowerCase();
+    if (!query) return workoutLibrary;
+    return workoutLibrary.filter((card) =>
+      card.workoutName.toLowerCase().includes(query) ||
+      (card.description || "").toLowerCase().includes(query)
+    );
+  }, [workoutLibrary, workoutSearchQuery]);
+
   // Auto-expand modal groups when searching
   // (handled inside WorkoutEditorModal)
 
@@ -397,6 +504,57 @@ export default function ProgramDetailPage() {
       else next.add(workoutKey);
       return next;
     });
+  };
+
+  const handleWorkoutDragStart = (e: React.DragEvent, card: WorkoutCard) => {
+    if (!isEditing) return;
+    e.dataTransfer.setData("workout-card", JSON.stringify(card));
+  };
+
+  const openLibraryWorkoutModal = (card: WorkoutCard) => {
+    setSelectedLibraryWorkout(card);
+  };
+
+  const handleDayDragOver = (e: React.DragEvent) => {
+    if (!isEditing) return;
+    e.preventDefault();
+  };
+
+  const handleDayDrop = (e: React.DragEvent, phaseIdx: number, dayIdx: number) => {
+    if (!isEditing || !editedProgram) return;
+    e.preventDefault();
+
+    const raw = e.dataTransfer.getData("workout-card");
+    if (!raw) return;
+
+    try {
+      const card = JSON.parse(raw) as WorkoutCard;
+      const updated = JSON.parse(JSON.stringify(editedProgram)) as ProgramDetail;
+      const currentWorkout = updated.phases[phaseIdx].workouts[dayIdx];
+      const mappedExercises: ExerciseData[] = (card.exercises || []).map((ex, idx) => ({
+        exerciseId: ex.id || "",
+        exerciseName: ex.name || "Unnamed Exercise",
+        order: idx + 1,
+        sets: ex.sets || 3,
+        repsRange: ex.repsRange || "8-12",
+        restPeriod: "60s",
+        notes: null,
+      }));
+
+      updated.phases[phaseIdx].workouts[dayIdx] = {
+        ...currentWorkout,
+        isRestDay: false,
+        workoutId: card.workoutId || currentWorkout.workoutId || `workout_${phaseIdx}_${dayIdx}`,
+        workoutName: card.workoutName,
+        description: card.description || "",
+        estimatedDuration: card.estimatedDuration || 0,
+        exercises: mappedExercises,
+      };
+
+      setEditedProgram(updated);
+    } catch (dropError) {
+      console.error("Failed to drop workout card:", dropError);
+    }
   };
 
   // === Edit mode functions ===
@@ -764,6 +922,28 @@ export default function ProgramDetailPage() {
     setSelectedWorkoutEdit(null);
   };
 
+  const handleLibraryWorkoutModalClose = (result: {
+    workoutName: string;
+    exercises: ModalExercise[];
+  }) => {
+    if (!selectedLibraryWorkout) return;
+
+    setWorkoutLibrary((prev) =>
+      prev.map((card) =>
+        card.id === selectedLibraryWorkout.id
+          ? {
+              ...card,
+              workoutName: result.workoutName || card.workoutName,
+              exercises: result.exercises || [],
+              estimatedDuration: (result.exercises || []).length * 5,
+            }
+          : card
+      )
+    );
+
+    setSelectedLibraryWorkout(null);
+  };
+
   // === Helpers ===
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -781,9 +961,8 @@ export default function ProgramDetailPage() {
   // === Early returns ===
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar />
-        <main className="ml-[220px] min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <main className="flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Loading program...</p>
@@ -795,9 +974,8 @@ export default function ProgramDetailPage() {
 
   if (error || !program) {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar />
-        <main className="ml-[220px] min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <main className="flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error || "Program not found"}</p>
             <Link
@@ -817,30 +995,114 @@ export default function ProgramDetailPage() {
     (acc, phase) => acc + phase.workouts.filter((w) => w.workoutName && !w.isRestDay).length,
     0
   );
-  const totalExercises = program.phases.reduce(
-    (acc, phase) =>
-      acc + phase.workouts.reduce((wAcc, w) => wAcc + (w.exercises?.length || 0), 0),
-    0
-  );
-  const totalRestDays = program.phases.reduce(
-    (acc, phase) => acc + phase.workouts.filter((w) => w.isRestDay).length,
-    0
-  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-
-      <main className="ml-[220px] min-h-screen">
-        <div className="p-8">
-          {/* Back Button */}
-          <Link
-            href="/programs"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Programs
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
+      <header className="flex shrink-0 items-center justify-between whitespace-nowrap border-b border-border bg-card px-6 py-3 z-20">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+              <Dumbbell className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="font-semibold text-card-foreground text-sm leading-tight">BeShaped Fitness</h1>
+              <span className="text-[10px] text-muted-foreground">Coach Portal</span>
+            </div>
           </Link>
+          <div className="h-6 w-px bg-border" />
+          <nav className="flex items-center gap-1">
+            {[
+              { icon: <LayoutDashboard size={18} />, label: "Dashboard", href: "/" },
+              { icon: <Users size={18} />, label: "Clients", href: "/clients" },
+              { icon: <Calendar size={18} />, label: "Programs", href: "/programs" },
+              { icon: <Library size={18} />, label: "Exercises", href: "/exercises" },
+            ].map((item) => {
+              const isActive = item.href === "/programs";
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  }`}
+                >
+                  {item.icon}
+                  <span className="hidden md:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/settings"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <Settings size={18} />
+            <span className="hidden md:inline">Settings</span>
+          </Link>
+        </div>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden relative">
+        <aside className="w-[300px] shrink-0 flex flex-col bg-card border-r border-border z-10">
+          <div className="p-4 border-b border-border space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
+              <Layers className="w-4 h-4" />
+              Workout Library
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <input
+                type="text"
+                value={workoutSearchQuery}
+                onChange={(e) => setWorkoutSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border-none rounded-lg bg-muted text-sm placeholder-muted-foreground focus:ring-2 focus:ring-ring focus:bg-card transition-all"
+                placeholder="Search workouts..."
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {filteredWorkoutCards.map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => openLibraryWorkoutModal(card)}
+                draggable={isEditing}
+                onDragStart={(e) => handleWorkoutDragStart(e, card)}
+                className="w-full text-left group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+              >
+                <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-card-foreground truncate">{card.workoutName}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {card.exercises.length} exercises • {card.estimatedDuration || 0} min
+                  </p>
+                </div>
+                <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+              </button>
+            ))}
+            {loadingWorkoutLibrary && (
+              <div className="text-center py-3 text-muted-foreground text-sm">Loading workouts...</div>
+            )}
+            {filteredWorkoutCards.length === 0 && (
+              <div className="text-center py-3 text-muted-foreground text-sm">No workouts found</div>
+            )}
+          </div>
+        </aside>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          <div className="max-w-7xl mx-auto">
+            <Link
+              href="/programs"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Programs
+            </Link>
 
           {/* Program Header Card */}
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-8 shadow-lg text-white mb-8">
@@ -895,10 +1157,6 @@ export default function ProgramDetailPage() {
                     <span className="text-xs text-blue-100">Workouts</span>
                     <span className="font-medium">{totalWorkouts}</span>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
-                    <span className="text-xs text-blue-100">Exercises</span>
-                    <span className="font-medium">{totalExercises}</span>
-                  </div>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -940,10 +1198,6 @@ export default function ProgramDetailPage() {
                 const phaseWorkoutCount = phase.workouts.filter(
                   (w) => w.workoutName && !w.isRestDay
                 ).length;
-                const phaseExerciseCount = phase.workouts.reduce(
-                  (acc, w) => acc + (w.exercises?.length || 0),
-                  0
-                );
 
                 // Group workouts into weeks of 7
                 const weeks: WorkoutData[][] = [];
@@ -1036,8 +1290,6 @@ export default function ProgramDetailPage() {
                         </div>
                         <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground">
                           <span>{phaseWorkoutCount} workouts</span>
-                          <span>•</span>
-                          <span>{phaseExerciseCount} exercises</span>
                         </div>
                       </div>
                     </button>
@@ -1067,121 +1319,106 @@ export default function ProgramDetailPage() {
                                 const isWorkoutExpanded = expandedWorkouts.has(workoutKey);
                                 const hasExercises = workout.exercises && workout.exercises.length > 0;
 
-                                // === REST DAY ===
-                                if (workout.isRestDay) {
-                                  return (
-                                    <div
-                                      key={dayIdx}
-                                      className="group relative flex h-28 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-muted-foreground"
-                                    >
-                                      {isEditing && (
-                                        <button
-                                          onClick={() => clearDay(phaseIdx, globalDayIdx)}
-                                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-muted-foreground hover:text-red-500 transition-all"
-                                        >
-                                          <X className="w-3 h-3" />
-                                        </button>
-                                      )}
-                                      <Hotel className="w-5 h-5 mb-1" />
-                                      <span className="text-xs font-medium">Rest Day</span>
-                                    </div>
-                                  );
-                                }
-
-                                // === EMPTY DAY ===
-                                if (!workout.workoutName) {
-                                  if (isEditing) {
-                                    return (
-                                      <div
-                                        key={dayIdx}
-                                        className="flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-all cursor-pointer group bg-card relative"
-                                        onClick={() => openWorkoutModal(phaseIdx, globalDayIdx)}
-                                      >
-                                        <div className="size-8 rounded-full bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-card flex items-center justify-center mb-2 transition-colors">
-                                          <Plus className="w-5 h-5" />
-                                        </div>
-                                        <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Add Workout</span>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); setRestDay(phaseIdx, globalDayIdx); }}
-                                          className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 px-2 py-1 text-[10px] font-medium rounded bg-muted hover:bg-amber-100 dark:hover:bg-amber-900/30 text-muted-foreground hover:text-amber-700 dark:hover:text-amber-400 transition-all flex items-center gap-1"
-                                        >
-                                          <Hotel className="w-3 h-3" />
-                                          Rest Day
-                                        </button>
-                                      </div>
-                                    );
-                                  }
-                                  return (
-                                    <div
-                                      key={dayIdx}
-                                      className="flex h-28 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card text-muted-foreground/50"
-                                    >
-                                      <span className="text-xs">Empty</span>
-                                    </div>
-                                  );
-                                }
-
-                                // === WORKOUT DAY ===
                                 return (
                                   <div
                                     key={dayIdx}
-                                    className="group relative flex flex-col rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-900/20 hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
-                                    onClick={() => {
-                                      if (isEditing) {
-                                        openWorkoutModal(phaseIdx, globalDayIdx);
-                                      } else if (hasExercises) {
-                                        toggleWorkout(workoutKey);
-                                      }
-                                    }}
+                                    className="flex flex-col gap-2"
+                                    onDragOver={handleDayDragOver}
+                                    onDrop={(e) => handleDayDrop(e, phaseIdx, globalDayIdx)}
                                   >
-                                    {isEditing && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); clearDay(phaseIdx, globalDayIdx); }}
-                                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-muted-foreground hover:text-red-500 transition-all z-10"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                    <div className="p-3 flex flex-col items-center justify-center gap-1.5 h-28 text-center">
-                                      <p className="text-sm font-semibold text-card-foreground leading-tight line-clamp-2">
-                                        {workout.workoutName}
-                                      </p>
-                                      {hasExercises && (
-                                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
-                                          <Dumbbell className="w-3 h-3" />
-                                          {workout.exercises.length} exercises
-                                          {!isEditing && (
-                                            isWorkoutExpanded ? (
-                                              <ChevronDown className="w-3 h-3 ml-auto" />
-                                            ) : (
-                                              <ChevronRight className="w-3 h-3 ml-auto" />
-                                            )
-                                          )}
+                                    {/* === REST DAY === */}
+                                    {workout.isRestDay ? (
+                                      <div className="group relative flex h-28 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-muted-foreground">
+                                        {isEditing && (
+                                          <button
+                                            onClick={() => clearDay(phaseIdx, globalDayIdx)}
+                                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-muted-foreground hover:text-red-500 transition-all"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                        <Hotel className="w-5 h-5 mb-1" />
+                                        <span className="text-xs font-medium">Rest Day</span>
+                                      </div>
+                                    ) : !workout.workoutName ? (
+                                      isEditing ? (
+                                        <div
+                                          className="flex h-28 flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-all cursor-pointer group bg-card relative"
+                                          onClick={() => openWorkoutModal(phaseIdx, globalDayIdx)}
+                                        >
+                                          <div className="size-8 rounded-full bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-card flex items-center justify-center mb-2 transition-colors">
+                                            <Plus className="w-5 h-5" />
+                                          </div>
+                                          <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Add Workout</span>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setRestDay(phaseIdx, globalDayIdx); }}
+                                            className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 px-2 py-1 text-[10px] font-medium rounded bg-muted hover:bg-amber-100 dark:hover:bg-amber-900/30 text-muted-foreground hover:text-amber-700 dark:hover:text-amber-400 transition-all flex items-center gap-1"
+                                          >
+                                            <Hotel className="w-3 h-3" />
+                                            Rest Day
+                                          </button>
                                         </div>
-                                      )}
-                                    </div>
+                                      ) : (
+                                        <div className="flex h-28 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card text-muted-foreground/50">
+                                          <span className="text-xs">Empty</span>
+                                        </div>
+                                      )
+                                    ) : (
+                                      <div
+                                        className="group relative flex flex-col rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-900/20 hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
+                                        onClick={() => {
+                                          if (isEditing) {
+                                            openWorkoutModal(phaseIdx, globalDayIdx);
+                                          } else if (hasExercises) {
+                                            toggleWorkout(workoutKey);
+                                          }
+                                        }}
+                                      >
+                                        {isEditing && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); clearDay(phaseIdx, globalDayIdx); }}
+                                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-muted-foreground hover:text-red-500 transition-all z-10"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                        <div className="p-3 flex flex-col items-center justify-center gap-1.5 h-28 text-center">
+                                          <p className="text-sm font-semibold text-card-foreground leading-tight line-clamp-2">
+                                            {workout.workoutName}
+                                          </p>
+                                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
+                                            <Dumbbell className="w-3 h-3" />
+                                            {hasExercises ? `${workout.exercises.length} exercises` : "No exercises"}
+                                            {!isEditing && hasExercises && (
+                                              isWorkoutExpanded ? (
+                                                <ChevronDown className="w-3 h-3 ml-auto" />
+                                              ) : (
+                                                <ChevronRight className="w-3 h-3 ml-auto" />
+                                              )
+                                            )}
+                                          </div>
+                                        </div>
 
-                                    {/* Expanded Exercise List (view mode only) */}
-                                    {!isEditing && isWorkoutExpanded && hasExercises && (
-                                      <div className="border-t border-indigo-200 dark:border-indigo-800 bg-card/80 divide-y divide-border/50">
-                                        {workout.exercises
-                                          .sort((a, b) => a.order - b.order)
-                                          .map((exercise, exIdx) => (
-                                            <div
-                                              key={exIdx}
-                                              className="px-3 py-2 text-xs"
-                                            >
-                                              <p className="font-medium text-card-foreground truncate">
-                                                {exercise.exerciseName}
-                                              </p>
-                                              <p className="text-muted-foreground mt-0.5">
-                                                {exercise.sets} × {exercise.repsRange}
-                                                {exercise.restPeriod && (
-                                                  <span> · {exercise.restPeriod} rest</span>
-                                                )}
-                                              </p>
-                                            </div>
-                                          ))}
+                                        {/* Expanded Exercise List (view mode only) */}
+                                        {!isEditing && isWorkoutExpanded && hasExercises && (
+                                          <div className="border-t border-indigo-200 dark:border-indigo-800 bg-card/80 divide-y divide-border/50">
+                                            {workout.exercises
+                                              .sort((a, b) => a.order - b.order)
+                                              .map((exercise, exIdx) => (
+                                                <div key={exIdx} className="px-3 py-2 text-xs">
+                                                  <p className="font-medium text-card-foreground truncate">
+                                                    {exercise.exerciseName}
+                                                  </p>
+                                                  <p className="text-muted-foreground mt-0.5">
+                                                    {exercise.sets} x {exercise.repsRange}
+                                                    {exercise.restPeriod && (
+                                                      <span> · {exercise.restPeriod} rest</span>
+                                                    )}
+                                                  </p>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1195,9 +1432,6 @@ export default function ProgramDetailPage() {
                         <div className="bg-muted/50 px-6 py-3 border-t border-border flex items-center justify-between">
                           <div className="flex gap-4 text-xs text-muted-foreground">
                             <span>Total Workouts: {phaseWorkoutCount}</span>
-                            <span>
-                              Total Exercises: {phaseExerciseCount}
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -1219,8 +1453,9 @@ export default function ProgramDetailPage() {
                 </button>
               )}
           </div>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
 
       {/* === Workout Editor Modal === */}
       {selectedWorkoutEdit && editedProgram && (
@@ -1252,6 +1487,18 @@ export default function ProgramDetailPage() {
           muscleGroupOrder={muscleGroupOrder}
           loadingExercises={loadingExercises}
           onClose={handleWorkoutModalClose}
+        />
+      )}
+
+      {selectedLibraryWorkout && (
+        <WorkoutEditorModal
+          isOpen={true}
+          workoutName={selectedLibraryWorkout.workoutName}
+          exercises={selectedLibraryWorkout.exercises || []}
+          groupedExercises={groupedExercises as Record<string, ModalExercise[]>}
+          muscleGroupOrder={muscleGroupOrder}
+          loadingExercises={loadingExercises}
+          onClose={handleLibraryWorkoutModalClose}
         />
       )}
     </div>
