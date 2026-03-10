@@ -33,8 +33,14 @@ export default function ClientDetailPage() {
   const params = useParams();
   const clientId = params?.id as string;
   const [activeTab, setActiveTab] = useState("overview");
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["overview"]));
 
   const [client, setClient] = useState<any>(null);
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    setVisitedTabs((prev) => new Set(prev).add(tabId));
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -237,7 +243,7 @@ export default function ClientDetailPage() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabChange(tab.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
                         ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
@@ -252,12 +258,18 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {/* Tab Content */}
-          {activeTab === "workout-history" ? (
-            <WorkoutHistory />
-          ) : activeTab === "progress" ? (
-            <Progress clientId={clientId} />
-          ) : activeTab === "overview" ? (
+          {/* Tab Content - WorkoutHistory and Progress stay mounted once visited to avoid re-fetch on tab switch */}
+          {visitedTabs.has("workout-history") && (
+            <div style={{ display: activeTab === "workout-history" ? "block" : "none" }}>
+              <WorkoutHistory />
+            </div>
+          )}
+          {visitedTabs.has("progress") && (
+            <div style={{ display: activeTab === "progress" ? "block" : "none" }}>
+              <Progress clientId={clientId} />
+            </div>
+          )}
+          {activeTab === "overview" && (
             /* Main Content Grid */
             <div className="grid grid-cols-3 gap-6">
               {/* Left Column - Main Content */}
@@ -307,8 +319,8 @@ export default function ClientDetailPage() {
 
               
             </div>
-          ) : (
-            /* Placeholder for other tabs */
+          )}
+          {["nutrition", "settings"].includes(activeTab) && (
             <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center">
               <p className="text-muted-foreground">
                 {tabs.find((t) => t.id === activeTab)?.label} content coming soon...
