@@ -269,32 +269,37 @@ export default function WorkoutHistory() {
       if (!clientId) return;
       
       try {
-        // Query workoutLogs collection for this user
         const workoutLogsRef = collection(db, "workoutLogs");
-        const q = query(workoutLogsRef, where("userId", "==", clientId));
-        const querySnapshot = await getDocs(q);
-        
-        const logs: WorkoutLog[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data() as Record<string, unknown>;
-          // Use completedAt timestamp from Firebase
-          const completedAtField = data.completedAt as { toDate?: () => Date } | Date | string | null | undefined;
-          let completedAt: Date;
-          if (
-            completedAtField &&
-            typeof completedAtField === "object" &&
-            "toDate" in completedAtField &&
-            typeof completedAtField.toDate === "function"
-          ) {
-            completedAt = completedAtField.toDate();
-          } else if (completedAtField instanceof Date) {
-            completedAt = completedAtField;
-          } else if (typeof completedAtField === "string" || typeof completedAtField === "number") {
-            completedAt = new Date(completedAtField);
-          } else {
-            completedAt = new Date();
-          }
+        const userRef = doc(db, "users", clientId);
+
+        // Query with BOTH formats: userId can be stored as string (clientId) or DocumentReference
+        const [stringSnapshot, refSnapshot] = await Promise.all([
+          getDocs(query(workoutLogsRef, where("userId", "==", clientId))),
+          getDocs(query(workoutLogsRef, where("userId", "==", userRef))),
+        ]);
+
+        const seenIds = new Set<string>();
+        const allDocs = [...stringSnapshot.docs, ...refSnapshot.docs].filter((d) => {
+          if (seenIds.has(d.id)) return false;
+          seenIds.add(d.id);
+          return true;
+        });
+
+        const logs: WorkoutLog[] = allDocs.map((docSnap) => {
+          const data = docSnap.data() as Record<string, unknown>;
+          const toDate = (val: unknown): Date | null => {
+            if (!val) return null;
+            if (typeof val === "object" && val !== null && "toDate" in val && typeof (val as { toDate: () => Date }).toDate === "function") {
+              return (val as { toDate: () => Date }).toDate();
+            }
+            if (val instanceof Date) return val;
+            if (typeof val === "string" || typeof val === "number") return new Date(val);
+            return null;
+          };
+          // Use completedAt, dateCompleted (client app), or startedAt for in-progress logs
+          const completedAt = toDate(data.completedAt) ?? toDate(data.dateCompleted) ?? toDate(data.startedAt) ?? new Date();
           return {
-            id: doc.id,
+            id: docSnap.id,
             completedAt,
             userId: String(data.userId || ""),
             programName: String(data.programName || ""),
@@ -303,7 +308,10 @@ export default function WorkoutHistory() {
             dayNumber: Number(data.dayNumber || 0),
             weekNumber: Number(data.weekNumber || 0),
             totalDuration: (data.totalDuration as number | null) || null,
-            status: (data.status as "completed" | "in-progress" | "skipped") || "completed",
+            status: (() => {
+              const s = String(data.status || "");
+              return (s === "completed" || s === "in-progress" || s === "skipped" ? s : "in-progress") as "completed" | "in-progress" | "skipped";
+            })(),
             exercises: normalizeWorkoutLogExercises(data),
             totalVolume: Number(data.totalVolume || 0),
             totalSets: Number(data.totalSets || 0),
@@ -311,12 +319,15 @@ export default function WorkoutHistory() {
             notes: (data.notes as string | null) || null,
           };
         });
-        
+
+        // Only include completed workouts
+        const completedLogs = logs.filter((log) => log.status === "completed");
+
         // Sort by date (most recent first)
-        logs.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
-        
-        setWorkoutLogs(logs);
-        console.log("Fetched workout logs:", logs);
+        completedLogs.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
+
+        setWorkoutLogs(completedLogs);
+        console.log("Fetched workout logs:", completedLogs);
       } catch (error) {
         console.error("Error fetching workout logs:", error);
       }
@@ -512,10 +523,12 @@ export default function WorkoutHistory() {
     const startingDayOfWeek = firstDay === 0 ? 6 : firstDay - 1;
 
     // Create a map of dates with workouts for O(1) lookup
+    // Use UTC date components to avoid timezone shifting - e.g. "March 1" stored as midnight UTC
+    // would incorrectly show as Feb 28 in timezones west of UTC with local methods
     const workoutDates = new Map();
     workoutLogs.forEach(log => {
       if (isValidDate(log.completedAt)) {
-        const dateKey = `${log.completedAt.getFullYear()}-${String(log.completedAt.getMonth() + 1).padStart(2, "0")}-${String(log.completedAt.getDate()).padStart(2, "0")}`;
+        const dateKey = `${log.completedAt.getUTCFullYear()}-${String(log.completedAt.getUTCMonth() + 1).padStart(2, "0")}-${String(log.completedAt.getUTCDate()).padStart(2, "0")}`;
         // Store the workout details
         // If multiple workouts on same day, prioritize "completed" or simply take the first one found
         if (!workoutDates.has(dateKey) || log.status === "completed") {

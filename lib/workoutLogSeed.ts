@@ -173,7 +173,6 @@ export const seedMissingWorkoutLogsForUserProgram = async ({
     if (existingOpenSlots.has(slotKey)) continue;
 
     await addDoc(collection(db, "workoutLogs"), {
-      dateCompleted: null,
       userId,
       programId: programRef,
       programName,
@@ -184,7 +183,7 @@ export const seedMissingWorkoutLogsForUserProgram = async ({
       startedAt: startedTimestamp,
       completedAt: null,
       totalDuration: null,
-      status: "in-progress",
+      status: "to-be-completed",
       exercises: slot.exercises,
       totalVolume: 0,
       totalSets: 0,
