@@ -57,6 +57,7 @@ interface ExerciseData {
 
 interface WorkoutData {
   dayNumber: number;
+  weekNumber?: number;
   dayName: string;
   isRestDay: boolean;
   workoutId: string | null;
@@ -168,7 +169,10 @@ const buildWorkoutSlotMap = (programData: ProgramDetail): Map<string, WorkoutSlo
     phase.workouts.forEach((workout, workoutIdx) => {
       if (!hasWorkoutAssigned(workout)) return;
 
-      const weekNumber = Math.floor(workoutIdx / 7) + 1;
+      const weekNumber =
+        typeof workout.weekNumber === "number" && workout.weekNumber > 0
+          ? workout.weekNumber
+          : Math.floor(workoutIdx / 7) + 1;
       const fallbackDayNumber = (workoutIdx % 7) + 1;
       const dayNumber =
         typeof workout.dayNumber === "number" && workout.dayNumber > 0
@@ -298,8 +302,9 @@ export default function ProgramDetailPage() {
               order: phase.order ?? idx,
               durationWeeks: phase.durationWeeks || 1,
               focusAreas: phase.focusAreas || [],
-              workouts: (phase.workouts || []).map((w: any) => ({
+              workouts: (phase.workouts || []).map((w: any, workoutIdx: number) => ({
                 dayNumber: w.dayNumber || 0,
+                weekNumber: w.weekNumber ?? Math.floor(workoutIdx / 7) + 1,
                 dayName: w.dayName || "",
                 isRestDay: w.isRestDay || false,
                 workoutId: w.workoutId || null,
@@ -606,6 +611,10 @@ export default function ProgramDetailPage() {
         assignedTo: editedProgram.assignedTo || [],
         phases: editedProgram.phases.map((phase) => ({
           ...phase,
+          workouts: phase.workouts.map((w, workoutIdx) => ({
+            ...w,
+            weekNumber: w.weekNumber ?? Math.floor(workoutIdx / 7) + 1,
+          })),
         })),
       });
 
@@ -806,6 +815,7 @@ export default function ProgramDetailPage() {
       for (let i = currentWorkouts.length; i < requiredWorkouts; i += 1) {
         currentWorkouts.push({
           dayNumber: (i % 7) + 1,
+          weekNumber: Math.floor(i / 7) + 1,
           dayName: dayNames[i % 7],
           isRestDay: false,
           workoutId: null,
@@ -836,6 +846,7 @@ export default function ProgramDetailPage() {
       focusAreas: [],
       workouts: Array.from({ length: 7 }, (_, i) => ({
         dayNumber: i + 1,
+        weekNumber: 1,
         dayName: dayNames[i],
         isRestDay: false,
         workoutId: null,
