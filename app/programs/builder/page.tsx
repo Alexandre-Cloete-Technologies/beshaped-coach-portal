@@ -32,6 +32,8 @@ import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEdito
 
 type TemplateCategory = "recent" | "strength" | "saved";
 
+type AccessType = "free" | "paid" | "assigned";
+
 interface WorkoutTemplateExercise {
   exerciseId?: string;
   exerciseName: string;
@@ -176,6 +178,8 @@ export default function ProgramBuilderPage() {
   const router = useRouter();
   const [programName, setProgramName] = useState("Name your program");
   const [isSaving, setIsSaving] = useState(false);
+  const [accessType, setAccessType] = useState<AccessType>("free");
+  const [price, setPrice] = useState<number | null>(null);
   const [sidebarTab, setSidebarTab] = useState<"templates" | "exercises">("templates");
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -556,6 +560,10 @@ export default function ProgramBuilderPage() {
 
   const handleSaveProgram = async () => {
     if (isSaving) return;
+    if (accessType === "paid" && (price === null || price < 0)) {
+      alert("Please enter a valid price for paid programs.");
+      return;
+    }
     setIsSaving(true);
 
     try {
@@ -569,6 +577,9 @@ export default function ProgramBuilderPage() {
         createdBy: "coach",
         createdAt: serverTimestamp(),
         isActive: true,
+        accessType,
+        price: accessType === "paid" ? (price ?? 0) : null,
+        assignedTo: [],
         phases: phases.map((phase, phaseIndex) => ({
           phaseId: phase.id,
           name: phase.name,
@@ -946,6 +957,61 @@ export default function ProgramBuilderPage() {
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                       <span className="text-xs text-blue-100">Duration</span>
                       <span className="font-medium">{phases.reduce((acc, phase) => acc + phase.durationWeeks, 0)} Weeks</span>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col gap-2">
+                      <span className="text-xs text-blue-100 font-semibold uppercase tracking-wider">Access Type</span>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="free"
+                            checked={accessType === "free"}
+                            onChange={() => { setAccessType("free"); setPrice(null); }}
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Free</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="assigned"
+                            checked={accessType === "assigned"}
+                            onChange={() => { setAccessType("assigned"); setPrice(null); }}
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Custom</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="paid"
+                            checked={accessType === "paid"}
+                            onChange={() => setAccessType("paid")}
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Paid</span>
+                        </label>
+                      </div>
+                      {accessType === "paid" && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-blue-100">Price ($)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={price ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPrice(val === "" ? null : Math.max(0, parseFloat(val) || 0));
+                            }}
+                            placeholder="0.00"
+                            className="w-24 bg-white/20 border border-white/30 rounded px-2 py-1 text-sm font-medium text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                          />
+                        </div>
+                      )}
                     </div>
                     {/* <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                       <span className="text-xs text-blue-100">Difficulty</span>

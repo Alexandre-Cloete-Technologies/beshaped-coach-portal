@@ -10,6 +10,7 @@ import {
   Settings,
   Dumbbell
 } from "lucide-react";
+import Image from "next/image";
 
 interface NavItem {
   icon: React.ReactNode;
@@ -32,7 +33,13 @@ export default function Sidebar() {
       {/* Logo Section */}
       <div className="p-5 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-          <Dumbbell className="w-5 h-5 text-primary-foreground" />
+        <Image
+              src={"/logotwo.png"}
+              alt="Company Logo"
+              width={40}
+              height={50}
+              className="h-auto w-full object-contain"
+            />
         </div>
         <div>
           <h1 className="font-semibold text-sidebar-foreground text-base">BeShaped Fitness</h1>

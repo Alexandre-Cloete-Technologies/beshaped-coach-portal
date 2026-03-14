@@ -87,6 +87,9 @@ interface ProgramDetail {
   createdBy: string;
   createdAt: any;
   isActive: boolean;
+  accessType?: "free" | "paid" | "assigned";
+  price?: number | null;
+  assignedTo?: string[];
   phases: PhaseData[];
 }
 
@@ -285,6 +288,9 @@ export default function ProgramDetailPage() {
             createdBy: data.createdBy || "Unknown",
             createdAt: data.createdAt,
             isActive: data.isActive ?? true,
+            accessType: data.accessType || "free",
+            price: data.price ?? null,
+            assignedTo: data.assignedTo || [],
             phases: (data.phases || []).map((phase: any, idx: number) => ({
               phaseId: phase.phaseId || `phase_${idx}`,
               name: phase.name || `Phase ${idx + 1}`,
@@ -584,6 +590,10 @@ export default function ProgramDetailPage() {
 
   const saveChanges = async () => {
     if (!editedProgram || !programId) return;
+    if (editedProgram.accessType === "paid" && (editedProgram.price == null || editedProgram.price < 0)) {
+      alert("Please enter a valid price for paid programs.");
+      return;
+    }
     try {
       setSaving(true);
       const previousProgram = program;
@@ -591,6 +601,9 @@ export default function ProgramDetailPage() {
       await updateDoc(doc(db, "programs", programId), {
         name: editedProgram.name,
         description: editedProgram.description,
+        accessType: editedProgram.accessType || "free",
+        price: editedProgram.accessType === "paid" ? (editedProgram.price ?? 0) : null,
+        assignedTo: editedProgram.assignedTo || [],
         phases: editedProgram.phases.map((phase) => ({
           ...phase,
         })),
@@ -1157,6 +1170,95 @@ export default function ProgramDetailPage() {
                     <span className="text-xs text-blue-100">Workouts</span>
                     <span className="font-medium">{totalWorkouts}</span>
                   </div>
+                  {isEditing && editedProgram ? (
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col gap-2">
+                      <span className="text-xs text-blue-100 font-semibold uppercase tracking-wider">Access Type</span>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="free"
+                            checked={(editedProgram.accessType || "free") === "free"}
+                            onChange={() =>
+                              setEditedProgram({
+                                ...editedProgram,
+                                accessType: "free",
+                                price: null,
+                              })
+                            }
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Free</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="assigned"
+                            checked={(editedProgram.accessType || "free") === "assigned"}
+                            onChange={() =>
+                              setEditedProgram({
+                                ...editedProgram,
+                                accessType: "assigned",
+                                price: null,
+                              })
+                            }
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Custom</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="paid"
+                            checked={(editedProgram.accessType || "free") === "paid"}
+                            onChange={() =>
+                              setEditedProgram({
+                                ...editedProgram,
+                                accessType: "paid",
+                                price: editedProgram.price ?? 0,
+                              })
+                            }
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Paid</span>
+                        </label>
+                      </div>
+                      {(editedProgram.accessType || "free") === "paid" && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-blue-100">Price ($)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={editedProgram.price ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditedProgram({
+                                ...editedProgram,
+                                price: val === "" ? null : Math.max(0, parseFloat(val) || 0),
+                              });
+                            }}
+                            placeholder="0.00"
+                            className="w-24 bg-white/20 border border-white/30 rounded px-2 py-1 text-sm font-medium text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
+                      <span className="text-xs text-blue-100">Access</span>
+                      <span className="font-medium">
+                        {program.accessType === "paid" && program.price != null
+                          ? `Paid $${program.price}`
+                          : program.accessType === "assigned"
+                            ? "Custom"
+                            : "Free"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2">

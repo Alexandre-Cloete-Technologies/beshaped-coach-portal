@@ -808,7 +808,7 @@ export default function ExercisesPage() {
                 </div>
 
                 {/* Equipment */}
-                {/* <div>
+                <div>
                   <label className="block text-xs font-medium text-card-foreground mb-2">
                     Equipment
                   </label>
@@ -822,7 +822,7 @@ export default function ExercisesPage() {
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
-                </div> */}
+                </div>
 
                 {/* Category */}
                 {/* <div>

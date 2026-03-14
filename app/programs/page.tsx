@@ -105,6 +105,8 @@ export default function ProgramsPage() {
               clientAvatars: data.clientAvatars || [],
               updatedAt: data.updatedAt ? `Updated ${formatDate(data.updatedAt)}` : undefined,
               createdBy: data.createdBy ? (userMap[data.createdBy] || data.createdBy) : undefined,
+              accessType: data.accessType || "free",
+              price: data.price ?? null,
             };
           });
           

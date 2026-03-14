@@ -15,6 +15,8 @@ export interface ProgramData {
   clientAvatars?: string[];
   updatedAt?: string;
   createdBy?: string;
+  accessType?: "free" | "paid" | "assigned";
+  price?: number | null;
 }
 
 interface ProgramCardProps {
@@ -45,7 +47,24 @@ export default function ProgramCard({
         {/* Header */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1 pr-2">
-            <h3 className="text-lg font-bold text-card-foreground leading-tight">{program.name}</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-lg font-bold text-card-foreground leading-tight">{program.name}</h3>
+              {program.accessType && (
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  program.accessType === "paid"
+                    ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                    : program.accessType === "assigned"
+                      ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                }`}>
+                  {program.accessType === "paid" && program.price != null
+                    ? `$${program.price}`
+                    : program.accessType === "assigned"
+                      ? "Custom"
+                      : "Free"}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               {program.updatedAt || (program.createdBy ? `Created by ${program.createdBy}` : "")}
             </p>
