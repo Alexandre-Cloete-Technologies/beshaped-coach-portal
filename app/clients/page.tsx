@@ -1,13 +1,13 @@
 "use client";
 
-import { Plus, Search, SlidersHorizontal, MoreVertical, UserPlus } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, MoreVertical, UserPlus, Edit, Trash2, AlertTriangle } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Pagination from "../components/Pagination";
 import AddClientModal from "../components/AddClientModal";
 import AssignProgramModal from "../components/AssignProgramModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { collection, getDocs, getDoc } from "firebase/firestore";
+import { collection, getDocs, getDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -32,6 +32,9 @@ export default function ClientsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -105,6 +108,28 @@ export default function ClientsPage() {
     return name.includes(query) || program.includes(query);
   });
 
+  const handleDeleteClick = (e: React.MouseEvent, client: { id: string; name: string }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setClientToDelete(client);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!clientToDelete) return;
+    try {
+      setDeleting(true);
+      await deleteDoc(doc(db, "users", clientToDelete.id));
+      setClients((prev) => prev.filter((c) => c.id !== clientToDelete.id));
+      setDeleteModalOpen(false);
+      setClientToDelete(null);
+    } catch (err) {
+      console.error("Error deleting client:", err);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
@@ -177,39 +202,32 @@ export default function ClientsPage() {
                   <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Current Program
                   </th>
-                  {/* <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Last Active
-                  </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Engagement
-                  </th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Actions
-                  </th> */}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
                       Loading clients...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-sm text-red-500">
+                    <td colSpan={4} className="py-8 text-center text-sm text-red-500">
                       {error}
                     </td>
                   </tr>
                 ) : filteredClients.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
                       No clients found
                     </td>
                   </tr>
                 ) : (
                   filteredClients.map((client, index) => {
-                  const engagement = engagementConfig[client.engagement as keyof typeof engagementConfig];
                   const initials = client.avatarInitials || client.name.split(' ').map((n: string) => n[0]).join('');
                   
                   return (
@@ -286,29 +304,28 @@ export default function ClientsPage() {
                         </Link>
                       </td> */}
 
-                      {/* Engagement */}
-                      {/* <td className="py-3 px-4">
-                        <Link href={`/clients/${client.id}`} className="block">
-                          <div className="flex items-center gap-1">
-                            {Array.from({ length: engagement.dots }).map((_, i) => (
-                              <div
-                                key={i}
-                                className={`w-1.5 h-1.5 rounded-full ${engagement.color}`}
-                              />
-                            ))}
-                          </div>
-                        </Link>
-                      </td> */}
-
                       {/* Actions */}
-                      {/* <td className="py-3 px-4">
-                        <button 
-                          onClick={(e) => e.preventDefault()}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </td> */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            className="p-2 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteClick(e, { id: client.id, name: client.name })}
+                            className="p-2 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 }))
@@ -345,6 +362,46 @@ export default function ClientsPage() {
           fetchUsers(); // Refresh client program data after assignment
         }}
       />
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => { if (!deleting) { setDeleteModalOpen(false); setClientToDelete(null); } }}
+          />
+          <div className="relative bg-card rounded-2xl shadow-2xl border border-border p-6 w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="text-lg font-bold text-card-foreground">Delete Client</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to delete <span className="font-semibold text-card-foreground">{clientToDelete?.name}</span>?
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setDeleteModalOpen(false); setClientToDelete(null); }}
+                disabled={deleting}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-muted text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
