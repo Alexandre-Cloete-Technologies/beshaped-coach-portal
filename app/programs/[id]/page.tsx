@@ -1118,7 +1118,7 @@ export default function ProgramDetailPage() {
           </div>
         </aside>
 
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-2">
           <div className="max-w-7xl mx-auto">
             <Link
               href="/programs"
@@ -1129,7 +1129,7 @@ export default function ProgramDetailPage() {
             </Link>
 
           {/* Program Header Card */}
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-8 shadow-lg text-white mb-8">
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 shadow-lg text-white mb-8">
             <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/5 to-transparent"></div>
             <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div className="flex-1 space-y-4">

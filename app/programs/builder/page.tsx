@@ -25,10 +25,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
+import PhaseDescriptionModal from "../../components/PhaseDescriptionModal";
 
 type TemplateCategory = "recent" | "strength" | "saved";
 
@@ -114,6 +115,8 @@ const muscleGroupOrder = [
   "Other"
 ];
 
+const PROGRAM_BUILDER_DRAFT_KEY = "program-builder-draft";
+
 const mockExercises: Exercise[] = [
   { id: "1", name: "Barbell Bench Press", muscleGroup: "Chest", equipment: "Barbell", difficulty: "intermediate", description: "Compound chest exercise" },
   { id: "2", name: "Incline Dumbbell Press", muscleGroup: "Chest", equipment: "Dumbbells", difficulty: "intermediate", description: "Upper chest focus" },
@@ -177,6 +180,7 @@ const getCategoryFromMuscle = (muscle: string): string => {
 export default function ProgramBuilderPage() {
   const router = useRouter();
   const [programName, setProgramName] = useState("Name your program");
+  const [programDescription, setProgramDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [accessType, setAccessType] = useState<AccessType>("free");
   const [price, setPrice] = useState<number | null>(null);
@@ -194,6 +198,8 @@ export default function ProgramBuilderPage() {
   
   // Modal State
   const [selectedWorkout, setSelectedWorkout] = useState<SelectedWorkout | null>(null);
+  const [phaseDescriptionModalPhase, setPhaseDescriptionModalPhase] = useState<Phase | null>(null);
+  const [phaseDescriptionDraft, setPhaseDescriptionDraft] = useState("");
 
   // Fetch exercises from Firebase on mount
   useEffect(() => {
@@ -254,84 +260,84 @@ export default function ProgramBuilderPage() {
     fetchExercises();
   }, []);
 
-  // Fetch workout templates from Firestore on mount
-  useEffect(() => {
-    const fetchWorkoutTemplates = async () => {
-      try {
-        setLoadingTemplates(true);
-        setTemplateFetchError(null);
+  // Fetch workout templates from Firestore (reusable for refetch after save)
+  const fetchWorkoutTemplates = useCallback(async () => {
+    try {
+      setLoadingTemplates(true);
+      setTemplateFetchError(null);
 
-        const workoutsSnapshot = await getDocs(collection(db, "workouts"));
-        if (workoutsSnapshot.empty) {
-          setSavedTemplates([]);
-          return;
-        }
+      const workoutsSnapshot = await getDocs(collection(db, "workouts"));
+      if (workoutsSnapshot.empty) {
+        setSavedTemplates([]);
+        return;
+      }
 
-        const fetchedTemplates: WorkoutTemplate[] = workoutsSnapshot.docs.map((workoutDoc) => {
-          const data = workoutDoc.data() as Record<string, unknown>;
-          const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
-          const exercisesCount = rawExercises.length;
-          const mappedTemplateExercises: WorkoutTemplateExercise[] = rawExercises.map((exercise) => {
-            const exerciseData = (exercise && typeof exercise === "object" ? exercise : {}) as Record<string, unknown>;
-            return {
-              exerciseId: typeof exerciseData.exerciseId === "string" ? exerciseData.exerciseId : undefined,
-              exerciseName:
-                typeof exerciseData.exerciseName === "string" && exerciseData.exerciseName.trim()
-                  ? exerciseData.exerciseName.trim()
-                  : typeof exerciseData.name === "string" && exerciseData.name.trim()
-                    ? exerciseData.name.trim()
-                    : "Unnamed Exercise",
-              targetSets:
-                typeof exerciseData.targetSets === "number"
-                  ? exerciseData.targetSets
-                  : typeof exerciseData.sets === "number"
-                    ? exerciseData.sets
-                    : undefined,
-              targetReps:
-                typeof exerciseData.targetReps === "string"
-                  ? exerciseData.targetReps
-                  : typeof exerciseData.repsRange === "string"
-                    ? exerciseData.repsRange
-                    : undefined,
-              restPeriod: typeof exerciseData.restPeriod === "string" ? exerciseData.restPeriod : undefined,
-              notes:
-                typeof exerciseData.notes === "string" || exerciseData.notes === null
-                  ? (exerciseData.notes as string | null)
-                  : undefined,
-            };
-          });
-          const estimatedDuration =
-            typeof data.estimatedDuration === "number" && Number.isFinite(data.estimatedDuration)
-              ? data.estimatedDuration
-              : exercisesCount * 5;
-
+      const fetchedTemplates: WorkoutTemplate[] = workoutsSnapshot.docs.map((workoutDoc) => {
+        const data = workoutDoc.data() as Record<string, unknown>;
+        const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
+        const exercisesCount = rawExercises.length;
+        const mappedTemplateExercises: WorkoutTemplateExercise[] = rawExercises.map((exercise) => {
+          const exerciseData = (exercise && typeof exercise === "object" ? exercise : {}) as Record<string, unknown>;
           return {
-            id: workoutDoc.id,
-            name:
-              typeof data.name === "string" && data.name.trim()
-                ? data.name.trim()
-                : "Untitled Workout",
-            exercises: exercisesCount,
-            duration: estimatedDuration,
-            category: "saved",
-            description: typeof data.description === "string" ? data.description : "",
-            tags: Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === "string") : [],
-            templateExercises: mappedTemplateExercises,
+            exerciseId: typeof exerciseData.exerciseId === "string" ? exerciseData.exerciseId : undefined,
+            exerciseName:
+              typeof exerciseData.exerciseName === "string" && exerciseData.exerciseName.trim()
+                ? exerciseData.exerciseName.trim()
+                : typeof exerciseData.name === "string" && exerciseData.name.trim()
+                  ? exerciseData.name.trim()
+                  : "Unnamed Exercise",
+            targetSets:
+              typeof exerciseData.targetSets === "number"
+                ? exerciseData.targetSets
+                : typeof exerciseData.sets === "number"
+                  ? exerciseData.sets
+                  : undefined,
+            targetReps:
+              typeof exerciseData.targetReps === "string"
+                ? exerciseData.targetReps
+                : typeof exerciseData.repsRange === "string"
+                  ? exerciseData.repsRange
+                  : undefined,
+            restPeriod: typeof exerciseData.restPeriod === "string" ? exerciseData.restPeriod : undefined,
+            notes:
+              typeof exerciseData.notes === "string" || exerciseData.notes === null
+                ? (exerciseData.notes as string | null)
+                : undefined,
           };
         });
+        const estimatedDuration =
+          typeof data.estimatedDuration === "number" && Number.isFinite(data.estimatedDuration)
+            ? data.estimatedDuration
+            : exercisesCount * 5;
 
-        setSavedTemplates(fetchedTemplates);
-      } catch (error) {
-        console.error("Error fetching workout templates:", error);
-        setTemplateFetchError("Failed to load saved templates.");
-        setSavedTemplates([]);
-      } finally {
-        setLoadingTemplates(false);
-      }
-    };
+        return {
+          id: workoutDoc.id,
+          name:
+            typeof data.name === "string" && data.name.trim()
+              ? data.name.trim()
+              : "Untitled Workout",
+          exercises: exercisesCount,
+          duration: estimatedDuration,
+          category: "saved",
+          description: typeof data.description === "string" ? data.description : "",
+          tags: Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === "string") : [],
+          templateExercises: mappedTemplateExercises,
+        };
+      });
 
-    fetchWorkoutTemplates();
+      setSavedTemplates(fetchedTemplates);
+    } catch (error) {
+      console.error("Error fetching workout templates:", error);
+      setTemplateFetchError("Failed to load saved templates.");
+      setSavedTemplates([]);
+    } finally {
+      setLoadingTemplates(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchWorkoutTemplates();
+  }, [fetchWorkoutTemplates]);
 
   // Group exercises by muscle group
   const groupedExercises = useMemo(() => {
@@ -508,6 +514,43 @@ export default function ProgramBuilderPage() {
 
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+  // Restore draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PROGRAM_BUILDER_DRAFT_KEY);
+      if (!stored) return;
+      const draft = JSON.parse(stored) as {
+        programName?: string;
+        programDescription?: string;
+        accessType?: AccessType;
+        price?: number | null;
+        phases?: Phase[];
+      };
+      if (draft.programName != null) setProgramName(draft.programName);
+      if (draft.programDescription != null) setProgramDescription(draft.programDescription);
+      if (draft.accessType != null) setAccessType(draft.accessType);
+      if (draft.price !== undefined) setPrice(draft.price);
+      if (Array.isArray(draft.phases) && draft.phases.length > 0) setPhases(draft.phases);
+    } catch {
+      // Invalid or corrupt data, ignore
+    }
+  }, []);
+
+  // Debounced save to localStorage when state changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const draft = {
+        programName,
+        programDescription,
+        accessType,
+        price,
+        phases,
+      };
+      localStorage.setItem(PROGRAM_BUILDER_DRAFT_KEY, JSON.stringify(draft));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [programName, programDescription, accessType, price, phases]);
+
   const togglePhase = (phaseId: string) => {
     setPhases(phases.map(phase => 
       phase.id === phaseId ? { ...phase, isExpanded: !phase.isExpanded } : phase
@@ -558,6 +601,28 @@ export default function ProgramBuilderPage() {
     setPhases([...phases, newPhase]);
   };
 
+  const handleClear = () => {
+    setProgramName("Name your program");
+    setProgramDescription("");
+    setAccessType("free");
+    setPrice(null);
+    setPhases([
+      {
+        id: "1",
+        name: "Phase 1",
+        description: "Define the focus for this phase",
+        weeks: "1-2",
+        isExpanded: true,
+        durationWeeks: 2,
+        days: [
+          { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" },
+          { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }, { type: "empty" }
+        ],
+      },
+    ]);
+    localStorage.removeItem(PROGRAM_BUILDER_DRAFT_KEY);
+  };
+
   const handleSaveProgram = async () => {
     if (isSaving) return;
     if (accessType === "paid" && (price === null || price < 0)) {
@@ -569,7 +634,7 @@ export default function ProgramBuilderPage() {
     try {
       const programData = {
         name: programName,
-        description: phases[0]?.description || "",
+        description: programDescription.trim() || "",
         totalDuration: phases.reduce((acc, phase) => acc + phase.durationWeeks, 0),
         daysPerWeek: 7,
         difficulty: "intermediate",
@@ -613,6 +678,7 @@ export default function ProgramBuilderPage() {
       };
 
       await addDoc(collection(db, "programs"), programData);
+      localStorage.removeItem(PROGRAM_BUILDER_DRAFT_KEY);
       router.push("/programs");
     } catch (error) {
       console.error("Error saving program:", error);
@@ -940,11 +1006,12 @@ export default function ProgramBuilderPage() {
               Back to Programs
             </Link>
             {/* Program Header Card */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-8 shadow-lg text-white">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 shadow-lg text-white">
               <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/5 to-transparent"></div>
-              <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="flex-1 space-y-4">
-                  <div>
+              <div className="relative z-10 flex flex-col gap-2">
+                {/* Top row: Program Title + Duration/Access/Price cards */}
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                  <div className="flex-1 min-w-0">
                     <label className="text-blue-100 text-xs font-semibold uppercase tracking-wider">Program Title</label>
                     <input 
                       type="text"
@@ -954,7 +1021,7 @@ export default function ProgramBuilderPage() {
                       placeholder="Enter program name"
                     />
                   </div>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-wrap gap-4 shrink-0">
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                       <span className="text-xs text-blue-100">Duration</span>
                       <span className="font-medium">{phases.reduce((acc, phase) => acc + phase.durationWeeks, 0)} Weeks</span>
@@ -1014,15 +1081,18 @@ export default function ProgramBuilderPage() {
                         </div>
                       )}
                     </div>
-                    {/* <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
-                      <span className="text-xs text-blue-100">Difficulty</span>
-                      <span className="font-medium">Intermediate</span>
-                    </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
-                      <span className="text-xs text-blue-100">Focus</span>
-                      <span className="font-medium">Hypertrophy</span>
-                    </div> */}
                   </div>
+                </div>
+                {/* Program Description - full width, larger height */}
+                <div>
+                  <label className="text-blue-100 text-xs font-semibold uppercase tracking-wider">Program Description</label>
+                  <textarea
+                    value={programDescription}
+                    onChange={(e) => setProgramDescription(e.target.value)}
+                    rows={8}
+                    className="w-full mt-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
+                    placeholder="Describe your program (goals, focus areas, who it's for...)"
+                  />
                 </div>
                 <div className="flex gap-2">
                   {/* <button className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors flex items-center gap-2">
@@ -1053,13 +1123,23 @@ export default function ProgramBuilderPage() {
                         className="text-lg font-bold text-card-foreground bg-transparent border-none p-0 focus:ring-0 w-full"
                         placeholder="Phase Name"
                       />
-                      <input
-                        type="text"
-                        value={phase.description}
-                        onChange={(e) => updatePhaseDescription(phase.id, e.target.value)}
-                        className="text-sm text-muted-foreground bg-transparent border-none p-0 focus:ring-0 w-full"
-                        placeholder="Phase description"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhaseDescriptionModalPhase(phase);
+                          setPhaseDescriptionDraft(phase.description || "");
+                        }}
+                        className="text-sm text-muted-foreground hover:text-foreground text-left w-full flex items-center gap-2 py-1 rounded hover:bg-muted/50 transition-colors"
+                      >
+                        <Edit className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">
+                          {phase.description?.trim()
+                            ? phase.description.trim().length > 15
+                              ? `${phase.description.trim().slice(0, 15)}...`
+                              : phase.description.trim()
+                            : "Add phase description"}
+                        </span>
+                      </button>
                     </div>
                   </div>
                     <div className="flex items-center gap-3">
@@ -1190,15 +1270,21 @@ export default function ProgramBuilderPage() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
 
             </div>
-            <div className="flex gap-4 ">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleClear}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                Clear
+              </button>
+              <div className="flex-1" />
               <button 
                 onClick={handleSaveProgram}
                 disabled={isSaving}
-                className="rounded-lg border border-border  px-4 py-2 text-sm font-semibold text-white  bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>
-
             </div>
           </div>
         </div>
@@ -1213,6 +1299,7 @@ export default function ProgramBuilderPage() {
             muscleGroupOrder={muscleGroupOrder}
             loadingExercises={loadingExercises}
             onClose={handleWorkoutModalClose}
+            onTemplateSaved={fetchWorkoutTemplates}
           />
         )}
 
@@ -1294,6 +1381,22 @@ export default function ProgramBuilderPage() {
             </div>
           </div>
         )}
+
+        <PhaseDescriptionModal
+          isOpen={!!phaseDescriptionModalPhase}
+          onClose={() => setPhaseDescriptionModalPhase(null)}
+          title={phaseDescriptionModalPhase ? `Phase Description — ${phaseDescriptionModalPhase.name}` : ""}
+          subtitle="Describe the focus and goals for this phase"
+          value={phaseDescriptionDraft}
+          onChange={setPhaseDescriptionDraft}
+          onSave={() => {
+            if (phaseDescriptionModalPhase) {
+              updatePhaseDescription(phaseDescriptionModalPhase.id, phaseDescriptionDraft);
+              setPhaseDescriptionModalPhase(null);
+            }
+          }}
+          placeholder="Define the focus for this phase..."
+        />
       </div>
     </div>
   );
