@@ -11,6 +11,7 @@ import {
   Apple,
   Settings,
   Dumbbell,
+  BookOpen,
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Link from "next/link";
@@ -20,11 +21,13 @@ import { db } from "@/lib/firebase";
 import { useParams } from "next/navigation";
 import WorkoutHistory from "./WorkoutHistory";
 import Progress from "./Progress";
+import ClientPrograms from "./ClientPrograms";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "workout-history", label: "Workout History", icon: History },
   { id: "progress", label: "Progress", icon: TrendingUp },
+  { id: "programs", label: "Programs", icon: BookOpen },
   { id: "nutrition", label: "Nutrition", icon: Apple },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -267,6 +270,11 @@ export default function ClientDetailPage() {
           {visitedTabs.has("progress") && (
             <div style={{ display: activeTab === "progress" ? "block" : "none" }}>
               <Progress clientId={clientId} />
+            </div>
+          )}
+          {visitedTabs.has("programs") && (
+            <div style={{ display: activeTab === "programs" ? "block" : "none" }}>
+              <ClientPrograms clientId={clientId} />
             </div>
           )}
           {activeTab === "overview" && (
