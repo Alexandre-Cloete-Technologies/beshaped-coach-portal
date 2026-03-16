@@ -128,6 +128,9 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           longestStreak: 0,
         },
         currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
+        availablePrograms: formData.currentProgram
+          ? [doc(db, "programs", formData.currentProgram)]
+          : [],
       });
 
       // If a program was selected, create a userPrograms entry (only if none exists)
@@ -159,7 +162,6 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
             programId: programRef,
             programName: selectedProgramObj?.name || programData?.name || "Unknown Program",
             status: "active",
-            availablePrograms: [],
             currentPhase: 1,
             currentWeek: 1,
             currentDay: 1,

@@ -7,7 +7,7 @@ import AddClientModal from "../components/AddClientModal";
 import AssignProgramModal from "../components/AssignProgramModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { collection, getDocs, getDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, getDoc, doc, deleteDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -119,7 +119,18 @@ export default function ClientsPage() {
     if (!clientToDelete) return;
     try {
       setDeleting(true);
-      await deleteDoc(doc(db, "users", clientToDelete.id));
+      const userRef = doc(db, "users", clientToDelete.id);
+
+      // Delete userPrograms entries for this user
+      const userProgramsQuery = query(
+        collection(db, "userPrograms"),
+        where("userId", "==", userRef)
+      );
+      const userProgramsSnapshot = await getDocs(userProgramsQuery);
+      await Promise.all(userProgramsSnapshot.docs.map((d) => deleteDoc(d.ref)));
+
+      // Delete the user document
+      await deleteDoc(userRef);
       setClients((prev) => prev.filter((c) => c.id !== clientToDelete.id));
       setDeleteModalOpen(false);
       setClientToDelete(null);

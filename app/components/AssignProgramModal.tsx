@@ -2,7 +2,7 @@
 
 import { X, Users, BookOpen, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, updateDoc, addDoc, query, where, Timestamp, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, addDoc, query, where, Timestamp, getDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { buildProgramWorkoutSlots, seedMissingWorkoutLogsForUserProgram } from "@/lib/workoutLogSeed";
 
@@ -105,6 +105,7 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
       const programRef = doc(db, "programs", selectedProgramId);
       await updateDoc(userRef, {
         currentProgram: programRef,
+        availablePrograms: arrayUnion(programRef),
       });
 
       // Check if a userPrograms doc already exists for this user
@@ -131,7 +132,6 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
           programId: programRef,
           programName: selectedProgram.name,
           status: "active",
-          availablePrograms: [],
           currentPhase: 1,
           currentWeek: 1,
           currentDay: 1,
