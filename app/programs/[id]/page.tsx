@@ -50,6 +50,7 @@ interface ExerciseData {
   repsRange: string;
   restPeriod: string;
   notes: string | null;
+  musclesInvolved?: string[];
 }
 
 interface WorkoutData {
@@ -94,6 +95,7 @@ interface EditExercise {
   id: string;
   name: string;
   muscleGroup: string;
+  musclesInvolved?: string[];
   equipment: string;
   difficulty: string;
   sets?: number;
@@ -314,6 +316,7 @@ export default function ProgramDetailPage() {
                   repsRange: ex.repsRange || "",
                   restPeriod: ex.restPeriod || "",
                   notes: ex.notes || null,
+                  musclesInvolved: ex.musclesInvolved || [],
                 })),
               })),
             })),
@@ -368,6 +371,7 @@ export default function ProgramDetailPage() {
               id: doc.id,
               name: data.name || "Unnamed Exercise",
               muscleGroup: getCategoryFromMuscle(String(rawMuscle)),
+              musclesInvolved: Array.isArray(data.musclesInvolved) ? data.musclesInvolved : (Array.isArray(data.primaryMuscles) ? data.primaryMuscles : []),
               equipment: data.equipment || "None",
               difficulty: data.difficulty || "intermediate",
             };
@@ -423,10 +427,9 @@ export default function ProgramDetailPage() {
                   : typeof ex.name === "string" && ex.name.trim()
                     ? ex.name.trim()
                     : "Unnamed Exercise",
-              muscleGroup:
-                typeof ex.muscleGroup === "string" && ex.muscleGroup
-                  ? ex.muscleGroup
-                  : "Other",
+              muscleGroup: "",
+              musclesInvolved:
+                Array.isArray(ex.musclesInvolved) ? ex.musclesInvolved : (Array.isArray(ex.primaryMuscles) ? ex.primaryMuscles : []),
               equipment:
                 typeof ex.equipment === "string" && ex.equipment
                   ? ex.equipment
@@ -542,6 +545,7 @@ export default function ProgramDetailPage() {
         repsRange: ex.repsRange || "8-12",
         restPeriod: "60s",
         notes: null,
+        musclesInvolved: ex.musclesInvolved || [],
       }));
 
       updated.phases[phaseIdx].workouts[dayIdx] = {
@@ -915,6 +919,7 @@ export default function ProgramDetailPage() {
             repsRange: ex.repsRange || "8-12",
             restPeriod: "60s",
             notes: null,
+            musclesInvolved: ex.musclesInvolved || [],
           })),
         };
       } else if (result.workoutName && result.workoutName !== "New Workout") {
@@ -1576,6 +1581,7 @@ export default function ProgramDetailPage() {
                 id: ex.exerciseId,
                 name: ex.exerciseName,
                 muscleGroup: "",
+                musclesInvolved: ex.musclesInvolved || [],
                 equipment: "",
                 difficulty: "",
                 sets: ex.sets,

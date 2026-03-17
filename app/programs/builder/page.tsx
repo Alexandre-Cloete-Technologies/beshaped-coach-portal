@@ -92,6 +92,7 @@ interface Exercise {
   id: string;
   name: string;
   muscleGroup: string;
+  musclesInvolved?: string[];
   equipment: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   description?: string;
@@ -238,6 +239,7 @@ export default function ProgramBuilderPage() {
               id: doc.id,
               name: data.name || "Unnamed Exercise",
               muscleGroup: getCategoryFromMuscle(String(rawMuscle)),
+              musclesInvolved: Array.isArray(data.musclesInvolved) ? data.musclesInvolved : (Array.isArray(data.primaryMuscles) ? data.primaryMuscles : []),
               equipment: data.equipment || "None",
               difficulty: data.difficulty || "intermediate",
               description: data.description,
@@ -404,15 +406,20 @@ export default function ProgramBuilderPage() {
     if (templateData) {
       const template = JSON.parse(templateData) as WorkoutTemplate;
       const droppedExercises: ModalExercise[] = Array.isArray(template.templateExercises)
-        ? template.templateExercises.map((exercise, index) => ({
-            id: exercise.exerciseId || `${template.id}-exercise-${index + 1}`,
-            name: exercise.exerciseName,
-            muscleGroup: "Other",
-            equipment: "Unknown",
-            difficulty: "intermediate",
-            sets: exercise.targetSets ?? 3,
-            repsRange: exercise.targetReps ?? "8-12",
-          }))
+        ? template.templateExercises.map((exercise, index) => {
+            const exerciseId = exercise.exerciseId || `${template.id}-exercise-${index + 1}`;
+            const fromLibrary = exercises.find((e) => e.id === exerciseId);
+            return {
+              id: exerciseId,
+              name: exercise.exerciseName,
+              muscleGroup: fromLibrary?.muscleGroup || "",
+              musclesInvolved: fromLibrary?.musclesInvolved || [],
+              equipment: fromLibrary?.equipment || "Unknown",
+              difficulty: fromLibrary?.difficulty || "intermediate",
+              sets: exercise.targetSets ?? 3,
+              repsRange: exercise.targetReps ?? "8-12",
+            };
+          })
         : [];
 
       setPhases((prevPhases) =>
@@ -668,6 +675,7 @@ export default function ProgramBuilderPage() {
               repsRange: exercise.repsRange || "8-12",
               restPeriod: "60s",
               notes: null,
+              musclesInvolved: exercise.musclesInvolved || [],
             })),
           })),
         })),

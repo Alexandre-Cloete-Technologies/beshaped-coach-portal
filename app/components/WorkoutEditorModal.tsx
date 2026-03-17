@@ -17,6 +17,7 @@ export interface ModalExercise {
   id: string;
   name: string;
   muscleGroup: string;
+  musclesInvolved?: string[];
   equipment: string;
   difficulty: string;
   sets?: number;

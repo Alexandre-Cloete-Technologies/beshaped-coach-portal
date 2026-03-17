@@ -19,6 +19,9 @@ interface ProgramExerciseRaw {
   repsRange?: string;
   restPeriod?: string;
   notes?: string | null;
+  musclesInvolved?: string[];
+  /** @deprecated Use musclesInvolved. Kept for backward compatibility when reading old data. */
+  primaryMuscles?: string[];
 }
 
 interface ProgramWorkoutRaw {
@@ -62,6 +65,7 @@ interface WorkoutLogExercise {
   personalBest: boolean;
   notes: string | null;
   sets: WorkoutLogExerciseSet[];
+  musclesInvolved?: string[];
 }
 
 export interface ProgramWorkoutSlot {
@@ -85,6 +89,7 @@ const buildWorkoutLogExercises = (rawExercises: ProgramExerciseRaw[] = []): Work
       restPeriod: ex.restPeriod || "",
       personalBest: false,
       notes: ex.notes || null,
+      musclesInvolved: Array.isArray(ex.musclesInvolved) ? ex.musclesInvolved : (Array.isArray(ex.primaryMuscles) ? ex.primaryMuscles : []),
       sets: Array.from({ length: targetSets }, (_, setIdx) => ({
         setNumber: setIdx + 1,
         weight: 0,

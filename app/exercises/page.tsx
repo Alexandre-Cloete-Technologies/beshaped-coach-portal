@@ -11,7 +11,7 @@ interface Exercise {
   id: string;
   name: string;
   muscleGroup: string;
-  primaryMuscles?: string[];
+  musclesInvolved?: string[];
   secondaryMuscles?: string[];
   equipment: string;
   difficulty: "beginner" | "intermediate" | "advanced";
@@ -34,7 +34,7 @@ interface ExerciseFormData {
   videoUrl: string;
   thumbnailUrl: string;
   anatomicalIllustration: string;
-  primaryMuscles: string[];
+  musclesInvolved: string[];
   secondaryMuscles: string[];
   equipment: string;
   category: string;
@@ -54,7 +54,7 @@ const emptyFormData: ExerciseFormData = {
   videoUrl: "",
   thumbnailUrl: "",
   anatomicalIllustration: "",
-  primaryMuscles: [],
+  musclesInvolved: [],
   secondaryMuscles: [],
   equipment: "",
   category: "",
@@ -214,6 +214,7 @@ const getCategoryFromMuscle = (muscle: string): string => {
 
 const getRawMuscleFromExerciseData = (data: any): string => {
   let rawMuscle =
+    data.musclesInvolved?.[0] ||
     data.primaryMuscles?.[0] ||
     data.secondaryMuscles?.[0] ||
     data.muscleGroup ||
@@ -224,7 +225,6 @@ const getRawMuscleFromExerciseData = (data: any): string => {
     data.bodyPart ||
     data.primaryMuscle ||
     data.primary_muscle ||
-    data.musclesInvolved ||
     data.muscles_involved ||
     data.muscleGroups ||
     data.muscle_groups ||
@@ -321,7 +321,7 @@ export default function ExercisesPage() {
               id: doc.id,
               name: data.name || "Unnamed Exercise",
               muscleGroup: muscleCategory, // Normalized category
-              primaryMuscles: Array.isArray(data.primaryMuscles) ? data.primaryMuscles : [],
+              musclesInvolved: Array.isArray(data.musclesInvolved) ? data.musclesInvolved : (Array.isArray(data.primaryMuscles) ? data.primaryMuscles : []),
               secondaryMuscles: Array.isArray(data.secondaryMuscles) ? data.secondaryMuscles : [],
               equipment: data.equipment || "None",
               difficulty: data.difficulty || "intermediate",
@@ -433,7 +433,7 @@ export default function ExercisesPage() {
   };
 
   const toggleMuscle = (muscle: string, isPrimary: boolean) => {
-    const field = isPrimary ? "primaryMuscles" : "secondaryMuscles";
+    const field = isPrimary ? "musclesInvolved" : "secondaryMuscles";
     setFormData(prev => {
       const current = prev[field];
       if (current.includes(muscle)) {
@@ -501,7 +501,7 @@ export default function ExercisesPage() {
         difficulty: values.difficulty,
         videoUrl: values.videoUrl.trim() || null,
         muscleGroup: values.muscleGroup,
-        primaryMuscles: values.primaryMuscles,
+        musclesInvolved: values.musclesInvolved,
         secondaryMuscles: values.secondaryMuscles,
         updatedAt: serverTimestamp(),
       });
@@ -517,7 +517,7 @@ export default function ExercisesPage() {
                 difficulty: values.difficulty,
                 videoUrl: values.videoUrl.trim() || undefined,
                 muscleGroup: values.muscleGroup,
-                primaryMuscles: values.primaryMuscles,
+                musclesInvolved: values.musclesInvolved,
                 secondaryMuscles: values.secondaryMuscles,
               }
             : ex
@@ -556,7 +556,7 @@ export default function ExercisesPage() {
           id: doc.id,
           name: data.name || "Unnamed Exercise",
           muscleGroup: muscleCategory,
-          primaryMuscles: Array.isArray(data.primaryMuscles) ? data.primaryMuscles : [],
+          musclesInvolved: Array.isArray(data.musclesInvolved) ? data.musclesInvolved : (Array.isArray(data.primaryMuscles) ? data.primaryMuscles : []),
           secondaryMuscles: Array.isArray(data.secondaryMuscles) ? data.secondaryMuscles : [],
           equipment: data.equipment || "None",
           difficulty: data.difficulty || "intermediate",
@@ -884,7 +884,7 @@ export default function ExercisesPage() {
                               type="button"
                               onClick={() => toggleMuscle(muscle, true)}
                               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                                formData.primaryMuscles.includes(muscle)
+                                formData.musclesInvolved.includes(muscle)
                                   ? "bg-blue-600 text-white"
                                   : "bg-muted text-muted-foreground hover:bg-muted/80"
                               }`}

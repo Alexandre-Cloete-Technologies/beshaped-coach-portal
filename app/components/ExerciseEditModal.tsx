@@ -9,7 +9,7 @@ export interface ExerciseEditValues {
   name: string;
   description: string;
   muscleGroup: string;
-  primaryMuscles: string[];
+  musclesInvolved: string[];
   secondaryMuscles: string[];
   equipment: string;
   difficulty: Difficulty;
@@ -20,7 +20,7 @@ interface ExerciseSummary {
   id: string;
   name: string;
   muscleGroup: string;
-  primaryMuscles?: string[];
+  musclesInvolved?: string[];
   secondaryMuscles?: string[];
   equipment: string;
   difficulty: Difficulty;
@@ -46,11 +46,11 @@ export default function ExerciseEditModal({
   onSave,
 }: ExerciseEditModalProps) {
   const resolveMuscleGroup = (
-    primaryMuscles: string[],
+    musclesInvolved: string[],
     secondaryMuscles: string[],
     fallback: string
   ) => {
-    const first = primaryMuscles[0] || secondaryMuscles[0] || "";
+    const first = musclesInvolved[0] || secondaryMuscles[0] || "";
     if (!first) return fallback || "Other";
 
     const normalized = first.toLowerCase().trim();
@@ -92,8 +92,8 @@ export default function ExerciseEditModal({
   const [form, setForm] = useState<ExerciseEditValues>({
     name: "",
     description: "",
-    muscleGroup: "Other",
-    primaryMuscles: [],
+    muscleGroup: "",
+    musclesInvolved: [],
     secondaryMuscles: [],
     equipment: "",
     difficulty: "intermediate",
@@ -106,8 +106,8 @@ export default function ExerciseEditModal({
     setForm({
       name: exercise.name || "",
       description: exercise.description || "",
-      muscleGroup: exercise.muscleGroup || "Other",
-      primaryMuscles: sanitizeMuscles(exercise.primaryMuscles),
+      muscleGroup: exercise.muscleGroup || "",
+      musclesInvolved: sanitizeMuscles(exercise.musclesInvolved ?? exercise.primaryMuscles),
       secondaryMuscles: sanitizeMuscles(exercise.secondaryMuscles),
       equipment: exercise.equipment || "",
       difficulty: exercise.difficulty || "intermediate",
@@ -132,7 +132,7 @@ export default function ExerciseEditModal({
     onSave({
       ...form,
       muscleGroup: resolveMuscleGroup(
-        form.primaryMuscles,
+        form.musclesInvolved,
         form.secondaryMuscles,
         form.muscleGroup
       ),
@@ -140,7 +140,7 @@ export default function ExerciseEditModal({
   };
 
   const toggleMuscle = (muscle: string, isPrimary: boolean) => {
-    const field = isPrimary ? "primaryMuscles" : "secondaryMuscles";
+    const field = isPrimary ? "musclesInvolved" : "secondaryMuscles";
     setForm((prev) => {
       const current = prev[field];
       if (current.includes(muscle)) {
@@ -230,7 +230,7 @@ export default function ExerciseEditModal({
                           type="button"
                           onClick={() => toggleMuscle(muscle, true)}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                            form.primaryMuscles.includes(muscle)
+                            form.musclesInvolved.includes(muscle)
                               ? "bg-blue-600 text-white"
                               : "bg-muted text-muted-foreground hover:bg-muted/80"
                           }`}
