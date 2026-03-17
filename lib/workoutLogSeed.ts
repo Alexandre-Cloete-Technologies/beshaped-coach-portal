@@ -23,6 +23,8 @@ interface ProgramExerciseRaw {
 
 interface ProgramWorkoutRaw {
   workoutName?: string;
+  /** @deprecated Use workoutName. Kept for backward compatibility when reading old data. */
+  dayName?: string;
   label?: string;
   dayNumber?: number;
   isRestDay?: boolean;
