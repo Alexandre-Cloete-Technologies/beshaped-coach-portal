@@ -111,7 +111,7 @@ export const buildProgramWorkoutSlots = (programData: ProgramDataRaw | undefined
       if (workout.isRestDay) return;
       if (workout.type === "rest" || workout.type === "empty") return;
 
-      const rawName = workout.workoutName || workout.label || "";
+      const rawName = workout.workoutName || workout.dayName || workout.label || "";
       if (!String(rawName).trim()) return;
 
       const weekNumber = Math.floor(workoutIdx / 7) + 1;

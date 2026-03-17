@@ -55,7 +55,6 @@ interface ExerciseData {
 interface WorkoutData {
   dayNumber: number;
   weekNumber?: number;
-  dayName: string;
   isRestDay: boolean;
   workoutId: string | null;
   workoutName: string | null;
@@ -302,10 +301,9 @@ export default function ProgramDetailPage() {
               workouts: (phase.workouts || []).map((w: any, workoutIdx: number) => ({
                 dayNumber: w.dayNumber || 0,
                 weekNumber: w.weekNumber ?? Math.floor(workoutIdx / 7) + 1,
-                dayName: w.dayName || "",
                 isRestDay: w.isRestDay || false,
                 workoutId: w.workoutId || null,
-                workoutName: w.workoutName || null,
+                workoutName: w.workoutName || w.dayName || null,
                 description: w.description || "",
                 estimatedDuration: w.estimatedDuration || 0,
                 exercises: (w.exercises || []).map((ex: any) => ({
@@ -810,7 +808,6 @@ export default function ProgramDetailPage() {
         currentWorkouts.push({
           dayNumber: (i % 7) + 1,
           weekNumber: Math.floor(i / 7) + 1,
-          dayName: dayNames[i % 7],
           isRestDay: false,
           workoutId: null,
           workoutName: null,
@@ -841,7 +838,6 @@ export default function ProgramDetailPage() {
       workouts: Array.from({ length: 7 }, (_, i) => ({
         dayNumber: i + 1,
         weekNumber: 1,
-        dayName: dayNames[i],
         isRestDay: false,
         workoutId: null,
         workoutName: null,

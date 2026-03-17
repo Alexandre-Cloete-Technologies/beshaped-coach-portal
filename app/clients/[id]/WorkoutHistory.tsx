@@ -137,7 +137,6 @@ export default function WorkoutHistory() {
     phase: string;
     phaseOrder: number;
     dayNumber: number;
-    dayName: string;
     isRestDay: boolean;
     description?: string;
     exercises: Array<{
@@ -198,7 +197,6 @@ export default function WorkoutHistory() {
                 phase: string;
                 phaseOrder: number;
                 dayNumber: number;
-                dayName: string;
                 isRestDay: boolean;
                 description?: string;
                 exercises: Array<{
@@ -225,11 +223,10 @@ export default function WorkoutHistory() {
                       // Skip rest days or workouts without names
                       if (workout.workoutName && !workout.isRestDay) {
                         workouts.push({ 
-                          workoutName: workout.workoutName,
+                          workoutName: workout.workoutName || workout.dayName || '',
                           phase: phaseName,
                           phaseOrder: phaseOrder,
                           dayNumber: workout.dayNumber || 0,
-                          dayName: workout.dayName || '',
                           isRestDay: workout.isRestDay || false,
                           description: workout.description,
                           exercises: (workout.exercises || []).map((ex: any) => ({
@@ -479,7 +476,7 @@ export default function WorkoutHistory() {
       
       return {
         date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
-        dayOfWeek: programWorkout.dayName || dayNames[date.getDay()],
+        dayOfWeek: programWorkout.workoutName || dayNames[date.getDay()],
         time: index === 0 ? "9:00 AM" : "--:--",
         name: programWorkout.workoutName,
         status: (index === 0 ? "completed" : "completed") as "completed" | "partial" | "skipped",

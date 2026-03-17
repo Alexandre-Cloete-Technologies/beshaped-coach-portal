@@ -655,7 +655,6 @@ export default function ProgramBuilderPage() {
           workouts: phase.days.map((day, dayIndex) => ({
             dayNumber: dayIndex + 1,
             weekNumber: Math.floor(dayIndex / 7) + 1,
-            dayName: dayNames[dayIndex % 7],
             isRestDay: day.type === "rest",
             workoutId: day.type === "workout" ? `workout_${phaseIndex}_${dayIndex}` : null,
             workoutName: day.type === "workout" ? (day.workoutName || "Unnamed Workout") : null,
