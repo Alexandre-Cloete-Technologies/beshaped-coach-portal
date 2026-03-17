@@ -48,11 +48,8 @@ interface ExerciseData {
   order: number;
   sets: number;
   repsRange: string;
-  tempo?: string;
   restPeriod: string;
   notes: string | null;
-  isSuperset?: boolean;
-  supersetGroup?: string;
 }
 
 interface WorkoutData {
@@ -317,11 +314,8 @@ export default function ProgramDetailPage() {
                   order: ex.order || 0,
                   sets: ex.sets || 0,
                   repsRange: ex.repsRange || "",
-                  tempo: ex.tempo || "",
                   restPeriod: ex.restPeriod || "",
                   notes: ex.notes || null,
-                  isSuperset: ex.isSuperset || false,
-                  supersetGroup: ex.supersetGroup || "",
                 })),
               })),
             })),
@@ -923,11 +917,8 @@ export default function ProgramDetailPage() {
             order: i,
             sets: ex.sets || 3,
             repsRange: ex.repsRange || "8-12",
-            tempo: "",
             restPeriod: "60s",
             notes: null,
-            isSuperset: false,
-            supersetGroup: "",
           })),
         };
       } else if (result.workoutName && result.workoutName !== "New Workout") {
