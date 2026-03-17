@@ -2,6 +2,7 @@
 
 import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Dumbbell, ChevronsUpDown, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
+import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -714,7 +715,10 @@ export default function ExercisesPage() {
                               idx !== groupExercises.length - 1 ? "border-b border-border/50" : ""
                             }`}
                           >
-                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <Link
+                              href={`/exercises/${exercise.id}`}
+                              className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer"
+                            >
                               <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-sm font-medium flex-shrink-0">
                                 {idx + 1}
                               </div>
@@ -724,7 +728,7 @@ export default function ExercisesPage() {
                                   <p className="text-xs text-muted-foreground truncate">{exercise.description}</p>
                                 )}
                               </div>
-                            </div>
+                            </Link>
                             
                             <div className="flex items-center gap-4">
                               <span className={`text-xs font-medium px-2 py-1 rounded ${getDifficultyBadge(exercise.difficulty)}`}>
@@ -734,14 +738,22 @@ export default function ExercisesPage() {
                                 <button
                                   className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded transition-colors"
                                   type="button"
-                                  onClick={() => openEditModal(exercise)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openEditModal(exercise);
+                                  }}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <button
                                   type="button"
                                   className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                  onClick={() => openDeleteModal(exercise)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openDeleteModal(exercise);
+                                  }}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
