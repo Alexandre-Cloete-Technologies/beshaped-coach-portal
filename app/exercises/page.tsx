@@ -7,6 +7,7 @@ import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ExerciseEditModal, { ExerciseEditValues } from "../components/ExerciseEditModal";
+import AnatomyGifPicker from "../components/AnatomyGifPicker";
 
 interface Exercise {
   id: string;
@@ -34,6 +35,7 @@ interface ExerciseFormData {
     control: string;
   };
   videoUrl: string;
+  anatomyExerciseWalkthrough: string;
   thumbnailUrl: string;
   anatomicalIllustration: string;
   musclesInvolved: string[];
@@ -54,6 +56,7 @@ const emptyFormData: ExerciseFormData = {
     control: "",
   },
   videoUrl: "",
+  anatomyExerciseWalkthrough: "",
   thumbnailUrl: "",
   anatomicalIllustration: "",
   musclesInvolved: [],
@@ -869,6 +872,15 @@ export default function ExercisesPage() {
                     onChange={(e) => handleInputChange("videoUrl", e.target.value)}
                     className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                     placeholder="https://..."
+                  />
+                </div>
+
+                {/* Anatomy Walkthrough */}
+                <div className="col-span-2">
+                  <AnatomyGifPicker
+                    value={formData.anatomyExerciseWalkthrough}
+                    onChange={(url) => handleInputChange("anatomyExerciseWalkthrough", url)}
+                    label="Anatomy Walkthrough"
                   />
                 </div>
 
