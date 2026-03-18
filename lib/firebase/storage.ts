@@ -98,6 +98,27 @@ export const listFiles = async (path: string): Promise<StorageReference[]> => {
 };
 
 /**
+ * List all files in a directory with their download URLs
+ */
+export const listFilesWithUrls = async (
+  path: string
+): Promise<{ name: string; url: string }[]> => {
+  try {
+    const items = await listFiles(path);
+    const urls = await Promise.all(
+      items.map(async (item) => ({
+        name: item.name,
+        url: await getDownloadURL(item),
+      }))
+    );
+    return urls;
+  } catch (error) {
+    console.error('Error listing files with URLs:', error);
+    throw error;
+  }
+};
+
+/**
  * Upload multiple files
  */
 export const uploadMultipleFiles = async (

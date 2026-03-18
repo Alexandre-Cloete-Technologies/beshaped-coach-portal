@@ -6,6 +6,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
+import AnatomyGifPicker from "../../components/AnatomyGifPicker";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -29,6 +30,7 @@ interface ExerciseDetail {
   equipment: string;
   difficulty: Difficulty;
   videoUrl: string;
+  anatomyExerciseWalkthrough: string;
   formTextInstructions: string;
 }
 
@@ -130,6 +132,10 @@ export default function ExerciseDetailPage() {
           equipment: (data.equipment as string) || "",
           difficulty: (data.difficulty as Difficulty) || "intermediate",
           videoUrl: (data.videoUrl as string) || "",
+          anatomyExerciseWalkthrough:
+            (data.anatomyExerciseWalkthrough as string) ||
+            (data.anatomyVideoUrl as string) ||
+            "",
           formTextInstructions: (data.formTextInstructions as string) || "",
         });
       } catch (err) {
@@ -197,6 +203,8 @@ export default function ExerciseDetailPage() {
         equipment: exercise.equipment || "None",
         difficulty: exercise.difficulty,
         videoUrl: exercise.videoUrl.trim() || null,
+        anatomyExerciseWalkthrough:
+          exercise.anatomyExerciseWalkthrough.trim() || null,
         muscleGroup: resolveMuscleGroup(
           exercise.musclesInvolved,
           exercise.secondaryMuscles,
@@ -307,8 +315,8 @@ export default function ExerciseDetailPage() {
           {/* Form */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="p-6 space-y-6">
-              {/* Exercise Name, Video URL & Equipment - same row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Exercise Name, Video URL, Equipment & Anatomy Video - same row */}
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr_1fr_1fr] gap-5">
                 <div>
                   <label className="block text-xs font-medium text-card-foreground mb-2">
                     Exercise Name *
@@ -362,6 +370,16 @@ export default function ExerciseDetailPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <AnatomyGifPicker
+                    value={exercise.anatomyExerciseWalkthrough}
+                    onChange={(url) =>
+                      handleChange("anatomyExerciseWalkthrough", url)
+                    }
+                    label="Anatomy Walkthrough"
+                  />
                 </div>
               </div>
 

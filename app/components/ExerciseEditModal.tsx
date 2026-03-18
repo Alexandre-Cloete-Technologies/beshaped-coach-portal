@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import AnatomyGifPicker from "./AnatomyGifPicker";
 
 type Difficulty = "beginner" | "intermediate" | "advanced";
 
@@ -14,6 +15,7 @@ export interface ExerciseEditValues {
   equipment: string;
   difficulty: Difficulty;
   videoUrl: string;
+  anatomyExerciseWalkthrough: string;
 }
 
 interface ExerciseSummary {
@@ -26,6 +28,7 @@ interface ExerciseSummary {
   difficulty: Difficulty;
   description?: string;
   videoUrl?: string;
+  anatomyExerciseWalkthrough?: string;
 }
 
 interface ExerciseEditModalProps {
@@ -98,6 +101,7 @@ export default function ExerciseEditModal({
     equipment: "",
     difficulty: "intermediate",
     videoUrl: "",
+    anatomyExerciseWalkthrough: "",
   });
 
   useEffect(() => {
@@ -112,6 +116,7 @@ export default function ExerciseEditModal({
       equipment: exercise.equipment || "",
       difficulty: exercise.difficulty || "intermediate",
       videoUrl: exercise.videoUrl || "",
+      anatomyExerciseWalkthrough: exercise.anatomyExerciseWalkthrough || "",
     });
   }, [isOpen, exercise, muscleCategoryDetails]);
 
@@ -198,6 +203,14 @@ export default function ExerciseEditModal({
                 onChange={(e) => handleChange("videoUrl", e.target.value)}
                 className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="https://..."
+              />
+            </div>
+
+            <div className="col-span-2">
+              <AnatomyGifPicker
+                value={form.anatomyExerciseWalkthrough}
+                onChange={(url) => handleChange("anatomyExerciseWalkthrough", url)}
+                label="Anatomy Walkthrough"
               />
             </div>
 

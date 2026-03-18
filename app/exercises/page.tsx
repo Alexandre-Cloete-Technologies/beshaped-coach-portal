@@ -19,6 +19,7 @@ interface Exercise {
   description?: string;
   instructions?: string[];
   videoUrl?: string;
+  anatomyExerciseWalkthrough?: string;
   createdAt?: Date;
 }
 
@@ -329,6 +330,7 @@ export default function ExercisesPage() {
               description: data.description,
               instructions: data.instructions,
               videoUrl: data.videoUrl,
+              anatomyExerciseWalkthrough: data.anatomyExerciseWalkthrough || data.anatomyVideoUrl,
               createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
             };
           });
@@ -501,6 +503,7 @@ export default function ExercisesPage() {
         equipment: values.equipment || "None",
         difficulty: values.difficulty,
         videoUrl: values.videoUrl.trim() || null,
+        anatomyExerciseWalkthrough: values.anatomyExerciseWalkthrough?.trim() || null,
         muscleGroup: values.muscleGroup,
         musclesInvolved: values.musclesInvolved,
         secondaryMuscles: values.secondaryMuscles,
@@ -517,6 +520,7 @@ export default function ExercisesPage() {
                 equipment: values.equipment || "None",
                 difficulty: values.difficulty,
                 videoUrl: values.videoUrl.trim() || undefined,
+                anatomyExerciseWalkthrough: values.anatomyExerciseWalkthrough?.trim() || undefined,
                 muscleGroup: values.muscleGroup,
                 musclesInvolved: values.musclesInvolved,
                 secondaryMuscles: values.secondaryMuscles,
@@ -564,6 +568,7 @@ export default function ExercisesPage() {
           description: data.description,
           instructions: data.instructions,
           videoUrl: data.videoUrl,
+          anatomyExerciseWalkthrough: data.anatomyExerciseWalkthrough || data.anatomyVideoUrl,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
         };
       });
