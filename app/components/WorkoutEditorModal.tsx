@@ -10,8 +10,10 @@ import {
   Plus,
   Dumbbell,
   GripVertical,
+  Trash2,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
+import ConfirmModal from "./ConfirmModal";
 
 export interface ModalExercise {
   id: string;
@@ -33,6 +35,7 @@ interface WorkoutEditorModalProps {
   loadingExercises: boolean;
   onClose: (result: { workoutName: string; exercises: ModalExercise[] }) => void;
   onTemplateSaved?: () => void;
+  onDelete?: () => void;
 }
 
 export default function WorkoutEditorModal({
@@ -44,6 +47,7 @@ export default function WorkoutEditorModal({
   loadingExercises,
   onClose,
   onTemplateSaved,
+  onDelete,
 }: WorkoutEditorModalProps) {
   const [localWorkoutName, setLocalWorkoutName] = useState(
     workoutName || "New Workout"
@@ -58,6 +62,7 @@ export default function WorkoutEditorModal({
   const [draggedExerciseIndex, setDraggedExerciseIndex] =
     useState<number | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -489,10 +494,21 @@ export default function WorkoutEditorModal({
 
       {/* Modal Footer */}
       <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {localExercises.length} exercise
-          {localExercises.length !== 1 ? "s" : ""} in workout
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {localExercises.length} exercise
+            {localExercises.length !== 1 ? "s" : ""} in workout
+          </p>
+          {onDelete && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-medium transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Workout
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handleSaveAsTemplate}
@@ -509,6 +525,24 @@ export default function WorkoutEditorModal({
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={async () => {
+          await onDelete?.();
+        }}
+        title="Delete Workout"
+        message={
+          <>
+            <p className="mb-1">
+              Are you sure you want to delete <span className="font-semibold text-card-foreground">{localWorkoutName}</span>?
+            </p>
+            <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+          </>
+        }
+        confirmLabel="Delete Workout"
+      />
     </div>
   </div>
   );

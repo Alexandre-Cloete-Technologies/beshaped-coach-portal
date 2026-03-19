@@ -21,15 +21,17 @@ import {
   Users,
   Calendar,
   Library,
-  Settings
+  Settings,
+  Trash2
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useCallback } from "react";
-import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
 import PhaseDescriptionModal from "../../components/PhaseDescriptionModal";
+import ConfirmModal from "../../components/ConfirmModal";
 
 type TemplateCategory = "recent" | "strength" | "saved";
 
@@ -201,6 +203,7 @@ export default function ProgramBuilderPage() {
   const [selectedWorkout, setSelectedWorkout] = useState<SelectedWorkout | null>(null);
   const [phaseDescriptionModalPhase, setPhaseDescriptionModalPhase] = useState<Phase | null>(null);
   const [phaseDescriptionDraft, setPhaseDescriptionDraft] = useState("");
+  const [showDeleteTemplateConfirm, setShowDeleteTemplateConfirm] = useState(false);
 
   // Fetch exercises from Firebase on mount
   useEffect(() => {
@@ -1324,7 +1327,7 @@ export default function ProgramBuilderPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelectedTemplate(null)}
+                  onClick={() => { setSelectedTemplate(null); setShowDeleteTemplateConfirm(false); }}
                   className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   aria-label="Close template preview"
                 >
@@ -1374,9 +1377,20 @@ export default function ProgramBuilderPage() {
                 )}
               </div>
 
-              <div className="flex items-center justify-end border-t border-border px-6 py-4">
+              <div className="flex items-center justify-between border-t border-border px-6 py-4">
+                <div>
+                  {selectedTemplate.category === "saved" && (
+                    <button
+                      onClick={() => setShowDeleteTemplateConfirm(true)}
+                      className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-medium transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Workout
+                    </button>
+                  )}
+                </div>
                 <button
-                  onClick={() => setSelectedTemplate(null)}
+                  onClick={() => { setSelectedTemplate(null); setShowDeleteTemplateConfirm(false); }}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
                 >
                   Close
@@ -1384,6 +1398,35 @@ export default function ProgramBuilderPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {selectedTemplate && selectedTemplate.category === "saved" && (
+          <ConfirmModal
+            isOpen={showDeleteTemplateConfirm}
+            onClose={() => setShowDeleteTemplateConfirm(false)}
+            onConfirm={async () => {
+              try {
+                await deleteDoc(doc(db, "workouts", selectedTemplate.id));
+                fetchWorkoutTemplates();
+                setSelectedTemplate(null);
+                setShowDeleteTemplateConfirm(false);
+              } catch (err) {
+                console.error("Error deleting workout:", err);
+                alert("Failed to delete workout. Please try again.");
+                throw err;
+              }
+            }}
+            title="Delete Workout"
+            message={
+              <>
+                <p className="mb-1">
+                  Are you sure you want to delete <span className="font-semibold text-card-foreground">{selectedTemplate.name}</span>?
+                </p>
+                <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+              </>
+            }
+            confirmLabel="Delete Workout"
+          />
         )}
 
         <PhaseDescriptionModal

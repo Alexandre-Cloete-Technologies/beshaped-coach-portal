@@ -1605,6 +1605,16 @@ export default function ProgramDetailPage() {
           muscleGroupOrder={muscleGroupOrder}
           loadingExercises={loadingExercises}
           onClose={handleLibraryWorkoutModalClose}
+          onDelete={async () => {
+            try {
+              await deleteDoc(doc(db, "workouts", selectedLibraryWorkout.id));
+              setWorkoutLibrary((prev) => prev.filter((c) => c.id !== selectedLibraryWorkout.id));
+              setSelectedLibraryWorkout(null);
+            } catch (err) {
+              console.error("Error deleting workout:", err);
+              alert("Failed to delete workout. Please try again.");
+            }
+          }}
         />
       )}
     </div>
