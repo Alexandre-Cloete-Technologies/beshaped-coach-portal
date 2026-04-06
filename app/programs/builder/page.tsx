@@ -27,7 +27,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useCallback } from "react";
-import { collection, getDocs, addDoc, serverTimestamp, doc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
 import PhaseDescriptionModal from "../../components/PhaseDescriptionModal";
@@ -204,6 +204,8 @@ export default function ProgramBuilderPage() {
   const [phaseDescriptionModalPhase, setPhaseDescriptionModalPhase] = useState<Phase | null>(null);
   const [phaseDescriptionDraft, setPhaseDescriptionDraft] = useState("");
   const [showDeleteTemplateConfirm, setShowDeleteTemplateConfirm] = useState(false);
+  const [templateNameDraft, setTemplateNameDraft] = useState("");
+  const [savingTemplateName, setSavingTemplateName] = useState(false);
 
   // Fetch exercises from Firebase on mount
   useEffect(() => {
@@ -396,6 +398,7 @@ export default function ProgramBuilderPage() {
 
   const openTemplateModal = (template: WorkoutTemplate) => {
     setSelectedTemplate(template);
+    setTemplateNameDraft(template.name);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -1315,9 +1318,19 @@ export default function ProgramBuilderPage() {
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-2xl">
               <div className="flex items-start justify-between border-b border-border px-6 py-4">
-                <div>
+                <div className="flex-1 min-w-0 mr-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Workout Template</p>
-                  <h3 className="mt-1 text-xl font-bold text-card-foreground">{selectedTemplate.name}</h3>
+                  {selectedTemplate.category === "saved" ? (
+                    <input
+                      type="text"
+                      value={templateNameDraft}
+                      onChange={(e) => setTemplateNameDraft(e.target.value)}
+                      className="mt-1 w-full text-xl font-bold text-card-foreground bg-transparent border-b-2 border-transparent hover:border-border focus:border-primary focus:outline-none px-0 py-1 transition-colors"
+                      placeholder="Workout name"
+                    />
+                  ) : (
+                    <h3 className="mt-1 text-xl font-bold text-card-foreground">{selectedTemplate.name}</h3>
+                  )}
                   <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{selectedTemplate.exercises} exercises</span>
                     <span>•</span>
@@ -1378,15 +1391,41 @@ export default function ProgramBuilderPage() {
               </div>
 
               <div className="flex items-center justify-between border-t border-border px-6 py-4">
-                <div>
+                <div className="flex items-center gap-2">
                   {selectedTemplate.category === "saved" && (
-                    <button
-                      onClick={() => setShowDeleteTemplateConfirm(true)}
-                      className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-medium transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete Workout
-                    </button>
+                    <>
+                      {templateNameDraft !== selectedTemplate.name && (
+                        <button
+                          onClick={async () => {
+                            if (!templateNameDraft.trim()) return;
+                            try {
+                              setSavingTemplateName(true);
+                              await updateDoc(doc(db, "workouts", selectedTemplate.id), {
+                                name: templateNameDraft.trim(),
+                              });
+                              setSelectedTemplate((prev) => prev ? { ...prev, name: templateNameDraft.trim() } : null);
+                              fetchWorkoutTemplates();
+                            } catch (err) {
+                              console.error("Error updating workout name:", err);
+                              alert("Failed to update workout name. Please try again.");
+                            } finally {
+                              setSavingTemplateName(false);
+                            }
+                          }}
+                          disabled={savingTemplateName}
+                          className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          {savingTemplateName ? "Saving..." : "Save Name"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowDeleteTemplateConfirm(true)}
+                        className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-medium transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Workout
+                      </button>
+                    </>
                   )}
                 </div>
                 <button

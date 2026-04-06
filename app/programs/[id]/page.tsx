@@ -938,18 +938,39 @@ export default function ProgramDetailPage() {
     setSelectedWorkoutEdit(null);
   };
 
-  const handleLibraryWorkoutModalClose = (result: {
+  const handleLibraryWorkoutModalClose = async (result: {
     workoutName: string;
     exercises: ModalExercise[];
   }) => {
     if (!selectedLibraryWorkout) return;
+
+    const newName = result.workoutName?.trim() || selectedLibraryWorkout.workoutName;
+    const mappedExercises = (result.exercises || []).map((ex, idx) => ({
+      exerciseId: ex.id,
+      exerciseName: ex.name,
+      order: idx,
+      targetSets: ex.sets || 3,
+      targetReps: ex.repsRange || "8-12",
+    }));
+
+    try {
+      await updateDoc(doc(db, "workouts", selectedLibraryWorkout.id), {
+        name: newName,
+        exercises: mappedExercises,
+        estimatedDuration: (result.exercises || []).length * 5,
+        updatedAt: Timestamp.now(),
+      });
+    } catch (err) {
+      console.error("Error updating workout:", err);
+      alert("Failed to save workout changes. Please try again.");
+    }
 
     setWorkoutLibrary((prev) =>
       prev.map((card) =>
         card.id === selectedLibraryWorkout.id
           ? {
               ...card,
-              workoutName: result.workoutName || card.workoutName,
+              workoutName: newName,
               exercises: result.exercises || [],
               estimatedDuration: (result.exercises || []).length * 5,
             }
