@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, ChevronDown, User, Calendar, Ruler, Camera } from "lucide-react";
+import { Search, User, Calendar, Ruler, Camera, RotateCcw } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -22,6 +22,92 @@ const JACKSON_POLLOCK_SITES = [
   "Thigh",
 ];
 
+const ASSESSMENT_DRAFT_KEY = "beshaped-coach-assessment-draft";
+
+const CIRCUMFERENCE_FIELDS = [
+  { key: "shoulder", label: "Shoulder" },
+  { key: "chest", label: "Chest" },
+  { key: "waist", label: "Waist" },
+  { key: "abdominal", label: "Abdominal" },
+  { key: "hip", label: "Hip" },
+  { key: "rightArm", label: "Right arm" },
+  { key: "rightArmContracted", label: "Right arm contracted" },
+  { key: "rightForearm", label: "Right forearm" },
+  { key: "leftArm", label: "Left arm" },
+  { key: "leftArmContracted", label: "Left arm contracted" },
+  { key: "leftForearm", label: "Left forearm" },
+  { key: "rightThigh", label: "Right thigh" },
+  { key: "leftThigh", label: "Left thigh" },
+  { key: "rightCalf", label: "Right calf" },
+  { key: "leftCalf", label: "Left calf" },
+] as const;
+
+type CircumferenceKey = (typeof CIRCUMFERENCE_FIELDS)[number]["key"];
+
+function emptyCircumferences(): Record<CircumferenceKey, string> {
+  return Object.fromEntries(CIRCUMFERENCE_FIELDS.map((f) => [f.key, ""])) as Record<
+    CircumferenceKey,
+    string
+  >;
+}
+
+type AssessmentDraftV1 = {
+  v: 1;
+  searchQuery: string;
+  selectedClientId: string;
+  assessmentDate: string;
+  height: string;
+  weight: string;
+  age: string;
+} & Record<CircumferenceKey, string> & {
+    skinfolds: Record<string, string>;
+  };
+
+function defaultSkinfolds(): Record<string, string> {
+  return Object.fromEntries(JACKSON_POLLOCK_SITES.map((s) => [s, ""]));
+}
+
+function mergeSkinfolds(stored: Record<string, string> | undefined): Record<string, string> {
+  const base = defaultSkinfolds();
+  if (!stored || typeof stored !== "object") return base;
+  for (const site of JACKSON_POLLOCK_SITES) {
+    if (typeof stored[site] === "string") base[site] = stored[site];
+  }
+  return base;
+}
+
+const BMI_CLASSIFICATION_ROWS = [
+  { range: "0 – 18.49", classification: "Underweight" },
+  { range: "18.5 – 24.99", classification: "Normal" },
+  { range: "25 – 29.99", classification: "Overweight" },
+  { range: "30 – 34.99", classification: "Obesity Class 1" },
+  { range: "35 – 39.99", classification: "Obesity Class 2" },
+  { range: "40 or higher", classification: "Obesity Class 3" },
+] as const;
+
+/** Brackets aligned with BMI_CLASSIFICATION_ROWS */
+function classificationFromBmi(bmi: number): (typeof BMI_CLASSIFICATION_ROWS)[number]["classification"] {
+  if (bmi < 18.5) return "Underweight";
+  if (bmi < 25) return "Normal";
+  if (bmi < 30) return "Overweight";
+  if (bmi < 35) return "Obesity Class 1";
+  if (bmi < 40) return "Obesity Class 2";
+  return "Obesity Class 3";
+}
+
+function readAssessmentDraft(): Partial<AssessmentDraftV1> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ASSESSMENT_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as Partial<AssessmentDraftV1>;
+  } catch {
+    return null;
+  }
+}
+
 export default function AssessmentPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
@@ -40,23 +126,69 @@ export default function AssessmentPage() {
   const [age, setAge] = useState("");
 
   // Body circumferences (cm)
-  const [waist, setWaist] = useState("");
-  const [hip, setHip] = useState("");
-  const [chest, setChest] = useState("");
-  const [leftArm, setLeftArm] = useState("");
-  const [rightArm, setRightArm] = useState("");
-  const [leftThigh, setLeftThigh] = useState("");
-  const [rightThigh, setRightThigh] = useState("");
-  const [leftCalf, setLeftCalf] = useState("");
-  const [rightCalf, setRightCalf] = useState("");
+  const [circumferences, setCircumferences] = useState(emptyCircumferences);
 
   // Skinfold measurements (mm)
-  const [skinfolds, setSkinfolds] = useState<Record<string, string>>(
-    Object.fromEntries(JACKSON_POLLOCK_SITES.map((s) => [s, ""]))
-  );
+  const [skinfolds, setSkinfolds] = useState<Record<string, string>>(defaultSkinfolds);
 
-  // Photos
+  // Photos (not persisted — File objects cannot be stored in localStorage)
   const [photos, setPhotos] = useState<File[]>([]);
+  const [photoInputKey, setPhotoInputKey] = useState(0);
+
+  const [draftReady, setDraftReady] = useState(false);
+
+  useEffect(() => {
+    const d = readAssessmentDraft();
+    if (d) {
+      if (typeof d.searchQuery === "string") setSearchQuery(d.searchQuery);
+      if (typeof d.selectedClientId === "string") setSelectedClientId(d.selectedClientId);
+      if (typeof d.assessmentDate === "string") setAssessmentDate(d.assessmentDate);
+      if (typeof d.height === "string") setHeight(d.height);
+      if (typeof d.weight === "string") setWeight(d.weight);
+      if (typeof d.age === "string") setAge(d.age);
+      setCircumferences(() => {
+        const next = emptyCircumferences();
+        const raw = d as Record<string, unknown>;
+        for (const { key } of CIRCUMFERENCE_FIELDS) {
+          const val = raw[key];
+          if (typeof val === "string") next[key] = val;
+        }
+        return next;
+      });
+      setSkinfolds(mergeSkinfolds(d.skinfolds));
+    }
+    setDraftReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady || typeof window === "undefined") return;
+    const payload: AssessmentDraftV1 = {
+      v: 1,
+      searchQuery,
+      selectedClientId,
+      assessmentDate,
+      height,
+      weight,
+      age,
+      ...circumferences,
+      skinfolds,
+    };
+    try {
+      localStorage.setItem(ASSESSMENT_DRAFT_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.error("Failed to persist assessment draft:", err);
+    }
+  }, [
+    draftReady,
+    searchQuery,
+    selectedClientId,
+    assessmentDate,
+    height,
+    weight,
+    age,
+    circumferences,
+    skinfolds,
+  ]);
 
   const fetchClients = async () => {
     try {
@@ -137,6 +269,30 @@ export default function AssessmentPage() {
     );
   }, [clients, searchQuery]);
 
+  /** BMI = weight (kg) / height (m)²; height form is in cm */
+  const bmiFromStats = useMemo(() => {
+    const hCm = parseFloat(height);
+    const wKg = parseFloat(weight);
+    if (
+      !Number.isFinite(hCm) ||
+      !Number.isFinite(wKg) ||
+      hCm <= 0 ||
+      wKg <= 0
+    ) {
+      return null;
+    }
+    const hM = hCm / 100;
+    const bmi = wKg / (hM * hM);
+    if (!Number.isFinite(bmi)) return null;
+    return {
+      display: bmi.toFixed(2),
+      classification: classificationFromBmi(bmi),
+    };
+  }, [height, weight]);
+
+  const bmiDisplay = bmiFromStats?.display ?? null;
+  const bmiClassificationDisplay = bmiFromStats?.classification ?? null;
+
   const updateSkinfold = (site: string, value: string) => {
     setSkinfolds((prev) => ({ ...prev, [site]: value }));
   };
@@ -152,16 +308,46 @@ export default function AssessmentPage() {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const resetForm = () => {
+    setSearchQuery("");
+    setSelectedClientId("");
+    setAssessmentDate(new Date().toISOString().split("T")[0]);
+    setHeight("");
+    setWeight("");
+    setAge("");
+    setCircumferences(emptyCircumferences());
+    setSkinfolds(defaultSkinfolds());
+    setPhotos([]);
+    setPhotoInputKey((k) => k + 1);
+    try {
+      localStorage.removeItem(ASSESSMENT_DRAFT_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <Sidebar />
 
-      <main className="ml-[220px] min-h-screen">
-        <div className="p-8 max-w-4xl">
-          <h1 className="text-2xl font-bold text-foreground mb-1">Assessment</h1>
-          <p className="text-sm text-muted-foreground mb-8">
-            Record client assessments and track progress over time.
-          </p>
+      <main className="ml-[220px] min-h-dvh">
+        <div className="p-8 w-full">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground mb-1">Assessment</h1>
+              <p className="text-sm text-muted-foreground">
+                Record client assessments and track progress over time.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="inline-flex shrink-0 items-center justify-center gap-2 h-10 px-4 rounded-lg border border-border bg-background text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset form
+            </button>
+          </div>
 
           {/* Client Selection */}
           <section className="bg-card rounded-xl border border-border shadow-sm p-6 mb-8">
@@ -204,17 +390,54 @@ export default function AssessmentPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Assessment Date
-                </label>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="date"
-                    value={assessmentDate}
-                    onChange={(e) => setAssessmentDate(e.target.value)}
-                    className="h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+                  <div className="shrink-0">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
+                      Assessment Date
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="date"
+                        value={assessmentDate}
+                        onChange={(e) => setAssessmentDate(e.target.value)}
+                        className="h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1 lg:max-w-sm">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                      BMI classification (reference)
+                    </p>
+                    <div className="overflow-hidden rounded-md border border-foreground/25 dark:border-border">
+                      <table className="w-full border-collapse text-center text-sm">
+                        <thead>
+                          <tr className="bg-pink-600 text-white dark:bg-pink-700">
+                            <th className="border-b border-r border-white/25 px-3 py-2.5 font-semibold">
+                              BMI
+                            </th>
+                            <th className="border-b border-white/25 px-3 py-2.5 font-semibold">
+                              Classification
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-background text-foreground dark:bg-card dark:text-card-foreground">
+                          {BMI_CLASSIFICATION_ROWS.map((row) => (
+                            <tr
+                              key={row.classification}
+                              className="border-b border-foreground/15 last:border-b-0 dark:border-border"
+                            >
+                              <td className="border-r border-foreground/15 px-3 py-2 dark:border-border">
+                                {row.range}
+                              </td>
+                              <td className="px-3 py-2">{row.classification}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
 
                 {selectedClientId && (
@@ -246,7 +469,7 @@ export default function AssessmentPage() {
                 <Ruler className="w-5 h-5" />
                 Basic Stats
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Height (cm)
@@ -274,6 +497,32 @@ export default function AssessmentPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-1">
+                    BMI
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    aria-readonly="true"
+                    value={bmiDisplay ?? ""}
+                    placeholder="From height & weight"
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-muted/40 text-sm text-card-foreground cursor-default focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
+                    BMI classification
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    aria-readonly="true"
+                    value={bmiClassificationDisplay ?? ""}
+                    placeholder="From BMI"
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-muted/40 text-sm text-card-foreground cursor-default focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Age (years)
                   </label>
                   <input
@@ -294,123 +543,23 @@ export default function AssessmentPage() {
                 Body Circumferences (cm)
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Waist
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 82"
-                    value={waist}
-                    onChange={(e) => setWaist(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Hip
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 98"
-                    value={hip}
-                    onChange={(e) => setHip(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Chest
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 102"
-                    value={chest}
-                    onChange={(e) => setChest(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Left Arm
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 32"
-                    value={leftArm}
-                    onChange={(e) => setLeftArm(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Right Arm
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 32"
-                    value={rightArm}
-                    onChange={(e) => setRightArm(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Left Thigh
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 58"
-                    value={leftThigh}
-                    onChange={(e) => setLeftThigh(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Right Thigh
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 58"
-                    value={rightThigh}
-                    onChange={(e) => setRightThigh(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Left Calf
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 38"
-                    value={leftCalf}
-                    onChange={(e) => setLeftCalf(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Right Calf
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 38"
-                    value={rightCalf}
-                    onChange={(e) => setRightCalf(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
+                {CIRCUMFERENCE_FIELDS.map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">
+                      {label}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="e.g. 40"
+                      value={circumferences[key]}
+                      onChange={(e) =>
+                        setCircumferences((prev) => ({ ...prev, [key]: e.target.value }))
+                      }
+                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -447,6 +596,7 @@ export default function AssessmentPage() {
               </h2>
               <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors">
                 <input
+                  key={photoInputKey}
                   type="file"
                   accept="image/*"
                   multiple
