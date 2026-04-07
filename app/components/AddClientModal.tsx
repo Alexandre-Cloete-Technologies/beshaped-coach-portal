@@ -21,9 +21,8 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
 
   // Static coaches data
   const staticCoaches = [
-    { id: "c1", name: "Coach Mike" },
+    { id: "c1", name: "Dewald" },
     { id: "c2", name: "Sarah Connor" },
-    { id: "c3", name: "John Doe" },
   ];
 
   const [formData, setFormData] = useState({

@@ -286,14 +286,14 @@ export default function ExerciseDetailPage() {
                   {exercise.name}
                 </h1>
                 <div className="flex items-center gap-3 mt-2">
-                  <span
+                  {/* <span
                     className={`text-xs font-medium px-2.5 py-1 rounded-full ${getDifficultyBadge(
                       exercise.difficulty
                     )}`}
                   >
                     {exercise.difficulty.charAt(0).toUpperCase() +
                       exercise.difficulty.slice(1)}
-                  </span>
+                  </span> */}
                   {exercise.equipment && (
                     <span className="text-sm text-muted-foreground">
                       {exercise.equipment}

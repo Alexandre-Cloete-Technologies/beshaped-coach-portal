@@ -732,16 +732,18 @@ export default function ExercisesPage() {
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium text-card-foreground truncate">{exercise.name}</p>
-                                {exercise.description && (
+                                {/* For not the description is hidden */}
+{/*                                 {exercise.description && (
                                   <p className="text-xs text-muted-foreground truncate">{exercise.description}</p>
-                                )}
+                                )} */}
                               </div>
                             </Link>
                             
                             <div className="flex items-center gap-4">
-                              <span className={`text-xs font-medium px-2 py-1 rounded ${getDifficultyBadge(exercise.difficulty)}`}>
+                              {/* For now, the difficulty badge is hidden */}
+{/*                               <span className={`text-xs font-medium px-2 py-1 rounded ${getDifficultyBadge(exercise.difficulty)}`}>
                                 {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
-                              </span>
+                              </span> */}
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                   className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded transition-colors"
