@@ -1,28 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  Search, 
-  GripVertical, 
-  Info, 
-  Plus, 
-  ChevronDown, 
+import {
+  Search,
+  GripVertical,
+  Info,
+  Plus,
+  ChevronDown,
   ChevronRight,
-  X, 
+  X,
   ArrowLeft,
-  Clock, 
+  Clock,
   Hotel,
   Edit,
   MoreHorizontal,
   CheckCircle,
   Send,
-  Dumbbell,
-  LayoutDashboard,
-  Users,
-  Calendar,
-  Library,
-  Settings,
-  Trash2
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,6 +26,7 @@ import { db } from "@/lib/firebase";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
 import PhaseDescriptionModal from "../../components/PhaseDescriptionModal";
 import ConfirmModal from "../../components/ConfirmModal";
+import Navbar from "../../components/Navbar";
 
 type TemplateCategory = "recent" | "strength" | "saved";
 
@@ -710,72 +705,7 @@ export default function ProgramBuilderPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
-      {/* Top Navigation Bar */}
-      <header className="flex shrink-0 items-center justify-between whitespace-nowrap border-b border-border bg-card px-6 py-3 z-20">
-        <div className="flex items-center gap-6">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-              <Dumbbell className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="font-semibold text-card-foreground text-sm leading-tight">BeShaped Fitness</h1>
-              <span className="text-[10px] text-muted-foreground">Coach Portal</span>
-            </div>
-          </Link>
-
-          {/* Divider */}
-          <div className="h-6 w-px bg-border" />
-
-          {/* Nav Links */}
-          <nav className="flex items-center gap-1">
-            {[
-              { icon: <LayoutDashboard size={18} />, label: "Dashboard", href: "/" },
-              { icon: <Users size={18} />, label: "Clients", href: "/clients" },
-              { icon: <Calendar size={18} />, label: "Programs", href: "/programs" },
-              { icon: <Library size={18} />, label: "Exercises", href: "/exercises" },
-            ].map((item) => {
-              const isActive = item.href === "/programs";
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="hidden md:inline">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {/* Settings */}
-          <Link
-            href="/settings"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-          >
-            <Settings size={18} />
-            <span className="hidden md:inline">Settings</span>
-          </Link>
-
-          {/* User Profile */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-              <span className="text-white text-xs font-medium">D</span>
-            </div>
-            <div className="hidden lg:block">
-              <p className="text-sm font-medium text-card-foreground leading-tight">Dewald</p>
-              <p className="text-[10px] text-muted-foreground">Head Coach</p>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Main Layout */}
       <div className="flex flex-1 overflow-hidden relative">

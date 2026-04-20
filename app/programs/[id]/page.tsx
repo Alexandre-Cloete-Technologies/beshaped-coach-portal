@@ -3,17 +3,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
   ArrowLeft,
-  Calendar,
   Layers,
   Clock,
   Dumbbell,
   Hotel,
   ChevronDown,
   ChevronRight,
-  Users,
-  LayoutDashboard,
-  Library,
-  Settings,
   Edit,
   Copy,
   Trash2,
@@ -39,6 +34,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useParams, useSearchParams } from "next/navigation";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
+import Navbar from "../../components/Navbar";
 
 // === Types ===
 
@@ -1035,53 +1031,7 @@ export default function ProgramDetailPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
-      <header className="flex shrink-0 items-center justify-between whitespace-nowrap border-b border-border bg-card px-6 py-3 z-20">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-              <Dumbbell className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="font-semibold text-card-foreground text-sm leading-tight">BeShaped Fitness</h1>
-              <span className="text-[10px] text-muted-foreground">Coach Portal</span>
-            </div>
-          </Link>
-          <div className="h-6 w-px bg-border" />
-          <nav className="flex items-center gap-1">
-            {[
-              { icon: <LayoutDashboard size={18} />, label: "Dashboard", href: "/" },
-              { icon: <Users size={18} />, label: "Clients", href: "/clients" },
-              { icon: <Calendar size={18} />, label: "Programs", href: "/programs" },
-              { icon: <Library size={18} />, label: "Exercises", href: "/exercises" },
-            ].map((item) => {
-              const isActive = item.href === "/programs";
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  }`}
-                >
-                  {item.icon}
-                  <span className="hidden md:inline">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/settings"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-          >
-            <Settings size={18} />
-            <span className="hidden md:inline">Settings</span>
-          </Link>
-        </div>
-      </header>
+      <Navbar />
 
       <div className="flex flex-1 overflow-hidden relative">
         <aside className="w-[300px] shrink-0 flex flex-col bg-card border-r border-border z-10">

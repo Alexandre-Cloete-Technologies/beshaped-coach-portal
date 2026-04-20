@@ -249,14 +249,14 @@ export default function WorkoutsPage() {
             </Link>
           </div>
 
-          <div className="bg-card p-4 rounded-xl shadow-sm border border-border mb-8">
+          <div className="bg-card p-3  shadow-sm border border-border mb-4">
             <div className="relative w-full max-w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-muted border-none rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                className="w-full pl-10 py-2 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none"
                 placeholder="Search workouts..."
               />
             </div>

@@ -17,19 +17,27 @@ import { ModalExercise } from "../../components/WorkoutEditorModal";
 import { db } from "@/lib/firebase";
 import { Exercise, getCategoryFromMuscle } from "../lib/exercise";
 
-function toModalExercise(ex: Exercise): ModalExercise {
+/** Sets as free text on this page only (same idea as reps); parsed when saving. */
+type CreateWorkoutExercise = Omit<ModalExercise, "sets"> & { sets?: string };
+
+function toCreateWorkoutExercise(ex: Exercise): CreateWorkoutExercise {
   return {
     ...ex,
     difficulty: ex.difficulty,
-    sets: 3,
+    sets: "3",
     repsRange: "8-12",
   };
+}
+
+function targetSetsFromForm(s: string | undefined): number {
+  const n = parseInt(String(s ?? "").trim(), 10);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
 }
 
 export default function CreateWorkoutPage() {
   const router = useRouter();
   const [workoutName, setWorkoutName] = useState("");
-  const [workoutExercises, setWorkoutExercises] = useState<ModalExercise[]>([]);
+  const [workoutExercises, setWorkoutExercises] = useState<CreateWorkoutExercise[]>([]);
   const [library, setLibrary] = useState<Exercise[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,14 +111,14 @@ export default function CreateWorkoutPage() {
   }, [library, searchQuery]);
 
   const addFromLibrary = (ex: Exercise) => {
-    setWorkoutExercises((prev) => [...prev, toModalExercise(ex)]);
+    setWorkoutExercises((prev) => [...prev, toCreateWorkoutExercise(ex)]);
   };
 
   const removeAt = (index: number) => {
     setWorkoutExercises((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateExercise = (index: number, field: keyof ModalExercise, value: unknown) => {
+  const updateExercise = (index: number, field: keyof CreateWorkoutExercise, value: unknown) => {
     setWorkoutExercises((prev) =>
       prev.map((ex, i) => (i === index ? { ...ex, [field]: value } : ex))
     );
@@ -158,7 +166,7 @@ export default function CreateWorkoutPage() {
         exerciseId: exercise.id,
         exerciseName: exercise.name,
         order: idx + 1,
-        targetSets: exercise.sets || 0,
+        targetSets: targetSetsFromForm(exercise.sets),
         targetReps: exercise.repsRange || "",
       }));
       await addDoc(collection(db, "workouts"), {
@@ -208,7 +216,7 @@ export default function CreateWorkoutPage() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-beshaped-green text-white text-sm font-semibold hover:bg-beshaped-dark-green disabled:opacity-50 transition-colors"
               >
                 {saving ? "Saving…" : "Save workout"}
               </button>
@@ -307,7 +315,7 @@ export default function CreateWorkoutPage() {
                   aria-describedby={
                     nameError ? "workout-name-error workout-name-hint" : "workout-name-hint"
                   }
-                  className={`block w-full min-h-0 border-0 bg-transparent p-0 text-sm font-semibold leading-tight text-card-foreground placeholder:text-muted-foreground placeholder:font-normal shadow-none outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-muted/40 ${
+                  className={`block w-full max-w-[50%] min-h-0 border-0 bg-transparent p-0 text-sm font-semibold leading-tight text-card-foreground placeholder:text-muted-foreground placeholder:font-normal shadow-none outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-muted/40 ${
                     nameError
                       ? "focus-visible:ring-destructive"
                       : "focus-visible:ring-ring"
@@ -354,6 +362,7 @@ export default function CreateWorkoutPage() {
                       onDragOver={(e) => onDragOverRow(e, index)}
                       onDragEnd={onDragEndRow}
                       /* This is the cards itself */
+                      /* py is on 2 but i may increase so i can add the set and reps shortcuts */
                       className={`border bg-card px-3 py-2 transition-all cursor-grab active:cursor-grabbing ${
                         draggedIndex === index
                           ? "border-primary bg-primary/10 shadow-md"
@@ -376,13 +385,10 @@ export default function CreateWorkoutPage() {
                               <label className="text-[10px] font-semibold uppercase text-muted-foreground whitespace-nowrap">
                                 Sets
                                 <input
-                                  type="number"
-                                  min={1}
-                                  max={20}
-                                  value={exercise.sets ?? 3}
-                                  onChange={(e) =>
-                                    updateExercise(index, "sets", parseInt(e.target.value, 10) || 1)
-                                  }
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={exercise.sets ?? ""}
+                                  onChange={(e) => updateExercise(index, "sets", e.target.value)}
                                   className="ml-1 w-14 rounded border border-border px-2 py-1 text-sm"
                                 />
                               </label>
