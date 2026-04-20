@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
   { icon: <ClipboardList size={20} />, label: "Assessment", href: "/assessment" },
   { icon: <Calendar size={20} />, label: "Programs", href: "/programs" },
   { icon: <Library size={20} />, label: "Exercises", href: "/exercises" },
+  { icon: <Dumbbell size={20} />, label: "Workouts", href: "/workouts" },
   // { icon: <CreditCard size={20} />, label: "Billing", href: "/billing" },
 ];
 
@@ -52,7 +53,10 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-4">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <li key={item.label}>
                 <a

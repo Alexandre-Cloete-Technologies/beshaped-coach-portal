@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { addDoc, collection, Timestamp } from "firebase/firestore";
+import { addDoc, collection, doc, Timestamp, updateDoc } from "firebase/firestore";
 import {
   Search,
   ChevronDown,
@@ -33,6 +33,8 @@ interface WorkoutEditorModalProps {
   groupedExercises: Record<string, ModalExercise[]>;
   muscleGroupOrder: string[];
   loadingExercises: boolean;
+  /** When set, "Save as Template" updates this document instead of creating a new one. */
+  existingWorkoutId?: string | null;
   onClose: (result: { workoutName: string; exercises: ModalExercise[] }) => void;
   onTemplateSaved?: () => void;
   onDelete?: () => void;
@@ -45,6 +47,7 @@ export default function WorkoutEditorModal({
   groupedExercises,
   muscleGroupOrder,
   loadingExercises,
+  existingWorkoutId = null,
   onClose,
   onTemplateSaved,
   onDelete,
@@ -184,20 +187,33 @@ export default function WorkoutEditorModal({
         return payload;
       });
 
-      await addDoc(collection(db, "workouts"), {
-        name: localWorkoutName?.trim() || "New Workout",
-        description: "",
-        createdBy: "admin",
-        createdByRole: "admin",
-        exercises: mappedExercises,
-        tags: [],
-        estimatedDuration: mappedExercises.length * 5,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const name = localWorkoutName?.trim() || "New Workout";
+      const estimatedDuration = mappedExercises.length * 5;
+
+      if (existingWorkoutId) {
+        await updateDoc(doc(db, "workouts", existingWorkoutId), {
+          name,
+          exercises: mappedExercises,
+          tags: [],
+          estimatedDuration,
+          updatedAt: now,
+        });
+      } else {
+        await addDoc(collection(db, "workouts"), {
+          name,
+          description: "",
+          createdBy: "admin",
+          createdByRole: "admin",
+          exercises: mappedExercises,
+          tags: [],
+          estimatedDuration,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
 
       onTemplateSaved?.();
-      alert("Workout template saved.");
+      alert(existingWorkoutId ? "Workout updated." : "Workout template saved.");
     } catch (error) {
       console.error("Error saving workout template:", error);
       alert("Failed to save workout template. Please try again.");

@@ -54,7 +54,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
           try {
             const programSnap = await getDoc(ref);
             if (programSnap.exists()) {
-              const programData = programSnap.data();
+              const programData = programSnap.data() as { name?: string };
               resolved.push({
                 id: programSnap.id,
                 name: programData?.name || "Unnamed Program",

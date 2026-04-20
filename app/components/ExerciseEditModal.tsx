@@ -23,6 +23,7 @@ interface ExerciseSummary {
   name: string;
   muscleGroup: string;
   musclesInvolved?: string[];
+  primaryMuscles?: string[];
   secondaryMuscles?: string[];
   equipment: string;
   difficulty: Difficulty;
