@@ -194,9 +194,9 @@ export default function ProgramsPage() {
 
       {/* Main Content */}
       <main className="ml-[220px] min-h-screen">
-        <div className="p-8">
+        <div className="p-4">
           {/* Header Section */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-2">
             <div>
               <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">Program Library</h1>
               <p className="text-muted-foreground">Manage your training templates and custom programs.</p>
@@ -228,9 +228,9 @@ export default function ProgramsPage() {
           </div>
 
           {/* Toolbar */}
-          <div className="bg-card p-4 rounded-xl shadow-sm border border-border mb-8 flex flex-col xl:flex-row gap-4 items-center justify-between">
+          <div className=" bg-card p-2  shadow-sm border border-border mb-2 flex flex-col xl:flex-row gap-4 items-center justify-between">
             {/* Search & Filters Group */}
-            <div className="flex flex-1 flex-col md:flex-row gap-3 w-full xl:w-auto">
+            <div className=" flex flex-1 flex-col md:flex-row gap-3 w-full xl:w-auto">
               {/* Search */}
               <div className="relative flex-1 min-w-[300px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -271,7 +271,7 @@ export default function ProgramsPage() {
               </button>
               <Link 
                 href="/programs/builder"
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+                className="flex items-center justify-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
               >
                 Create New Program
               </Link>

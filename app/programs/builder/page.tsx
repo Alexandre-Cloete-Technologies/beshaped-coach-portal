@@ -767,7 +767,7 @@ export default function ProgramBuilderPage() {
 
                 {!loadingTemplates && savedTemplateResults.length > 0 && (
                   <>
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">Saved Templates</div>
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">Saved Workouts</div>
                     {savedTemplateResults.map((template) => (
                   <div
                     key={template.id}

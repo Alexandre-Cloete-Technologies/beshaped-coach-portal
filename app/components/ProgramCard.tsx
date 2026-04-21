@@ -34,38 +34,28 @@ export default function ProgramCard({
   onDuplicate, 
   onDelete 
 }: ProgramCardProps) {
-  const getBadgeStyle = () => {
-    if (program.isTemplate) {
-      return "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-blue-100 dark:border-blue-800";
-    }
-    return "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 border-purple-100 dark:border-purple-800";
-  };
-
   return (
     <article className="group relative flex flex-col bg-card rounded-xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
       <div className="p-5 flex flex-col h-full">
         {/* Header */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1 pr-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-lg font-bold text-card-foreground leading-tight">{program.name}</h3>
-              {program.accessType && (
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                  program.accessType === "paid"
-                    ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
-                    : program.accessType === "assigned"
-                      ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                }`}>
-                  {program.accessType === "paid" && program.price != null
-                    ? `$${program.price}`
-                    : program.accessType === "assigned"
-                      ? "Custom"
-                      : "Free"}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <h3 className="text-lg font-bold text-card-foreground leading-tight">{program.name}</h3>
+            {program.accessType && (
+              <span
+                className="inline-flex items-center justify-center mt-2 px-2.5 py-1  text-xs font-bold text-white bg-beshaped-dark-green shadow-sm border border-blue-700/30 dark:border-blue-500/40"
+                aria-label={`Access: ${program.accessType}`}
+              >
+                {program.accessType === "paid" && program.price != null
+                  ? `$${program.price}`
+                  : program.accessType === "assigned"
+                    ? "Custom"
+                    : "Free"}
+              </span>
+            )}
+            <p
+              className={`text-sm font-medium text-card-foreground ${program.accessType ? "mt-2" : "mt-1"}`}
+            >
               {program.updatedAt || (program.createdBy ? `Created by ${program.createdBy}` : "")}
             </p>
           </div>
