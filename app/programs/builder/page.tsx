@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   Search,
   GripVertical,
@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useCallback } from "react";
 import { collection, getDocs, addDoc, serverTimestamp, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import WorkoutEditorModal, { ModalExercise } from "../../components/WorkoutEditorModal";
@@ -177,7 +176,7 @@ const getCategoryFromMuscle = (muscle: string): string => {
 
 export default function ProgramBuilderPage() {
   const router = useRouter();
-  const [programName, setProgramName] = useState("Name your program");
+  const [programName, setProgramName] = useState("");
   const [programDescription, setProgramDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [accessType, setAccessType] = useState<AccessType>("free");
@@ -201,6 +200,21 @@ export default function ProgramBuilderPage() {
   const [showDeleteTemplateConfirm, setShowDeleteTemplateConfirm] = useState(false);
   const [templateNameDraft, setTemplateNameDraft] = useState("");
   const [savingTemplateName, setSavingTemplateName] = useState(false);
+  const [phaseMenuOpenId, setPhaseMenuOpenId] = useState<string | null>(null);
+  const [phasePendingDelete, setPhasePendingDelete] = useState<Phase | null>(null);
+  const phaseHeaderMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (phaseMenuOpenId == null) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const el = phaseHeaderMenuRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setPhaseMenuOpenId(null);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [phaseMenuOpenId]);
 
   // Fetch exercises from Firebase on mount
   useEffect(() => {
@@ -534,7 +548,11 @@ export default function ProgramBuilderPage() {
         price?: number | null;
         phases?: Phase[];
       };
-      if (draft.programName != null) setProgramName(draft.programName);
+      if (draft.programName != null) {
+        setProgramName(
+          draft.programName === "Name your program" ? "" : draft.programName
+        );
+      }
       if (draft.programDescription != null) setProgramDescription(draft.programDescription);
       if (draft.accessType != null) setAccessType(draft.accessType);
       if (draft.price !== undefined) setPrice(draft.price);
@@ -610,7 +628,7 @@ export default function ProgramBuilderPage() {
   };
 
   const handleClear = () => {
-    setProgramName("Name your program");
+    setProgramName("");
     setProgramDescription("");
     setAccessType("free");
     setPrice(null);
@@ -633,6 +651,11 @@ export default function ProgramBuilderPage() {
 
   const handleSaveProgram = async () => {
     if (isSaving) return;
+    const trimmedName = programName.trim();
+    if (!trimmedName) {
+      alert("Please enter a program title before saving.");
+      return;
+    }
     if (accessType === "paid" && (price === null || price < 0)) {
       alert("Please enter a valid price for paid programs.");
       return;
@@ -641,7 +664,7 @@ export default function ProgramBuilderPage() {
 
     try {
       const programData = {
-        name: programName,
+        name: trimmedName,
         description: programDescription.trim() || "",
         totalDuration: phases.reduce((acc, phase) => acc + phase.durationWeeks, 0),
         daysPerWeek: 7,
@@ -937,130 +960,35 @@ export default function ProgramBuilderPage() {
         {/* Center Canvas */}
         <main className="flex-1 overflow-y-auto bg-background scroll-smooth">
 
-          <div className="mx-auto max-w-[1280px] p-8 flex flex-col gap-8 pb-32">
+          <div className="mx-auto max-w-[1600px] p-4 flex flex-col gap-4 pb-32 ">
             <Link
               href="/programs"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground  transition-colors"
+              className="inline-flex self-start items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Programs
             </Link>
-            {/* Program Header Card */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 shadow-lg text-white">
-              <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/5 to-transparent"></div>
-              <div className="relative z-10 flex flex-col gap-2">
-                {/* Top row: Program Title + Duration/Access/Price cards */}
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                  <div className="flex-1 min-w-0">
-                    <label className="text-blue-100 text-xs font-semibold uppercase tracking-wider">Program Title</label>
-                    <input 
-                      type="text"
-                      value={programName}
-                      onChange={(e) => setProgramName(e.target.value)}
-                      className="w-full bg-transparent border-none text-4xl font-bold text-white placeholder-blue-200 focus:ring-0 px-0 leading-tight focus:outline-none"
-                      placeholder="Enter program name"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-4 shrink-0">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
-                      <span className="text-xs text-blue-100">Duration</span>
-                      <span className="font-medium">{phases.reduce((acc, phase) => acc + phase.durationWeeks, 0)} Weeks</span>
-                    </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col gap-2">
-                      <span className="text-xs text-blue-100 font-semibold uppercase tracking-wider">Access Type</span>
-                      <div className="flex flex-wrap gap-2">
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="accessType"
-                            value="free"
-                            checked={accessType === "free"}
-                            onChange={() => { setAccessType("free"); setPrice(null); }}
-                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
-                          />
-                          <span className="text-sm font-medium">Free</span>
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="accessType"
-                            value="assigned"
-                            checked={accessType === "assigned"}
-                            onChange={() => { setAccessType("assigned"); setPrice(null); }}
-                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
-                          />
-                          <span className="text-sm font-medium">Custom</span>
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="accessType"
-                            value="paid"
-                            checked={accessType === "paid"}
-                            onChange={() => setAccessType("paid")}
-                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
-                          />
-                          <span className="text-sm font-medium">Paid</span>
-                        </label>
-                      </div>
-                      {accessType === "paid" && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-blue-100">Price ($)</span>
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            value={price ?? ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setPrice(val === "" ? null : Math.max(0, parseFloat(val) || 0));
-                            }}
-                            placeholder="0.00"
-                            className="w-24 bg-white/20 border border-white/30 rounded px-2 py-1 text-sm font-medium text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                {/* Program Description - full width, larger height */}
-                <div>
-                  <label className="text-blue-100 text-xs font-semibold uppercase tracking-wider">Program Description</label>
-                  <textarea
-                    value={programDescription}
-                    onChange={(e) => setProgramDescription(e.target.value)}
-                    rows={8}
-                    className="w-full mt-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none"
-                    placeholder="Describe your program (goals, focus areas, who it's for...)"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  {/* <button className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors flex items-center gap-2">
-                    <Edit className="w-4 h-4" />
-                    Edit Details
-                  </button> */}
-                </div>
-              </div>
-            </div>
-
+            <div className="flex flex-col xl:flex-row xl:items-start gap-8">
+              <div className="flex-1 min-w-0 flex flex-col gap-8">
             {/* Phases */}
             {phases.map((phase) => (
-              <div key={phase.id} className="flex flex-col rounded-xl bg-card shadow-sm border border-border">
+              /* Phase card */
+              <div key={phase.id} className="flex flex-col bg-card shadow-sm border border-border ">
                 {/* Phase Header */}
-                <div className="flex items-center justify-between border-b border-border px-6 py-4">
-                  <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between border-b border-border px-4 py-2 gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
                     <button 
                       onClick={() => togglePhase(phase.id)}
-                      className="text-muted-foreground hover:text-primary transition-colors"
+                      className="text-muted-foreground hover:text-primary transition-colors shrink-0"
                     >
                       <ChevronDown className={`w-5 h-5 transition-transform ${phase.isExpanded ? "" : "-rotate-90"}`} />
                     </button>
-                    <div className="flex-1">
+                    <div className="flex flex-row items-center gap-3 min-w-0 flex-1">
                       <input
                         type="text"
                         value={phase.name}
                         onChange={(e) => updatePhaseName(phase.id, e.target.value)}
-                        className="text-lg font-bold text-card-foreground bg-transparent border-none p-0 focus:ring-0 w-full"
+                        className="text-base font-bold text-card-foreground bg-transparent border-none p-0 focus:ring-0 shrink-0 w-auto min-w-[6rem] max-w-[40%]"
                         placeholder="Phase Name"
                       />
                       <button
@@ -1069,20 +997,18 @@ export default function ProgramBuilderPage() {
                           setPhaseDescriptionModalPhase(phase);
                           setPhaseDescriptionDraft(phase.description || "");
                         }}
-                        className="text-sm text-muted-foreground hover:text-foreground text-left w-full flex items-center gap-2 py-1 rounded hover:bg-muted/50 transition-colors"
+                        className="text-sm text-muted-foreground hover:text-foreground text-left flex items-center gap-2 py-1 rounded hover:bg-muted/50 transition-colors min-w-0 flex-1 justify-start"
                       >
                         <Edit className="w-3.5 h-3.5 shrink-0" />
                         <span className="truncate">
                           {phase.description?.trim()
-                            ? phase.description.trim().length > 15
-                              ? `${phase.description.trim().slice(0, 15)}...`
-                              : phase.description.trim()
+                            ? phase.description.trim()
                             : "Add phase description"}
                         </span>
                       </button>
                     </div>
                   </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                       <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5 border border-border">
                         <Clock className="w-3 h-3 text-muted-foreground" />
                         <select
@@ -1095,9 +1021,48 @@ export default function ProgramBuilderPage() {
                           ))}
                         </select>
                       </div>
-                      <button className="text-muted-foreground hover:text-foreground">
-                        <MoreHorizontal className="w-5 h-5" />
-                      </button>
+                      <div
+                        className="relative"
+                        ref={phaseMenuOpenId === phase.id ? phaseHeaderMenuRef : undefined}
+                      >
+                        <button
+                          type="button"
+                          aria-expanded={phaseMenuOpenId === phase.id}
+                          aria-haspopup="menu"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPhaseMenuOpenId((id) => (id === phase.id ? null : phase.id));
+                          }}
+                          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <MoreHorizontal className="w-5 h-5" />
+                        </button>
+                        {phaseMenuOpenId === phase.id && (
+                          <div
+                            role="menu"
+                            className="absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-lg border border-border bg-card py-1 shadow-lg"
+                          >
+                            <button
+                              type="button"
+                              role="menuitem"
+                              disabled={phases.length <= 1}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPhaseMenuOpenId(null);
+                                if (phases.length <= 1) {
+                                  alert("A program must have at least one phase.");
+                                  return;
+                                }
+                                setPhasePendingDelete(phase);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
+                            >
+                              <Trash2 className="h-4 w-4 shrink-0" />
+                              Delete phase
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1179,7 +1144,7 @@ export default function ProgramBuilderPage() {
                     </div>
 
                     {/* Phase Footer */}
-                    <div className="bg-muted/50 px-6 py-3 border-t border-border rounded-b-xl flex items-center justify-between">
+                    <div className="bg-muted/50 px-6 py-3 border-t border-border flex items-center justify-between">
                       <div className="flex gap-4 text-xs text-muted-foreground">
                         <span>Total Workouts: {phase.days.filter(d => d.type === "workout").length}</span>
 
@@ -1201,6 +1166,107 @@ export default function ProgramBuilderPage() {
               </div>
               <span className="text-lg font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Phase</span>
             </button>
+              </div>
+
+              {/* Program title / details — right column on wide screens */}
+              <aside className="w-full xl:w-[400px] shrink-0 xl:sticky xl:top-8 xl:self-start">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 shadow-lg text-white">
+              <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/5 to-transparent"></div>
+              <div className="relative z-10 flex flex-col gap-2">
+                {/* Top block: Program Title + Duration/Access */}
+                <div className="flex flex-col gap-6">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-blue-100 text-xs font-semibold uppercase tracking-wider">Program Title</label>
+                    <input 
+                      type="text"
+                      value={programName}
+                      onChange={(e) => setProgramName(e.target.value)}
+                      className="w-full bg-transparent border-none text-3xl xl:text-4xl font-bold text-white placeholder-blue-200 focus:ring-0 px-0 leading-tight focus:outline-none"
+                      placeholder="Name your program"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-4 shrink-0">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
+                      <span className="text-xs text-blue-100">Duration</span>
+                      <span className="font-medium">{phases.reduce((acc, phase) => acc + phase.durationWeeks, 0)} Weeks</span>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col gap-2 min-w-0 flex-1 basis-[200px]">
+                      <span className="text-xs text-blue-100 font-semibold uppercase tracking-wider">Access Type</span>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="free"
+                            checked={accessType === "free"}
+                            onChange={() => { setAccessType("free"); setPrice(null); }}
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Free</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="assigned"
+                            checked={accessType === "assigned"}
+                            onChange={() => { setAccessType("assigned"); setPrice(null); }}
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Custom</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="accessType"
+                            value="paid"
+                            checked={accessType === "paid"}
+                            onChange={() => setAccessType("paid")}
+                            className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                          />
+                          <span className="text-sm font-medium">Paid</span>
+                        </label>
+                      </div>
+                      {accessType === "paid" && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-blue-100">Price ($)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={price ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPrice(val === "" ? null : Math.max(0, parseFloat(val) || 0));
+                            }}
+                            placeholder="0.00"
+                            className="w-24 bg-white/20 border border-white/30 rounded px-2 py-1 text-sm font-medium text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-blue-100 text-xs font-semibold uppercase tracking-wider">Program Description</label>
+                  <textarea
+                    value={programDescription}
+                    onChange={(e) => setProgramDescription(e.target.value)}
+                    rows={8}
+                    className="w-full mt-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-white/50 resize-y min-h-[120px]"
+                    placeholder="Describe your program (goals, focus areas, who it's for...)"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  {/* <button className="bg-white/20 hover:bg-white/30 text-white rounded-lg px-4 py-2 text-sm font-semibold backdrop-blur-sm transition-colors flex items-center gap-2">
+                    <Edit className="w-4 h-4" />
+                    Edit Details
+                  </button> */}
+                </div>
+              </div>
+            </div>
+              </aside>
+            </div>
           </div>
         </main>
 
@@ -1220,7 +1286,7 @@ export default function ProgramBuilderPage() {
               <div className="flex-1" />
               <button 
                 onClick={handleSaveProgram}
-                disabled={isSaving}
+                disabled={isSaving || !programName.trim()}
                 className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? "Saving..." : "Save"}
@@ -1397,6 +1463,32 @@ export default function ProgramBuilderPage() {
             confirmLabel="Delete Workout"
           />
         )}
+
+        <ConfirmModal
+          isOpen={!!phasePendingDelete}
+          onClose={() => setPhasePendingDelete(null)}
+          onConfirm={async () => {
+            const p = phasePendingDelete;
+            if (!p) return;
+            setPhases((prev) => prev.filter((x) => x.id !== p.id));
+          }}
+          title="Delete phase"
+          message={
+            phasePendingDelete ? (
+              <>
+                <p className="mb-1">
+                  Are you sure you want to delete{" "}
+                  <span className="font-semibold text-card-foreground">
+                    {phasePendingDelete.name.trim() || "this phase"}
+                  </span>
+                  ?
+                </p>
+                <p className="text-xs text-muted-foreground">This cannot be undone.</p>
+              </>
+            ) : null
+          }
+          confirmLabel="Delete phase"
+        />
 
         <PhaseDescriptionModal
           isOpen={!!phaseDescriptionModalPhase}
