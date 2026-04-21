@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
-import { Dumbbell } from "lucide-react";
-import Sidebar from "../../components/Sidebar";
 import Breadcrumbs from "../../components/Breadcrumbs";
+import Navbar from "../../components/Navbar";
+import CreateWorkoutPage from "../../components/CreateWorkoutPage";
 import { db } from "@/lib/firebase";
 
 interface WorkoutExerciseRow {
+  exerciseId: string;
   exerciseName: string;
   targetSets?: number;
   targetReps?: string;
@@ -27,6 +28,8 @@ function parseWorkoutDoc(id: string, data: Record<string, unknown>): WorkoutDeta
   const rows: WorkoutExerciseRow[] = rawExercises.map((exercise) => {
     const exerciseData =
       exercise && typeof exercise === "object" ? (exercise as Record<string, unknown>) : {};
+    const exerciseId =
+      typeof exerciseData.exerciseId === "string" ? exerciseData.exerciseId : "";
     const exerciseName =
       typeof exerciseData.exerciseName === "string" && exerciseData.exerciseName.trim()
         ? exerciseData.exerciseName.trim()
@@ -45,7 +48,7 @@ function parseWorkoutDoc(id: string, data: Record<string, unknown>): WorkoutDeta
         : typeof exerciseData.repsRange === "string"
           ? exerciseData.repsRange
           : undefined;
-    return { exerciseName, targetSets, targetReps };
+    return { exerciseId, exerciseName, targetSets, targetReps };
   });
 
   return {
@@ -103,33 +106,37 @@ export default function WorkoutDetailPage() {
     };
   }, [id]);
 
-  const breadcrumbItems =
-    loading && !workout
-      ? [
-          { label: "Workouts", href: "/workouts" },
-          { label: "Loading…" },
-        ]
-      : notFound || !workout
-        ? [
-            { label: "Workouts", href: "/workouts" },
-            { label: "Not found" },
-          ]
-        : [
-            { label: "Workouts", href: "/workouts" },
-            { label: workout.name },
-          ];
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-
-      <main className="ml-[220px] min-h-screen w-[calc(100%-220px)]">
-        <div className="p-8 w-full max-w-none">
-          <Breadcrumbs items={breadcrumbItems} />
-
-          {loading && !workout ? (
+  if (loading && !workout) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <main className="min-h-0 w-full flex-1 p-2">
+          <div className="p-6 lg:p-2 w-full max-w-none">
+            <Breadcrumbs
+              items={[
+                { label: "Workouts", href: "/workouts" },
+                { label: "Loading…" },
+              ]}
+            />
             <div className="text-muted-foreground text-sm py-8">Loading workout…</div>
-          ) : notFound || !workout ? (
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (notFound || !workout) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <main className="min-h-0 w-full flex-1 p-2">
+          <div className="p-6 lg:p-2 w-full max-w-none">
+            <Breadcrumbs
+              items={[
+                { label: "Workouts", href: "/workouts" },
+                { label: "Not found" },
+              ]}
+            />
             <div className="rounded-xl border border-border bg-card p-8 text-center">
               <p className="text-muted-foreground mb-4">This workout could not be found.</p>
               <Link
@@ -139,59 +146,28 @@ export default function WorkoutDetailPage() {
                 Back to workouts
               </Link>
             </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2 mb-8">
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">{workout.name}</h1>
-                {workout.description.trim() ? (
-                  <p className="text-muted-foreground max-w-3xl">{workout.description}</p>
-                ) : null}
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mt-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Dumbbell className="w-4 h-4" />
-                    {workout.exercises.length} exercise
-                    {workout.exercises.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-              </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-              <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-muted/40 font-semibold text-sm text-card-foreground">
-                  Exercises
-                </div>
-                {workout.exercises.length === 0 ? (
-                  <p className="p-6 text-sm text-muted-foreground">No exercises in this template yet.</p>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {workout.exercises.map((ex, index) => (
-                      <li
-                        key={`${ex.exerciseName}-${index}`}
-                        className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm"
-                      >
-                        <span className="font-medium text-card-foreground">
-                          {index + 1}. {ex.exerciseName}
-                        </span>
-                        <span className="text-muted-foreground tabular-nums">
-                          {ex.targetSets != null ? `${ex.targetSets} sets` : "—"}
-                          {ex.targetReps ? ` · ${ex.targetReps} reps` : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <p className="mt-6 text-sm text-muted-foreground">
-                Edit this template from the{" "}
-                <Link href="/workouts" className="text-primary font-medium hover:underline">
-                  workouts list
-                </Link>
-                .
-              </p>
-            </>
-          )}
-        </div>
-      </main>
-    </div>
+  return (
+    <CreateWorkoutPage
+      existingWorkoutId={workout.id}
+      initialWorkoutName={workout.name}
+      initialExerciseRefs={workout.exercises.map((r) => ({
+        exerciseId: r.exerciseId,
+        targetSets: r.targetSets,
+        targetReps: r.targetReps,
+      }))}
+      heading={workout.name}
+      submitLabel="Save changes"
+      breadcrumbs={[
+        { label: "Workouts", href: "/workouts" },
+        { label: workout.name },
+      ]}
+      redirectTo={`/workouts/${workout.id}`}
+    />
   );
 }
