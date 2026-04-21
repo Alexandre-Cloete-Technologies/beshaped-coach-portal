@@ -11,7 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { addDoc, collection, getDocs, Timestamp } from "firebase/firestore";
-import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/Navbar";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import { ModalExercise } from "../../components/WorkoutEditorModal";
 import { db } from "@/lib/firebase";
@@ -43,6 +43,8 @@ export default function CreateWorkoutPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  /** While set, that exercise card is not draggable (user is in Sets/Reps inputs). */
+  const [inputFocusRowIndex, setInputFocusRowIndex] = useState<number | null>(null);
   const [nameError, setNameError] = useState(false);
   const workoutNameInputRef = useRef<HTMLInputElement>(null);
 
@@ -136,6 +138,19 @@ export default function CreateWorkoutPage() {
   };
   const onDragEndRow = () => setDraggedIndex(null);
 
+  const onExerciseInputsBlur = (rowIndex: number) => {
+    queueMicrotask(() => {
+      const el = document.activeElement;
+      if (
+        el instanceof HTMLInputElement &&
+        el.dataset.inputsRow === String(rowIndex)
+      ) {
+        return;
+      }
+      setInputFocusRowIndex((prev) => (prev === rowIndex ? null : prev));
+    });
+  };
+
   const onDropBuilder = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.currentTarget.classList.remove("bg-primary/5");
@@ -190,10 +205,10 @@ export default function CreateWorkoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
+    <div className="flex min-h-screen flex-col bg-background">
+      <Navbar />
 
-      <main className="ml-[220px] min-h-screen w-[calc(100%-220px)]">
+      <main className="min-h-0 w-full flex-1 p-2">
         <div className="p-6 lg:p-2 w-full max-w-none">
           <Breadcrumbs
             items={[
@@ -202,7 +217,7 @@ export default function CreateWorkoutPage() {
             ]}
           />
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3 ">
             <h1 className="text-3xl font-bold text-foreground tracking-tight">Create a workout</h1>
             <div className="flex flex-wrap items-center gap-2">
               <Link
@@ -225,7 +240,7 @@ export default function CreateWorkoutPage() {
 
           <div className="flex flex-col xl:flex-row gap-6 xl:items-stretch min-h-[min(70vh,800px)]">
             {/* Left: exercise library */}
-            <section className="flex-1 min-w-0 flex flex-col rounded-xl border border-border bg-card shadow-sm overflow-hidden xl:max-w-[52%]">
+            <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm xl:min-h-0 xl:flex-[2]">
               <div className="flex flex-col gap-0.5 px-4 py-3 border-b border-border bg-muted/40">
                 <h2 className="text-sm font-semibold leading-tight text-card-foreground">Exercise library</h2>
                 <p className="text-xs leading-tight text-muted-foreground">
@@ -305,7 +320,7 @@ export default function CreateWorkoutPage() {
             </section>
 
             {/* Right: your workout */}
-            <section className="flex-1 min-w-0 flex flex-col rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+            <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm xl:min-h-0 xl:flex-[3]">
               <div className="flex flex-col gap-0.5 px-4 py-3 border-b border-border bg-muted/40">
                 <label htmlFor="workout-name" className="sr-only">
                   Workout name
@@ -366,13 +381,15 @@ export default function CreateWorkoutPage() {
                     /* CARDS START HERE */
                     <div
                       key={`${exercise.id}-${index}`}
-                      draggable
+                      draggable={inputFocusRowIndex !== index}
                       onDragStart={() => onDragStartRow(index)}
                       onDragOver={(e) => onDragOverRow(e, index)}
                       onDragEnd={onDragEndRow}
-                      /* This is the cards itself */
-                      /* py is on 2 but i may increase so i can add the set and reps shortcuts */
-                      className={`border bg-card px-3 py-3 transition-all cursor-grab active:cursor-grabbing ${
+                      className={`border bg-card px-3 py-3 transition-all ${
+                        inputFocusRowIndex === index
+                          ? "cursor-default"
+                          : "cursor-grab active:cursor-grabbing"
+                      } ${
                         draggedIndex === index
                           ? "border-primary bg-primary/10 shadow-md"
                           : "border-border hover:border-primary/40"
@@ -420,13 +437,17 @@ export default function CreateWorkoutPage() {
                                 <input
                                   type="text"
                                   inputMode="numeric"
+                                  data-inputs-row={index}
                                   value={exercise.sets ?? ""}
                                   onChange={(e) => updateExercise(index, "sets", e.target.value)}
-                                  className="ml-1 w-14 rounded border border-border px-2 py-1 text-sm text-foreground"
+                                  onFocus={() => setInputFocusRowIndex(index)}
+                                  onBlur={() => onExerciseInputsBlur(index)}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  className="ml-1 box-border h-8 w-12 rounded border border-black px-1.5 text-center text-sm tabular-nums leading-8 text-foreground dark:border-neutral-300"
                                 />
                               </label>
-                              <div className="flex shrink-0 items-center">
-                                {["8-12"].map((repShortcut) => {
+                              <div className="ml-8 flex shrink-0 items-center">
+                                {["5", "8-10", "8-12", "15-20"].map((repShortcut) => {
                                   const repsStr = (exercise.repsRange ?? "").trim();
                                   const isActive = repsStr === repShortcut;
                                   return (
@@ -453,9 +474,13 @@ export default function CreateWorkoutPage() {
                                 Reps
                                 <input
                                   type="text"
+                                  data-inputs-row={index}
                                   value={exercise.repsRange ?? ""}
                                   onChange={(e) => updateExercise(index, "repsRange", e.target.value)}
-                                  className="ml-1 w-24 rounded border border-border px-2 py-1 text-sm text-foreground"
+                                  onFocus={() => setInputFocusRowIndex(index)}
+                                  onBlur={() => onExerciseInputsBlur(index)}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  className="ml-1 box-border h-8 w-[4.5rem] rounded border border-black px-1.5 text-center text-sm leading-8 text-foreground dark:border-neutral-300"
                                 />
                               </label>
                             </div>
