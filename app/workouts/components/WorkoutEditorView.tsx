@@ -8,10 +8,10 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import Navbar from "./Navbar";
-import Breadcrumbs, { BreadcrumbItem } from "./Breadcrumbs";
-import { muscleGroupOrder } from "../workouts/lib/exercise";
-import type { WorkoutEditorState } from "../workouts/lib/useWorkoutEditor";
+import Navbar from "../../components/Navbar";
+import Breadcrumbs, { BreadcrumbItem } from "../../components/Breadcrumbs";
+import { muscleGroupOrder } from "../lib/exercise";
+import type { WorkoutEditorState } from "../lib/useWorkoutEditor";
 
 export type WorkoutEditorViewProps = WorkoutEditorState & {
   heading?: string;

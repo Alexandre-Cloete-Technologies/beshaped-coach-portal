@@ -1,21 +1,21 @@
 "use client";
 
-import type { BreadcrumbItem } from "./Breadcrumbs";
-import WorkoutEditorView from "./WorkoutEditorView";
+import type { BreadcrumbItem } from "../../components/Breadcrumbs";
+import WorkoutEditorView from "../components/WorkoutEditorView";
 import {
   useWorkoutEditor,
   type CreateWorkoutExercise,
   type InitialExerciseRef,
-} from "../workouts/lib/useWorkoutEditor";
+} from "../lib/useWorkoutEditor";
 
 export type {
   CreateWorkoutExercise,
   InitialExerciseRef,
-} from "../workouts/lib/useWorkoutEditor";
+} from "../lib/useWorkoutEditor";
 export {
   toCreateWorkoutExercise,
   targetSetsFromForm,
-} from "../workouts/lib/useWorkoutEditor";
+} from "../lib/useWorkoutEditor";
 
 export type CreateWorkoutPageProps = {
   initialWorkoutName?: string;

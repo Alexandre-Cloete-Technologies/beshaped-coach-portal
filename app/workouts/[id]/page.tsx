@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import Navbar from "../../components/Navbar";
-import CreateWorkoutPage from "../../components/CreateWorkoutPage";
+import CreateWorkoutPage from "../components/CreateWorkoutPage";
 import { db } from "@/lib/firebase";
 
 interface WorkoutExerciseRow {
