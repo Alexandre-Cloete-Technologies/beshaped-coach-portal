@@ -15,7 +15,7 @@ import Navbar from "../../components/Navbar";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import { ModalExercise } from "../../components/WorkoutEditorModal";
 import { db } from "@/lib/firebase";
-import { Exercise, getCategoryFromMuscle } from "../lib/exercise";
+import { Exercise, getCategoryFromMuscle, muscleGroupOrder } from "../lib/exercise";
 
 /** Sets as free text on this page only (same idea as reps); parsed when saving. */
 type CreateWorkoutExercise = Omit<ModalExercise, "sets"> & { sets?: string };
@@ -41,6 +41,7 @@ export default function CreateWorkoutPage() {
   const [library, setLibrary] = useState<Exercise[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   /** While set, that exercise card is not draggable (user is in Sets/Reps inputs). */
@@ -103,14 +104,39 @@ export default function CreateWorkoutPage() {
 
   const filteredLibrary = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return library;
-    return library.filter(
-      (ex) =>
+    const hasCategoryFilter = selectedCategories.size > 0;
+    return library.filter((ex) => {
+      if (hasCategoryFilter && !selectedCategories.has(ex.muscleGroup)) {
+        return false;
+      }
+      if (!q) return true;
+      return (
         ex.name.toLowerCase().includes(q) ||
         ex.muscleGroup.toLowerCase().includes(q) ||
         ex.equipment.toLowerCase().includes(q)
-    );
-  }, [library, searchQuery]);
+      );
+    });
+  }, [library, searchQuery, selectedCategories]);
+
+  const libraryCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const ex of library) {
+      counts[ex.muscleGroup] = (counts[ex.muscleGroup] ?? 0) + 1;
+    }
+    return counts;
+  }, [library]);
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) {
+        next.delete(cat);
+      } else {
+        next.add(cat);
+      }
+      return next;
+    });
+  };
 
   const addFromLibrary = (ex: Exercise) => {
     setWorkoutExercises((prev) => [...prev, toCreateWorkoutExercise(ex)]);
@@ -258,12 +284,57 @@ export default function CreateWorkoutPage() {
                     className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
                   />
                 </div>
+                <div className="mt-3 flex flex-wrap gap-1" role="group" aria-label="Filter by muscle group">
+                  {(() => {
+                    const allActive = selectedCategories.size === 0;
+                    return (
+                      <button
+                        key="all"
+                        type="button"
+                        onClick={() => setSelectedCategories(new Set())}
+                        aria-pressed={allActive}
+                        className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          allActive
+                            ? "border-primary bg-beshaped-green text-primary-foreground"
+                            : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                        }`}
+                      >
+                        All
+                        <span className="ml-1 tabular-nums opacity-70">({library.length})</span>
+                      </button>
+                    );
+                  })()}
+                  {muscleGroupOrder.map((cat) => {
+                    const isActive = selectedCategories.has(cat);
+                    const count = libraryCategoryCounts[cat] ?? 0;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => toggleCategory(cat)}
+                        aria-pressed={isActive}
+                        className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          isActive
+                            ? "border-primary bg-beshaped-green text-primary-foreground"
+                            : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                        }`}
+                      >
+                        {cat}
+                        <span className="ml-1 tabular-nums opacity-70">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex-1 overflow-auto min-h-[280px]">
                 {loadingLibrary ? (
                   <p className="p-6 text-sm text-muted-foreground">Loading exercises…</p>
                 ) : filteredLibrary.length === 0 ? (
-                  <p className="p-6 text-sm text-muted-foreground text-center">No exercises match your search.</p>
+                  <p className="p-6 text-sm text-muted-foreground text-center">
+                    {selectedCategories.size > 0
+                      ? `No exercises match ${Array.from(selectedCategories).join(", ")}.`
+                      : "No exercises match your search."}
+                  </p>
                 ) : (
                   <table className="w-full min-w-[520px] table-fixed border-collapse text-sm">
                     <thead>

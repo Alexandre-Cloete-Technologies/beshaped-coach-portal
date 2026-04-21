@@ -316,7 +316,7 @@ export default function WorkoutsPage() {
                   {filteredWorkouts.map((w) => (
                     <tr
                       key={w.id}
-                      className="border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors"
+                      className="border-b border-border transition-colors duration-150 last:border-b-0 hover:bg-beshaped-green/10 dark:hover:bg-beshaped-green/20"
                     >
                       <td className="px-2 py-0.5 align-middle">
                         <Link
