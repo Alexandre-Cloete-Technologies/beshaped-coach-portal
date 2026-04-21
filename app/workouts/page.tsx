@@ -243,7 +243,7 @@ export default function WorkoutsPage() {
             </div>
             <Link
               href="/workouts/create"
-              className="flex items-center justify-center gap-2 shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+              className="flex items-center justify-center gap-2 shrink-0 bg-beshaped-green hover:bg-beshaped-dark-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
             >
               Create workout
             </Link>

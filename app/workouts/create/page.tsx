@@ -250,19 +250,25 @@ export default function CreateWorkoutPage() {
                 ) : filteredLibrary.length === 0 ? (
                   <p className="p-6 text-sm text-muted-foreground text-center">No exercises match your search.</p>
                 ) : (
-                  <table className="w-full min-w-[480px] table-fixed border-collapse text-sm">
+                  <table className="w-full min-w-[520px] table-fixed border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/30 text-left">
-                        <th className="px-3 py-2 font-semibold text-muted-foreground w-[38%]">Exercise</th>
-                        <th className="px-3 py-2 font-semibold text-muted-foreground w-[22%]">Muscle</th>
-                        <th className="px-3 py-2 font-semibold text-muted-foreground w-[28%]">Equipment</th>
+                        <th
+                          scope="col"
+                          className="w-[10%] px-2 py-2 text-center text-sm font-semibold text-muted-foreground"
+                        >
+                          #
+                        </th>
+                        <th className="px-3 py-2 font-semibold text-muted-foreground w-[32%]">Exercise</th>
+                        <th className="px-3 py-2 font-semibold text-muted-foreground w-[20%]">Muscle</th>
+                        <th className="px-3 py-2 font-semibold text-muted-foreground w-[26%]">Equipment</th>
                         <th className="px-3 py-2 font-semibold text-muted-foreground w-[12%] text-right">
                           Add
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredLibrary.map((ex) => (
+                      {filteredLibrary.map((ex, rowIndex) => (
                         <tr
                           key={ex.id}
                           draggable
@@ -272,6 +278,9 @@ export default function CreateWorkoutPage() {
                           }}
                           className="border-b border-border last:border-b-0 hover:bg-muted/30"
                         >
+                          <td className="px-2 py-2 align-middle text-center text-sm text-muted-foreground tabular-nums">
+                            {rowIndex + 1}
+                          </td>
                           <td className="px-3 py-2 align-middle font-medium text-card-foreground truncate">
                             {ex.name}
                           </td>
@@ -363,7 +372,7 @@ export default function CreateWorkoutPage() {
                       onDragEnd={onDragEndRow}
                       /* This is the cards itself */
                       /* py is on 2 but i may increase so i can add the set and reps shortcuts */
-                      className={`border bg-card px-3 py-2 transition-all cursor-grab active:cursor-grabbing ${
+                      className={`border bg-card px-3 py-3 transition-all cursor-grab active:cursor-grabbing ${
                         draggedIndex === index
                           ? "border-primary bg-primary/10 shadow-md"
                           : "border-border hover:border-primary/40"
@@ -381,6 +390,30 @@ export default function CreateWorkoutPage() {
                             <span className="min-w-0 max-w-[min(11rem,36vw)] shrink truncate text-xs text-muted-foreground">
                               {exercise.muscleGroup} · {exercise.equipment}
                             </span>
+                            <div className="flex shrink-0 items-center">
+                              {[2, 3, 4, 5].map((num) => {
+                                const setsStr = (exercise.sets ?? "").trim();
+                                const isActive = setsStr === String(num);
+                                return (
+                                  <button
+                                    key={num}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateExercise(index, "sets", String(num));
+                                    }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    className={` border px-2 py-1 text-xs font-medium transition-colors ${
+                                      isActive
+                                        ? "border-primary bg-beshaped-green text-primary-foreground"
+                                        : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                    }`}
+                                  >
+                                    {num}
+                                  </button>
+                                );
+                              })}
+                            </div>
                             <div className="ml-3 flex shrink-0 items-center gap-2 sm:ml-4">
                               <label className="text-[10px] font-semibold uppercase text-muted-foreground whitespace-nowrap">
                                 Sets
@@ -389,16 +422,40 @@ export default function CreateWorkoutPage() {
                                   inputMode="numeric"
                                   value={exercise.sets ?? ""}
                                   onChange={(e) => updateExercise(index, "sets", e.target.value)}
-                                  className="ml-1 w-14 rounded border border-border px-2 py-1 text-sm"
+                                  className="ml-1 w-14 rounded border border-border px-2 py-1 text-sm text-foreground"
                                 />
                               </label>
+                              <div className="flex shrink-0 items-center">
+                                {["8-12"].map((repShortcut) => {
+                                  const repsStr = (exercise.repsRange ?? "").trim();
+                                  const isActive = repsStr === repShortcut;
+                                  return (
+                                    <button
+                                      key={repShortcut}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateExercise(index, "repsRange", repShortcut);
+                                      }}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      className={` border px-2 py-1 text-xs font-medium transition-colors ${
+                                        isActive
+                                          ? "border-primary bg-beshaped-green text-primary-foreground"
+                                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                      }`}
+                                    >
+                                      {repShortcut}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                               <label className="text-[10px] font-semibold uppercase text-muted-foreground whitespace-nowrap">
                                 Reps
                                 <input
                                   type="text"
                                   value={exercise.repsRange ?? ""}
                                   onChange={(e) => updateExercise(index, "repsRange", e.target.value)}
-                                  className="ml-1 w-24 rounded border border-border px-2 py-1 text-sm"
+                                  className="ml-1 w-24 rounded border border-border px-2 py-1 text-sm text-foreground"
                                 />
                               </label>
                             </div>
