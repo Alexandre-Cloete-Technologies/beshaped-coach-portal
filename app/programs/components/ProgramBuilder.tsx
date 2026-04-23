@@ -614,30 +614,18 @@ export default function ProgramBuilder({
       return (
         <div
           key={globalDayIdx}
-          className="flex flex-col gap-2"
+          className="flex h-full flex-col gap-2"
           onDragOver={handleDayDragOver}
           onDrop={(e) => handleDayDrop(e, phaseIdx, globalDayIdx)}
         >
-          <div
-            className={`group relative flex ${
-              isBanner ? "h-28" : "h-24"
-            } flex-col items-center justify-center rounded-lg border border-dashed border-border ${
-              isBanner ? "bg-muted/30" : "bg-muted/50"
-            } text-muted-foreground ${
-              isAside ? "hover:border-amber-400 transition-colors" : ""
-            }`}
-          >
+          <div className="group relative flex h-full flex-col items-center justify-center text-muted-foreground">
             {isEditing && (
               <button
                 onClick={() => clearDay(phaseIdx, globalDayIdx)}
-                className={`${
-                  isBanner
-                    ? "absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                    : "absolute top-2 right-2 opacity-0 group-hover:opacity-100"
-                } text-muted-foreground hover:text-red-500 transition-all`}
+                className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-all"
                 title="Remove rest day"
               >
-                <X className={isBanner ? "w-3 h-3" : "w-4 h-4"} />
+                <X className="w-4 h-4" />
               </button>
             )}
             <Hotel className="w-5 h-5 mb-1" />
@@ -701,13 +689,13 @@ export default function ProgramBuilder({
     return (
       <div
         key={globalDayIdx}
-        className="flex flex-col gap-2"
+        className="flex h-full flex-col gap-2"
         onDragOver={handleDayDragOver}
         onDrop={(e) => handleDayDrop(e, phaseIdx, globalDayIdx)}
       >
         <div
-          className={`group relative flex flex-col rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-900/20 hover:shadow-md transition-shadow cursor-pointer ${
-            isBanner ? "overflow-hidden" : "p-3 h-full gap-2 transition-shadow"
+          className={`group relative flex flex-col cursor-pointer ${
+            isBanner ? "overflow-hidden" : "h-full gap-2"
           }`}
           onClick={() => {
             if (isEditing) {
@@ -785,12 +773,12 @@ export default function ProgramBuilder({
                   </button>
                 )}
               </div>
-              <p className="text-sm font-semibold text-card-foreground leading-tight">
+              <p className="text-sm font-semibold text-card-foreground leading-tight text-center">
                 {workout.workoutName}
               </p>
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-auto">
+              <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground mt-auto">
                 {hasExercises && (
-                  <span className="bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                  <span className="bg-beshaped-dark-green text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
                     {workout.exercises.length} exercises
                   </span>
                 )}
@@ -814,7 +802,7 @@ export default function ProgramBuilder({
     return (
       <div
         key={phase.phaseId}
-        className="flex flex-col bg-card shadow-sm border border-border "
+        className="flex flex-col bg-card shadow-sm border border-grey"
       >
         {/* Phase Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-2 gap-4">
@@ -837,25 +825,10 @@ export default function ProgramBuilder({
                 className="text-base font-bold text-card-foreground bg-transparent border-none p-0 focus:ring-0 shrink-0 w-auto min-w-[6rem] max-w-[40%]"
                 placeholder="Phase Name"
               />
-              <button
-                type="button"
-                onClick={() => {
-                  setPhaseDescriptionModalIdx(phaseIdx);
-                  setPhaseDescriptionDraft(phase.description || "");
-                }}
-                className="text-sm text-muted-foreground hover:text-foreground text-left flex items-center gap-2 py-1 rounded hover:bg-muted/50 transition-colors min-w-0 flex-1 justify-start"
-              >
-                <Edit className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">
-                  {phase.description?.trim()
-                    ? phase.description.trim()
-                    : "Add phase description"}
-                </span>
-              </button>
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5 border border-border">
+            <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 border border-border">
               <Clock className="w-3 h-3 text-muted-foreground" />
               <select
                 value={phase.durationWeeks}
@@ -871,6 +844,22 @@ export default function ProgramBuilder({
                 ))}
               </select>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setPhaseDescriptionModalIdx(phaseIdx);
+                setPhaseDescriptionDraft(phase.description || "");
+              }}
+              className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title={
+                phase.description?.trim()
+                  ? "Edit phase description"
+                  : "Add phase description"
+              }
+              aria-label="Edit phase description"
+            >
+              <Edit className="w-5 h-5" />
+            </button>
             <div
               className="relative"
               ref={
@@ -925,25 +914,42 @@ export default function ProgramBuilder({
         {/* Weekly Grid (flat, builder style) */}
         {expanded && (
           <>
-            <div className="p-6">
-              <div className="grid grid-cols-7 gap-4 min-w-[800px]">
+            <div className="p-3">
+              <div className="grid grid-cols-7 gap-0 min-w-[800px] mb-2">
                 {dayNames.map((day) => (
                   <div key={day} className="text-center">
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <span className="text-xs font-bold uppercase tracking-wider">
                       {day}
                     </span>
                   </div>
                 ))}
-
+              </div>
+              <div className="grid grid-cols-7 gap-0 min-w-[800px] border-l border-t border-black/30">
                 {Array.from({ length: totalDays }).map((_, idx) => {
                   const weekIdx = Math.floor(idx / 7);
                   const dayInWeekIdx = idx % 7;
-                  return renderDayCard(
-                    phaseIdx,
-                    phase.phaseId,
-                    weekIdx,
-                    dayInWeekIdx,
-                    idx
+                  const workout = phase.workouts[idx];
+                  const isRest = workout?.isRestDay;
+                  const hasWorkout =
+                    !!workout?.workoutName && !workout?.isRestDay;
+                  const cellTint = isRest
+                    ? "bg-muted/50"
+                    : hasWorkout
+                      ? "bg-indigo-50/50 dark:bg-indigo-900/20"
+                      : "";
+                  return (
+                    <div
+                      key={idx}
+                      className={`border-r border-b border-black/30 p-2 min-h-[130px] ${cellTint}`}
+                    >
+                      {renderDayCard(
+                        phaseIdx,
+                        phase.phaseId,
+                        weekIdx,
+                        dayInWeekIdx,
+                        idx
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -1140,7 +1146,9 @@ export default function ProgramBuilder({
             <div className="flex flex-wrap gap-4 shrink-0">
               <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col">
                 <span className="text-xs text-blue-100">Duration</span>
-                <span className="font-medium">{totalDuration} Weeks</span>
+                <span className="font-medium">
+                  {totalDuration} {totalDuration === 1 ? "Week" : "Weeks"}
+                </span>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20 flex flex-col gap-2 min-w-0 flex-1 basis-[200px]">
                 <span className="text-xs text-blue-100 font-semibold uppercase tracking-wider">
