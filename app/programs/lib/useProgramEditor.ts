@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { ModalExercise } from "../../components/WorkoutEditorModal";
@@ -329,7 +323,6 @@ export const normalizeInitialProgram = (
 
 export interface UseProgramEditorOptions {
   initialProgram?: Partial<ProgramFormData>;
-  isEditing: boolean;
   draftKey?: string;
 }
 
@@ -342,7 +335,6 @@ export interface SelectedSlot {
 
 export function useProgramEditor({
   initialProgram,
-  isEditing,
   draftKey,
 }: UseProgramEditorOptions) {
   // Program state
@@ -350,25 +342,14 @@ export function useProgramEditor({
     normalizeInitialProgram(initialProgram)
   );
 
-  // Keep the working copy synced with `initialProgram`:
-  // - When `initialProgram` changes (parent's source of truth changed, e.g. after
-  //   a successful save or fresh fetch), mirror it.
-  // - When `isEditing` flips from true -> false without a concurrent save, also
-  //   mirror initialProgram (effectively a "cancel" revert).
-  // Builder always has isEditing=true and no initialProgram, so this is a no-op
-  // there except on mount.
-  const initialSignature = JSON.stringify(initialProgram ?? null);
-  const prevEditingRef = useRef(isEditing);
+  // Keep editor state in sync when the parent passes a new program (e.g. detail
+  // page after fetch, or after save). Builder omits this prop: effect no-ops.
+  // We key off object identity, not JSON.stringify, so Firestore/undefined fields
+  // cannot break the sync the way stringify could.
   useEffect(() => {
-    const exitedEditing = prevEditingRef.current && !isEditing;
-    prevEditingRef.current = isEditing;
-    if (!initialProgram) {
-      if (exitedEditing) setProgram(createDefaultProgram());
-      return;
-    }
+    if (initialProgram == null) return;
     setProgram(normalizeInitialProgram(initialProgram));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, initialSignature]);
+  }, [initialProgram]);
 
   // Exercise library
   const [exercises, setExercises] = useState<EditExercise[]>([]);
@@ -447,11 +428,12 @@ export function useProgramEditor({
     };
   }, []);
 
-  // Workout template / library (both the "saved templates" list and the "workout library" cards)
+  // Saved workout templates (consumed by the sidebar "Saved Workouts" list)
   const [savedTemplates, setSavedTemplates] = useState<WorkoutTemplate[]>([]);
-  const [workoutLibrary, setWorkoutLibrary] = useState<WorkoutCard[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
-  const [templateFetchError, setTemplateFetchError] = useState<string | null>(null);
+  const [templateFetchError, setTemplateFetchError] = useState<string | null>(
+    null
+  );
 
   const fetchWorkoutTemplates = useCallback(async () => {
     try {
@@ -461,12 +443,10 @@ export function useProgramEditor({
       const workoutsSnapshot = await getDocs(collection(db, "workouts"));
       if (workoutsSnapshot.empty) {
         setSavedTemplates([]);
-        setWorkoutLibrary([]);
         return;
       }
 
       const fetchedTemplates: WorkoutTemplate[] = [];
-      const fetchedCards: WorkoutCard[] = [];
 
       workoutsSnapshot.docs.forEach((workoutDoc) => {
         const data = workoutDoc.data() as Record<string, unknown>;
@@ -515,54 +495,6 @@ export function useProgramEditor({
           }
         );
 
-        const mappedCardExercises: ModalExercise[] = rawExercises.map(
-          (exercise, idx) => {
-            const ex = (exercise && typeof exercise === "object"
-              ? exercise
-              : {}) as Record<string, unknown>;
-            return {
-              id:
-                typeof ex.exerciseId === "string" && ex.exerciseId
-                  ? ex.exerciseId
-                  : typeof ex.id === "string" && ex.id
-                    ? ex.id
-                    : `${workoutDoc.id}-exercise-${idx + 1}`,
-              name:
-                typeof ex.exerciseName === "string" && ex.exerciseName.trim()
-                  ? ex.exerciseName.trim()
-                  : typeof ex.name === "string" && ex.name.trim()
-                    ? ex.name.trim()
-                    : "Unnamed Exercise",
-              muscleGroup: "",
-              musclesInvolved: Array.isArray(ex.musclesInvolved)
-                ? (ex.musclesInvolved as string[])
-                : Array.isArray(ex.primaryMuscles)
-                  ? (ex.primaryMuscles as string[])
-                  : [],
-              equipment:
-                typeof ex.equipment === "string" && ex.equipment
-                  ? ex.equipment
-                  : "Unknown",
-              difficulty:
-                typeof ex.difficulty === "string" && ex.difficulty
-                  ? ex.difficulty
-                  : "intermediate",
-              sets:
-                typeof ex.targetSets === "number"
-                  ? ex.targetSets
-                  : typeof ex.sets === "number"
-                    ? ex.sets
-                    : 3,
-              repsRange:
-                typeof ex.targetReps === "string"
-                  ? ex.targetReps
-                  : typeof ex.repsRange === "string"
-                    ? ex.repsRange
-                    : "8-12",
-            };
-          }
-        );
-
         const workoutName =
           typeof data.name === "string" && data.name.trim()
             ? data.name.trim()
@@ -580,7 +512,8 @@ export function useProgramEditor({
           exercises: exerciseCount,
           duration: estimatedDuration,
           category: "saved",
-          description: typeof data.description === "string" ? data.description : "",
+          description:
+            typeof data.description === "string" ? data.description : "",
           tags: Array.isArray(data.tags)
             ? (data.tags as unknown[]).filter(
                 (tag): tag is string => typeof tag === "string"
@@ -588,25 +521,13 @@ export function useProgramEditor({
             : [],
           templateExercises,
         });
-
-        fetchedCards.push({
-          id: workoutDoc.id,
-          workoutId: workoutDoc.id,
-          workoutName,
-          description:
-            typeof data.description === "string" ? data.description : "",
-          estimatedDuration,
-          exercises: mappedCardExercises,
-        });
       });
 
       setSavedTemplates(fetchedTemplates);
-      setWorkoutLibrary(fetchedCards);
     } catch (error) {
       console.error("Error fetching workout templates:", error);
       setTemplateFetchError("Failed to load saved templates.");
       setSavedTemplates([]);
-      setWorkoutLibrary([]);
     } finally {
       setLoadingTemplates(false);
     }
@@ -685,26 +606,10 @@ export function useProgramEditor({
     });
   }, []);
 
-  // Expanded workouts (for view-mode exercise list)
-  const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(
-    new Set()
-  );
-
-  const toggleWorkout = useCallback((workoutKey: string) => {
-    setExpandedWorkouts((prev) => {
-      const next = new Set(prev);
-      if (next.has(workoutKey)) next.delete(workoutKey);
-      else next.add(workoutKey);
-      return next;
-    });
-  }, []);
-
   // Modal state
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
   const [selectedTemplate, setSelectedTemplate] =
     useState<WorkoutTemplate | null>(null);
-  const [selectedLibraryWorkout, setSelectedLibraryWorkout] =
-    useState<WorkoutCard | null>(null);
   const [phaseDescriptionModalIdx, setPhaseDescriptionModalIdx] = useState<
     number | null
   >(null);
@@ -1046,9 +951,8 @@ export function useProgramEditor({
     loadingExercises,
     groupedExercises,
 
-    // workout library & templates
+    // workout templates
     savedTemplates,
-    workoutLibrary,
     loadingTemplates,
     templateFetchError,
     fetchWorkoutTemplates,
@@ -1065,17 +969,11 @@ export function useProgramEditor({
     expandedPhases,
     togglePhase,
 
-    // workout expansion
-    expandedWorkouts,
-    toggleWorkout,
-
     // modal state
     selectedSlot,
     setSelectedSlot,
     selectedTemplate,
     setSelectedTemplate,
-    selectedLibraryWorkout,
-    setSelectedLibraryWorkout,
     phaseDescriptionModalIdx,
     setPhaseDescriptionModalIdx,
     phaseDescriptionDraft,
@@ -1084,9 +982,6 @@ export function useProgramEditor({
     setPhaseMenuOpenId,
     phasePendingDeleteIdx,
     setPhasePendingDeleteIdx,
-
-    // pass-through
-    isEditing,
   };
 }
 

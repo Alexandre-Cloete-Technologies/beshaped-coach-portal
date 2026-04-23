@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useParams } from "next/navigation";
@@ -22,6 +22,15 @@ export default function ProgramDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // When the route id changes, clear immediately so we never show ProgramBuilder
+  // with the previous program's data (or a mismatched id) while a new doc loads.
+  useLayoutEffect(() => {
+    if (!programId) return;
+    setProgram(null);
+    setError(null);
+    setLoading(true);
+  }, [programId]);
 
   useEffect(() => {
     const fetchProgram = async () => {
@@ -116,8 +125,7 @@ export default function ProgramDetailPage() {
 
   return (
     <ProgramBuilder
-      headerVariant="aside"
-      isEditing
+      key={programId}
       initialProgram={program}
       saving={saving}
       submitLabel="Save Changes"

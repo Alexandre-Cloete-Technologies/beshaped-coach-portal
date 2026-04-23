@@ -38,8 +38,6 @@ export default function ProgramBuilderPage() {
 
   return (
     <ProgramBuilder
-      headerVariant="aside"
-      isEditing
       draftKey={PROGRAM_BUILDER_DRAFT_KEY}
       showClearButton
       submitLabel="Save"
