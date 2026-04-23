@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -13,8 +14,10 @@ const PROGRAM_BUILDER_DRAFT_KEY = "program-builder-draft";
 
 export default function ProgramBuilderPage() {
   const router = useRouter();
+  const [saving, setSaving] = useState(false);
 
   const handleSave = async (data: ProgramFormData) => {
+    setSaving(true);
     try {
       await addDoc(collection(db, "programs"), {
         ...toFirestorePayload(data),
@@ -33,6 +36,8 @@ export default function ProgramBuilderPage() {
     } catch (error) {
       console.error("Error saving program:", error);
       alert("Failed to save program. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -40,6 +45,7 @@ export default function ProgramBuilderPage() {
     <ProgramBuilder
       draftKey={PROGRAM_BUILDER_DRAFT_KEY}
       showClearButton
+      saving={saving}
       submitLabel="Save"
       backHref="/programs"
       onSave={handleSave}

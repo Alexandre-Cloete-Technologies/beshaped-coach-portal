@@ -201,6 +201,7 @@ export default function ProgramBuilder({
   };
 
   const handleSave = async () => {
+    if (saving) return;
     const trimmedName = program.name.trim();
     if (!trimmedName) {
       alert("Please enter a program title before saving.");
@@ -213,7 +214,14 @@ export default function ProgramBuilder({
       alert("Please enter a valid price for paid programs.");
       return;
     }
-    await onSave({ ...program, name: trimmedName });
+    try {
+      await onSave({ ...program, name: trimmedName });
+    } catch (err) {
+      console.error("Save program failed:", err);
+      const message =
+        err instanceof Error ? err.message : "Something went wrong while saving.";
+      alert(message);
+    }
   };
 
   const handleClearClick = () => {
@@ -865,28 +873,28 @@ export default function ProgramBuilder({
           </div>
         </main>
 
-        {/* Footer action bar */}
-        <div className="absolute bottom-0 right-0 left-0 md:left-[280px] bg-card/90 backdrop-blur-md border-t border-border px-8 py-4 z-20">
-          <div className="flex items-center justify-between mx-auto max-w-[1280px]">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"></div>
-            <div className="flex items-center gap-4">
-              {showClearButton && (
-                <button
-                  onClick={handleClearClick}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-              <div className="flex-1" />
+        {/* Footer action bar (z-40 so it sits above main scroll content; modals use z-50) */}
+        <div className="pointer-events-auto absolute bottom-0 right-0 left-0 z-40 bg-card/90 backdrop-blur-md border-t border-border px-8 py-4 md:left-[280px]">
+          <div className="mx-auto flex max-w-[1280px] items-center justify-end gap-3">
+            {showClearButton && (
               <button
-                onClick={handleSave}
-                disabled={saving || !program.name.trim()}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={handleClearClick}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
               >
-                {saving ? "Saving..." : submitLabel}
+                Clear
               </button>
-            </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                void handleSave();
+              }}
+              disabled={saving}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? "Saving..." : submitLabel}
+            </button>
           </div>
         </div>
 

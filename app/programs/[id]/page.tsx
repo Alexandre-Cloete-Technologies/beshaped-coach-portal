@@ -2,9 +2,11 @@
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
+import { CheckCircle, AlertCircle, X } from "lucide-react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useParams } from "next/navigation";
 import { db } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
 import Navbar from "../../components/Navbar";
 import ProgramBuilder from "../components/ProgramBuilder";
 import {
@@ -22,6 +24,10 @@ export default function ProgramDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveToast, setSaveToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // When the route id changes, clear immediately so we never show ProgramBuilder
   // with the previous program's data (or a mismatched id) while a new doc loads.
@@ -70,8 +76,28 @@ export default function ProgramDetailPage() {
     fetchProgram();
   }, [programId]);
 
+  useEffect(() => {
+    if (!saveToast) return;
+    const duration = saveToast.type === "error" ? 7000 : 4500;
+    const t = setTimeout(() => setSaveToast(null), duration);
+    return () => clearTimeout(t);
+  }, [saveToast]);
+
   const handleSave = async (data: ProgramFormData) => {
-    if (!programId || !program) return;
+    if (!programId) {
+      setSaveToast({
+        type: "error",
+        message: "Cannot save: missing program id. Try refreshing the page.",
+      });
+      return;
+    }
+    if (!program) {
+      setSaveToast({
+        type: "error",
+        message: "Program data is not loaded. Try refreshing the page.",
+      });
+      return;
+    }
     try {
       setSaving(true);
       const previousProgram = program;
@@ -82,9 +108,17 @@ export default function ProgramDetailPage() {
       await syncWorkoutLogsForProgramChange(previousProgram, data, programRef);
 
       setProgram(data);
+      setSaveToast({
+        type: "success",
+        message: "Program saved successfully.",
+      });
     } catch (err) {
       console.error("Error saving program:", err);
-      alert("Failed to save program. Please try again.");
+      const message =
+        err instanceof Error && err.message.trim().length > 0
+          ? err.message
+          : "Failed to save program. Please try again.";
+      setSaveToast({ type: "error", message });
     } finally {
       setSaving(false);
     }
@@ -124,13 +158,50 @@ export default function ProgramDetailPage() {
   }
 
   return (
-    <ProgramBuilder
-      key={programId}
-      initialProgram={program}
-      saving={saving}
-      submitLabel="Save Changes"
-      backHref="/programs"
-      onSave={handleSave}
-    />
+    <>
+      <ProgramBuilder
+        key={programId}
+        initialProgram={program}
+        saving={saving}
+        submitLabel="Save Changes"
+        backHref="/programs"
+        onSave={handleSave}
+      />
+
+      {saveToast && (
+        <div
+          role="alert"
+          className={cn(
+            "fixed bottom-6 right-6 z-[100] flex max-w-md items-start gap-3 rounded-lg border px-4 py-3 shadow-lg animate-in fade-in duration-200",
+            saveToast.type === "success"
+              ? "border-beshaped-dark-green/80 bg-card text-foreground"
+              : "border-destructive/60 bg-destructive/10 text-foreground"
+          )}
+        >
+          {saveToast.type === "success" ? (
+            <CheckCircle
+              className="mt-0.5 h-5 w-5 shrink-0 text-beshaped-dark-green"
+              aria-hidden
+            />
+          ) : (
+            <AlertCircle
+              className="mt-0.5 h-5 w-5 shrink-0 text-destructive"
+              aria-hidden
+            />
+          )}
+          <p className="min-w-0 flex-1 text-sm font-medium leading-snug">
+            {saveToast.message}
+          </p>
+          <button
+            type="button"
+            onClick={() => setSaveToast(null)}
+            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </>
   );
 }
