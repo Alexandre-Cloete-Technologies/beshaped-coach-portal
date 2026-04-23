@@ -5,10 +5,8 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ChevronDown,
-  ChevronRight,
   Clock,
   Edit,
-  GripVertical,
   Hotel,
   Info,
   MoreHorizontal,
@@ -87,12 +85,8 @@ export default function ProgramBuilder({
     loadingTemplates,
     templateFetchError,
     fetchWorkoutTemplates,
-    sidebarTab,
-    setSidebarTab,
     searchQuery,
     setSearchQuery,
-    expandedGroups,
-    toggleGroup,
     expandedPhases,
     togglePhase,
     selectedSlot,
@@ -244,7 +238,7 @@ export default function ProgramBuilder({
   const renderSidebar = () => (
     <aside className="w-[280px] shrink-0 flex flex-col bg-card border-r border-border z-10">
       {/* Sidebar Header / Search */}
-      <div className="p-4 border-b border-border space-y-4">
+      <div className="p-4 border-b border-border">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
@@ -252,39 +246,14 @@ export default function ProgramBuilder({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="block w-full pl-10 pr-3 py-2 border-none rounded-lg bg-muted text-sm placeholder-muted-foreground focus:ring-2 focus:ring-ring focus:bg-card transition-all"
-            placeholder="Search library..."
+            placeholder="Search for a workout..."
           />
-        </div>
-
-        <div className="flex p-1 bg-muted rounded-lg">
-          <button
-            onClick={() => setSidebarTab("templates")}
-            className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${
-              sidebarTab === "templates"
-                ? "bg-card text-card-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Workouts
-          </button>
-          <button
-            onClick={() => setSidebarTab("exercises")}
-            className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${
-              sidebarTab === "exercises"
-                ? "bg-card text-card-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Exercises
-          </button>
         </div>
       </div>
 
-      {/* Draggable List */}
+      {/* Draggable workout list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {sidebarTab === "templates"
-          ? renderAsideTemplateList()
-          : renderAsideExerciseList()}
+        {renderAsideTemplateList()}
       </div>
 
       <div className="p-4 border-t border-border">
@@ -296,27 +265,26 @@ export default function ProgramBuilder({
     </aside>
   );
 
-  const renderTemplateRow = (template: WorkoutTemplate) => (
+  const renderWorkoutRow = (workout: WorkoutTemplate) => (
     <div
-      key={template.id}
-      className="group flex items-center gap-3 bg-card border border-border rounded-lg p-3 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
+      key={workout.id}
+      className="group flex items-center gap-3 bg-card border border-border rounded-lg p-2 hover:border-primary/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all"
       draggable
-      onDragStart={(e) => handleTemplateDragStart(e, template)}
-      onClick={() => openTemplateModal(template)}
+      onDragStart={(e) => handleTemplateDragStart(e, workout)}
+      onClick={() => openTemplateModal(workout)}
     >
-      <GripVertical className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-card-foreground truncate">
-          {template.name}
+          {workout.name}
         </p>
         <p className="text-xs text-muted-foreground truncate">
-          {template.exercises} Exercises • {template.duration} min
+          {workout.exercises} Exercises
         </p>
       </div>
       <button
         onClick={(e) => {
           e.stopPropagation();
-          openTemplateModal(template);
+          openTemplateModal(workout);
         }}
         className="text-muted-foreground hover:text-foreground"
       >
@@ -344,7 +312,7 @@ export default function ProgramBuilder({
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
             Saved Workouts
           </div>
-          {savedTemplateResults.map(renderTemplateRow)}
+          {savedTemplateResults.map(renderWorkoutRow)}
         </>
       )}
 
@@ -362,7 +330,7 @@ export default function ProgramBuilder({
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
             Recent
           </div>
-          {recentTemplates.map(renderTemplateRow)}
+          {recentTemplates.map(renderWorkoutRow)}
         </>
       )}
 
@@ -371,7 +339,7 @@ export default function ProgramBuilder({
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-4">
             Strength
           </div>
-          {strengthTemplates.map(renderTemplateRow)}
+          {strengthTemplates.map(renderWorkoutRow)}
         </>
       )}
 
@@ -384,74 +352,6 @@ export default function ProgramBuilder({
           </div>
         )}
     </>
-  );
-
-  const renderAsideExerciseList = () => (
-    <div className="space-y-1">
-      {loadingExercises ? (
-        <div className="text-center py-8 text-muted-foreground text-sm">
-          Loading exercises...
-        </div>
-      ) : (
-        muscleGroupOrder.map((group) => {
-          const groupExercises = groupedExercises[group];
-          if (groupExercises.length === 0) return null;
-          const expanded = expandedGroups.has(group);
-
-          return (
-            <div
-              key={group}
-              className="border border-border rounded-lg overflow-hidden bg-card"
-            >
-              <button
-                onClick={() => toggleGroup(group)}
-                className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors text-xs font-semibold text-card-foreground uppercase tracking-wider"
-              >
-                <div className="flex items-center gap-2">
-                  {expanded ? (
-                    <ChevronDown className="w-3 h-3" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3" />
-                  )}
-                  {group}
-                </div>
-                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                  {groupExercises.length}
-                </span>
-              </button>
-
-              {expanded && (
-                <div className="divide-y divide-border/50">
-                  {groupExercises.map((exercise) => (
-                    <div
-                      key={exercise.id}
-                      className="group flex items-center gap-2 px-3 py-2 hover:bg-muted/30"
-                    >
-                      <GripVertical className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-card-foreground truncate">
-                          {exercise.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          {exercise.equipment} • {exercise.difficulty}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })
-      )}
-
-      {!loadingExercises &&
-        Object.values(groupedExercises).every((g) => g.length === 0) && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            No exercises found
-          </div>
-        )}
-    </div>
   );
 
   // === Day card renderer ===
@@ -898,7 +798,7 @@ export default function ProgramBuilder({
                 void handleSave();
               }}
               disabled={saving}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-white bg-beshaped-dark-green hover:bg-beshaped-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? "Saving..." : submitLabel}
             </button>

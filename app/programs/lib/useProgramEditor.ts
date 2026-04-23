@@ -542,10 +542,6 @@ export function useProgramEditor({
 
   // Grouped exercises by muscle group
   const [searchQuery, setSearchQuery] = useState("");
-  const [sidebarTab, setSidebarTab] = useState<"templates" | "exercises">(
-    "templates"
-  );
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const groupedExercises = useMemo(() => {
     const groups: Record<string, EditExercise[]> = {};
@@ -553,16 +549,7 @@ export function useProgramEditor({
       groups[group] = [];
     });
 
-    const filtered =
-      sidebarTab === "exercises" && searchQuery.trim()
-        ? exercises.filter(
-            (ex) =>
-              ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              ex.muscleGroup.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        : exercises;
-
-    filtered.forEach((exercise) => {
+    exercises.forEach((exercise) => {
       const group = muscleGroupOrder.includes(exercise.muscleGroup)
         ? exercise.muscleGroup
         : "Other";
@@ -570,26 +557,7 @@ export function useProgramEditor({
     });
 
     return groups;
-  }, [exercises, searchQuery, sidebarTab]);
-
-  useEffect(() => {
-    if (searchQuery.trim() && sidebarTab === "exercises") {
-      const groupsWithMatches = new Set<string>();
-      Object.entries(groupedExercises).forEach(([group, exs]) => {
-        if (exs.length > 0) groupsWithMatches.add(group);
-      });
-      setExpandedGroups(groupsWithMatches);
-    }
-  }, [searchQuery, groupedExercises, sidebarTab]);
-
-  const toggleGroup = useCallback((group: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      return next;
-    });
-  }, []);
+  }, [exercises]);
 
   // Phase expansion (collapsed / expanded per phase)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
@@ -966,13 +934,9 @@ export function useProgramEditor({
     templateFetchError,
     fetchWorkoutTemplates,
 
-    // sidebar state
-    sidebarTab,
-    setSidebarTab,
+    // sidebar search (workout list)
     searchQuery,
     setSearchQuery,
-    expandedGroups,
-    toggleGroup,
 
     // phase expansion
     expandedPhases,
