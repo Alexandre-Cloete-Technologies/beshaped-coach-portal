@@ -324,6 +324,8 @@ export const normalizeInitialProgram = (
 export interface UseProgramEditorOptions {
   initialProgram?: Partial<ProgramFormData>;
   draftKey?: string;
+  /** When true, all phase cards start expanded (e.g. program detail). Default: only phase 1. */
+  defaultExpandAllPhases?: boolean;
 }
 
 export interface SelectedSlot {
@@ -336,6 +338,7 @@ export interface SelectedSlot {
 export function useProgramEditor({
   initialProgram,
   draftKey,
+  defaultExpandAllPhases = false,
 }: UseProgramEditorOptions) {
   // Program state
   const [program, setProgram] = useState<ProgramFormData>(() =>
@@ -588,14 +591,20 @@ export function useProgramEditor({
     });
   }, []);
 
-  // Phase expansion (for view-mode collapsing)
+  // Phase expansion (collapsed / expanded per phase)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
+  const phaseExpansionBootstrappedRef = useRef(false);
 
   useEffect(() => {
-    if (program.phases.length > 0 && expandedPhases.size === 0) {
-      setExpandedPhases(new Set([program.phases[0].phaseId]));
-    }
-  }, [program.phases, expandedPhases.size]);
+    if (program.phases.length === 0) return;
+    if (phaseExpansionBootstrappedRef.current) return;
+    phaseExpansionBootstrappedRef.current = true;
+    setExpandedPhases(
+      defaultExpandAllPhases
+        ? new Set(program.phases.map((p) => p.phaseId))
+        : new Set([program.phases[0].phaseId])
+    );
+  }, [program.phases, defaultExpandAllPhases]);
 
   const togglePhase = useCallback((phaseId: string) => {
     setExpandedPhases((prev) => {

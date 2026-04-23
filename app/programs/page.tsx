@@ -3,6 +3,7 @@
 import { Search, AlertTriangle, UserPlus } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import ProgramCard, { ProgramData } from "../components/ProgramCard";
+import ProgramsListSkeleton from "./components/ProgramsListSkeleton";
 import AssignProgramModal from "../components/AssignProgramModal";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
@@ -280,8 +281,9 @@ export default function ProgramsPage() {
 
           {/* Programs Grid */}
           {loading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Loading programs...
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Loading your programs…</p>
+              <ProgramsListSkeleton />
             </div>
           ) : filteredPrograms.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

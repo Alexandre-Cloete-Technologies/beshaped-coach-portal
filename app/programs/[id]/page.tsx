@@ -126,12 +126,24 @@ export default function ProgramDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen flex flex-col bg-background">
         <Navbar />
-        <main className="flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading program...</p>
+        <main
+          className="flex flex-1 flex-col items-center justify-center px-4 py-12"
+          aria-busy
+          aria-label="Loading program"
+        >
+          <div className="max-w-sm text-center">
+            <div
+              className="mx-auto mb-5 h-12 w-12 animate-spin rounded-full border-2 border-muted border-t-primary"
+              role="status"
+            />
+            <h2 className="text-lg font-semibold text-foreground">
+              Loading program
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Fetching your program from the library…
+            </p>
           </div>
         </main>
       </div>
@@ -140,16 +152,19 @@ export default function ProgramDetailPage() {
 
   if (error || !program) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen flex flex-col bg-background">
         <Navbar />
-        <main className="flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-red-500 mb-4">{error || "Program not found"}</p>
+        <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
+          <div className="max-w-md text-center">
+            <h2 className="text-lg font-semibold text-foreground">
+              Can&apos;t load program
+            </h2>
+            <p className="mt-2 text-sm text-destructive">{error || "Program not found"}</p>
             <Link
               href="/programs"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="mt-6 inline-block text-sm font-medium text-primary hover:underline"
             >
-              ← Back to Programs
+              ← Back to programs
             </Link>
           </div>
         </main>
@@ -166,6 +181,7 @@ export default function ProgramDetailPage() {
         submitLabel="Save Changes"
         backHref="/programs"
         onSave={handleSave}
+        defaultExpandAllPhases
       />
 
       {saveToast && (

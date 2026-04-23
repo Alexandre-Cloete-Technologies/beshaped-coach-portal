@@ -44,6 +44,8 @@ export interface ProgramBuilderProps {
   onClear?: () => void;
   onSave: (data: ProgramFormData) => void | Promise<void>;
   backHref?: string;
+  /** Open every phase card on first load (detail page). Builder keeps only phase 1 open by default. */
+  defaultExpandAllPhases?: boolean;
 }
 
 export default function ProgramBuilder({
@@ -55,8 +57,13 @@ export default function ProgramBuilder({
   onClear,
   onSave,
   backHref = "/programs",
+  defaultExpandAllPhases = false,
 }: ProgramBuilderProps) {
-  const editor = useProgramEditor({ initialProgram, draftKey });
+  const editor = useProgramEditor({
+    initialProgram,
+    draftKey,
+    defaultExpandAllPhases,
+  });
 
   const {
     program,
