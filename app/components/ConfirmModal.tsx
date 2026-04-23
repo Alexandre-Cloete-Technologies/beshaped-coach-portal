@@ -11,6 +11,8 @@ interface ConfirmModalProps {
   message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Shown on the confirm button while `onConfirm` is in flight */
+  confirmLoadingLabel?: string;
   variant?: "danger" | "warning";
 }
 
@@ -22,6 +24,7 @@ export default function ConfirmModal({
   message,
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
+  confirmLoadingLabel = "Deleting...",
   variant = "danger",
 }: ConfirmModalProps) {
   const [loading, setLoading] = useState(false);
@@ -71,7 +74,7 @@ export default function ConfirmModal({
             disabled={loading}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
           >
-            {loading ? "Deleting..." : confirmLabel}
+            {loading ? confirmLoadingLabel : confirmLabel}
           </button>
         </div>
       </div>

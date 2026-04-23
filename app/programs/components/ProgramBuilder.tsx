@@ -23,6 +23,7 @@ import WorkoutEditorModal, {
 } from "../../components/WorkoutEditorModal";
 import PhaseDescriptionModal from "../../components/PhaseDescriptionModal";
 import ConfirmModal from "../../components/ConfirmModal";
+import { ProgramBuilderFooterBar } from "./ProgramBuilderFooterBar";
 import {
   mockTemplates,
   muscleGroupOrder,
@@ -79,6 +80,7 @@ export default function ProgramBuilder({
     dropTemplateOnDay,
     applyWorkoutEdit,
     resetProgram,
+    resetToLastLoaded,
     loadingExercises,
     groupedExercises,
     savedTemplates,
@@ -109,6 +111,7 @@ export default function ProgramBuilder({
   const [savingTemplateName, setSavingTemplateName] = useState(false);
   const [showDeleteTemplateConfirm, setShowDeleteTemplateConfirm] =
     useState(false);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
   useEffect(() => {
     if (phaseMenuOpenId == null) return;
@@ -781,29 +784,43 @@ export default function ProgramBuilder({
         </main>
 
         {/* Footer action bar (z-40 so it sits above main scroll content; modals use z-50) */}
-        <div className="pointer-events-auto absolute bottom-0 right-0 left-0 z-40 bg-card/90 backdrop-blur-md border-t border-border px-8 py-4 md:left-[280px]">
-          <div className="mx-auto flex max-w-[1280px] items-center justify-end gap-3">
-            {showClearButton && (
-              <button
-                type="button"
-                onClick={handleClearClick}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
-              >
-                Clear
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                void handleSave();
-              }}
-              disabled={saving}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-white bg-beshaped-dark-green hover:bg-beshaped-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? "Saving..." : submitLabel}
-            </button>
-          </div>
-        </div>
+        <ProgramBuilderFooterBar
+          saving={saving}
+          submitLabel={submitLabel}
+          onSave={() => {
+            void handleSave();
+          }}
+          onRevertToLastLoaded={
+            initialProgram != null ? resetToLastLoaded : undefined
+          }
+          onClearAll={
+            initialProgram != null || showClearButton
+              ? () => setShowClearAllConfirm(true)
+              : undefined
+          }
+        />
+
+        <ConfirmModal
+          isOpen={showClearAllConfirm}
+          onClose={() => setShowClearAllConfirm(false)}
+          onConfirm={async () => {
+            handleClearClick();
+          }}
+          title="Clear all"
+          message={
+            <>
+              <p className="mb-1">
+                This will remove the entire program from the editor and start
+                from a blank template. Unsaved changes will be lost.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Are you sure you want to continue?
+              </p>
+            </>
+          }
+          confirmLabel="Clear all"
+          confirmLoadingLabel="Clearing..."
+        />
 
         {/* Workout Editor Modal — for day workouts */}
         {selectedSlot && (

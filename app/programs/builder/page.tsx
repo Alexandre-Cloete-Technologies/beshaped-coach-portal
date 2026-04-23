@@ -30,7 +30,7 @@ export default function ProgramBuilderPage() {
         assignedTo: [],
       });
       if (typeof window !== "undefined") {
-        localStorage.removeItem(PROGRAM_BUILDER_DRAFT_KEY);
+      localStorage.removeItem(PROGRAM_BUILDER_DRAFT_KEY);
       }
       router.push("/programs");
     } catch (error) {

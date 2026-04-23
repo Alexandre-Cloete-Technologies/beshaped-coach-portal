@@ -860,10 +860,27 @@ export function useProgramEditor({
   const resetProgram = useCallback(() => {
     setProgram(createDefaultProgram());
     setExpandedPhases(new Set());
+    setSelectedSlot(null);
+    setSelectedTemplate(null);
+    setPhaseDescriptionModalIdx(null);
+    setPhaseDescriptionDraft("");
+    setPhaseMenuOpenId(null);
+    setPhasePendingDeleteIdx(null);
     if (draftKey && typeof window !== "undefined") {
       localStorage.removeItem(draftKey);
     }
   }, [draftKey]);
+
+  const resetToLastLoaded = useCallback(() => {
+    if (initialProgram == null) return;
+    setProgram(normalizeInitialProgram(initialProgram));
+    setSelectedSlot(null);
+    setSelectedTemplate(null);
+    setPhaseDescriptionModalIdx(null);
+    setPhaseDescriptionDraft("");
+    setPhaseMenuOpenId(null);
+    setPhasePendingDeleteIdx(null);
+  }, [initialProgram]);
 
   // localStorage draft hydration (only when draftKey provided)
   const draftHydratedRef = useRef(false);
@@ -922,6 +939,7 @@ export function useProgramEditor({
 
     // reset
     resetProgram,
+    resetToLastLoaded,
 
     // exercise library
     exercises,
