@@ -2,7 +2,7 @@
 
 import { ArrowRight, Award, Plus, X } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { collection, query, where, getDocs, orderBy, limit, doc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface ProgressProps {

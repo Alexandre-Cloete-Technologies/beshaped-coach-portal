@@ -5,7 +5,6 @@ import {
   getDownloadURL,
   deleteObject,
   listAll,
-  UploadResult,
   UploadTask,
   StorageReference,
 } from 'firebase/storage';

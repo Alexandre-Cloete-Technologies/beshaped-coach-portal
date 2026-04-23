@@ -10,8 +10,6 @@ import {
   ChevronDown,
   ChevronRight,
   Edit,
-  Copy,
-  Trash2,
   Play,
   Plus,
   Search,

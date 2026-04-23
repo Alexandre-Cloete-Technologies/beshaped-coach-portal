@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Layers, Edit, Copy, Trash2 } from "lucide-react";
+import { Calendar, Layers, Edit, Trash2 } from "lucide-react";
 
 export interface ProgramData {
   id: string;
@@ -31,7 +31,6 @@ export default function ProgramCard({
   program, 
   onView, 
   onEdit, 
-  onDuplicate, 
   onDelete 
 }: ProgramCardProps) {
   return (

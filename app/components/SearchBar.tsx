@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 
 interface SearchBarProps {
   value: string;

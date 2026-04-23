@@ -223,19 +223,6 @@ export default function ExerciseDetailPage() {
     }
   };
 
-  const getDifficultyBadge = (difficulty: string) => {
-    switch (difficulty) {
-      case "beginner":
-        return "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300";
-      case "intermediate":
-        return "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
-      case "advanced":
-        return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background">

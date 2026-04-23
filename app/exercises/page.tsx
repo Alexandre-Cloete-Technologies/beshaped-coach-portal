@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Dumbbell, ChevronsUpDown, X } from "lucide-react";
+import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, Dumbbell, ChevronsUpDown, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
@@ -71,9 +71,6 @@ const equipmentOptions = [
   "Kettlebell", "Resistance Bands", "Medicine Ball", "Pull-up Bar", "Bench", "Other"
 ];
 
-const categoryOptions = [
-  "Strength", "Hypertrophy", "Power", "Endurance", "Flexibility", "Cardio", "Rehabilitation"
-];
 
 const muscleCategoryDetails: Array<{ category: string; muscles: string[] }> = [
   { category: "Chest", muscles: ["Upper chest", "Chest"] },
@@ -420,23 +417,6 @@ export default function ExercisesPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleInstructionChange = (field: keyof ExerciseFormData["instructions"], value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      instructions: { ...prev.instructions, [field]: value }
-    }));
-  };
-
-  const addTip = () => {
-    if (newTip.trim()) {
-      setFormData(prev => ({ ...prev, tips: [...prev.tips, newTip.trim()] }));
-      setNewTip("");
-    }
-  };
-
-  const removeTip = (index: number) => {
-    setFormData(prev => ({ ...prev, tips: prev.tips.filter((_, i) => i !== index) }));
-  };
 
   const toggleMuscle = (muscle: string, isPrimary: boolean) => {
     const field = isPrimary ? "musclesInvolved" : "secondaryMuscles";

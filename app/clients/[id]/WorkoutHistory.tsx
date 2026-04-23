@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Search, Filter, Download, List, LayoutGrid } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";

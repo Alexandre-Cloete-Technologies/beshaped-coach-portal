@@ -1,8 +1,7 @@
 "use client";
 
-import { Plus, UserPlus } from "lucide-react";
+import {  UserPlus } from "lucide-react";
 import Sidebar from "./components/Sidebar";
-import StatsCard from "./components/StatsCard";
 import SearchBar from "./components/SearchBar";
 import ClientCard, { ClientData } from "./components/ClientCard";
 import Pagination from "./components/Pagination";
@@ -25,7 +24,7 @@ export default function Home() {
         setLoading(true);
         const usersCollection = collection(db, "users");
         const usersSnapshot = await getDocs(usersCollection);
-        const { query, where, orderBy, limit } = await import("firebase/firestore");
+        const { query, where } = await import("firebase/firestore");
         
         // Fetch all userPrograms
         const userProgramsCollection = collection(db, "userPrograms");

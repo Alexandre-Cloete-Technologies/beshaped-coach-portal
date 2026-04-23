@@ -6,8 +6,6 @@ import {
   Users, 
   Calendar, 
   Library, 
-  CreditCard, 
-  Settings,
   Dumbbell,
   ClipboardList
 } from "lucide-react";
