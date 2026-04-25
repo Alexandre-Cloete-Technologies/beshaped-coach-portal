@@ -225,7 +225,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="text-lg font-semibold text-card-foreground">Add New Client</h2>
+            <h2 className="text-lg font-semibold text-card-foreground">Add a New Client</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Create a new client profile</p>
           </div>
           <button
@@ -416,7 +416,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           <button
             onClick={handleSubmit}
             disabled={loading || !formData.username || !formData.email || !formData.password || formData.password.length < 6}
-            className="h-10 px-5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-5 rounded-lg bg-beshaped-dark-green text-white text-xs font-medium hover:bg-beshaped-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Adding..." : "Add Client"}
           </button>

@@ -184,7 +184,7 @@ export default function ClientDetailPage() {
       <Sidebar />
 
       <main className="ml-[220px] min-h-screen">
-        <div className="p-8">
+        <div className="p-4">
           {/* Back Button */}
           <Link 
             href="/clients"

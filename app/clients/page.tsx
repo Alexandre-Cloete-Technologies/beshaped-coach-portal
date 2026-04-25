@@ -191,9 +191,8 @@ export default function ClientsPage() {
               {/* Add New Client Button */}
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="h-10 px-4 rounded-lg bg-blue-600 text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm"
+                className="h-10 px-4 rounded-lg bg-beshaped-dark-green text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-beshaped-green transition-colors shadow-sm"
               >
-                <Plus className="w-4 h-4" />
                 Add New Client
               </button>
             </div>

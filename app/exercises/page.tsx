@@ -624,9 +624,8 @@ export default function ExercisesPage() {
               {/* Add Button */}
               <button 
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+                className="flex items-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
               >
-                <Plus className="w-5 h-5" />
                 Add Exercise
               </button>
             </div>

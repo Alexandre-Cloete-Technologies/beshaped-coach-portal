@@ -914,8 +914,8 @@ export default function WorkoutHistory() {
                 className="group bg-card rounded-xl border border-border overflow-hidden opacity-90 hover:opacity-100 transition-opacity"
                 open={index === expandedWorkout}
               >
-                <summary className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-5 cursor-pointer hover:bg-accent/50 transition-colors select-none relative list-none">
-                  <div className="flex items-center gap-4 min-w-[120px]">
+                <summary className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-2 cursor-pointer hover:bg-accent/50 transition-colors select-none relative list-none">
+                  <div className="flex items-center gap-4 min-w-[120px]  ">
                     <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-muted text-muted-foreground border border-border">
                       <span className="text-xs font-bold uppercase tracking-wide">{workout.date.split(" ")[0]}</span>
                       <span className="text-xl font-bold leading-none">{workout.date.split(" ")[1]}</span>
@@ -930,11 +930,9 @@ export default function WorkoutHistory() {
                     <div className="flex flex-col gap-1">
                       <h3 className="text-card-foreground font-bold text-lg">{workout.name}</h3>
                       {workout.phase && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                            {workout.phase}
-                          </span>
-                        </div>
+                        <p className="text-xs font-bold text-foreground mt-1">
+                          {workout.phase}
+                        </p>
                       )}
                       {index === 0 && workout.duration && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -964,7 +962,7 @@ export default function WorkoutHistory() {
 
                 {/* Display exercises from workoutLogs (primary) */}
                 {workout.workoutLogExercises && workout.workoutLogExercises.length > 0 ? (
-                  <div className="border-t border-border bg-muted/30 p-5">
+                  <div className="border-t border-border bg-muted/30 p-2">
                     {/* Phase Info Header */}
                     {workout.phase && (
                       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
