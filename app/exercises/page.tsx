@@ -2,6 +2,7 @@
 
 import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, Dumbbell, ChevronsUpDown, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
+import Breadcrumbs from "../components/Breadcrumbs";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
@@ -96,6 +97,10 @@ const muscleGroupOrder = [
   "Neck",
   "Other"
 ];
+
+function getDisplayGroup(ex: Exercise): string {
+  return muscleGroupOrder.includes(ex.muscleGroup) ? ex.muscleGroup : "Other";
+}
 
 // Map specific muscles to broader categories
 const muscleToCategory: Record<string, string> = {
@@ -281,6 +286,7 @@ export default function ExercisesPage() {
   const [exercises, setExercises] = useState<Exercise[]>(mockExercises);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Add exercise modal state
@@ -348,38 +354,60 @@ export default function ExercisesPage() {
     fetchExercises();
   }, []);
 
-  // Group exercises by muscle group
+  const exerciseCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const ex of exercises) {
+      const g = getDisplayGroup(ex);
+      counts[g] = (counts[g] ?? 0) + 1;
+    }
+    return counts;
+  }, [exercises]);
+
+  // Group exercises by muscle group (search + category filter match workout editor)
   const groupedExercises = useMemo(() => {
     const groups: Record<string, Exercise[]> = {};
-    
-    // Initialize all groups
-    muscleGroupOrder.forEach(group => {
+    muscleGroupOrder.forEach((group) => {
       groups[group] = [];
     });
-    
-    // Filter by search and group
-    const filtered = searchQuery.trim() 
-      ? exercises.filter(ex => 
-          ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          ex.muscleGroup.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          ex.equipment.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+
+    const hasCategoryFilter = selectedCategories.size > 0;
+    let working = hasCategoryFilter
+      ? exercises.filter((ex) => selectedCategories.has(getDisplayGroup(ex)))
       : exercises;
-    
-    filtered.forEach(exercise => {
-      const group = muscleGroupOrder.includes(exercise.muscleGroup) 
-        ? exercise.muscleGroup 
-        : "Other";
+
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      working = working.filter(
+        (ex) =>
+          ex.name.toLowerCase().includes(q) ||
+          ex.muscleGroup.toLowerCase().includes(q) ||
+          ex.equipment.toLowerCase().includes(q)
+      );
+    }
+
+    working.forEach((exercise) => {
+      const group = getDisplayGroup(exercise);
       groups[group].push(exercise);
     });
-    
-    return groups;
-  }, [exercises, searchQuery]);
 
-  // Auto-expand groups when searching
+    return groups;
+  }, [exercises, searchQuery, selectedCategories]);
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) {
+        next.delete(cat);
+      } else {
+        next.add(cat);
+      }
+      return next;
+    });
+  };
+
+  // Auto-expand groups when search or category filter is active
   useEffect(() => {
-    if (searchQuery.trim()) {
-      // Expand all groups that have matching exercises
+    if (searchQuery.trim() || selectedCategories.size > 0) {
       const groupsWithMatches = new Set<string>();
       Object.entries(groupedExercises).forEach(([group, exs]) => {
         if (exs.length > 0) {
@@ -388,7 +416,7 @@ export default function ExercisesPage() {
       });
       setExpandedGroups(groupsWithMatches);
     }
-  }, [searchQuery, groupedExercises]);
+  }, [searchQuery, selectedCategories, groupedExercises]);
 
   const toggleGroup = (group: string) => {
     setExpandedGroups(prev => {
@@ -580,6 +608,7 @@ export default function ExercisesPage() {
 
   const totalExercises = exercises.length;
   const filteredTotal = Object.values(groupedExercises).reduce((sum, exs) => sum + exs.length, 0);
+  const hasActiveFilters = Boolean(searchQuery.trim() || selectedCategories.size > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -590,6 +619,7 @@ export default function ExercisesPage() {
           {/* Header Section */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
             <div>
+              <Breadcrumbs items={[{ label: "Exercises" }]} />
               <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">Exercise Library</h1>
               <p className="text-muted-foreground">
                 {totalExercises} exercises organized by muscle group
@@ -598,48 +628,107 @@ export default function ExercisesPage() {
           </div>
 
           {/* Toolbar */}
-          <div className="bg-card p-4 rounded-xl shadow-sm border border-border mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-            {/* Search */}
-            <div className="relative flex-1 w-full md:max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <input 
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-muted border-none rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none"
-                placeholder="Search exercises by name, muscle, or equipment..."
-              />
+          <div className="bg-card p-4 rounded-xl shadow-sm border border-border mb-6 flex flex-col gap-0">
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              {/* Search */}
+              <div className="relative flex-1 w-full md:max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-muted border-none rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                  placeholder="Search exercises by name, muscle, or equipment..."
+                />
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0 w-full md:w-auto justify-end">
+                {/* Expand/Collapse All */}
+                <button
+                  type="button"
+                  onClick={allExpanded ? collapseAll : expandAll}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronsUpDown className="w-4 h-4" />
+                  {allExpanded ? "Collapse All" : "Expand All"}
+                </button>
+
+                {/* Add Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+                >
+                  Add Exercise
+                </button>
+              </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              {/* Expand/Collapse All */}
-              <button 
-                onClick={allExpanded ? collapseAll : expandAll}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ChevronsUpDown className="w-4 h-4" />
-                {allExpanded ? "Collapse All" : "Expand All"}
-              </button>
-              
-              {/* Add Button */}
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
-              >
-                Add Exercise
-              </button>
+            <div
+              className="mt-3 flex flex-wrap gap-1"
+              role="group"
+              aria-label="Filter by muscle group"
+            >
+              {(() => {
+                const allActive = selectedCategories.size === 0;
+                return (
+                  <button
+                    key="all"
+                    type="button"
+                    onClick={() => setSelectedCategories(new Set())}
+                    aria-pressed={allActive}
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      allActive
+                        ? "border-primary bg-beshaped-green text-primary-foreground"
+                        : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                    }`}
+                  >
+                    All
+                    <span className="ml-1 tabular-nums opacity-70">({exercises.length})</span>
+                  </button>
+                );
+              })()}
+              {muscleGroupOrder.map((cat) => {
+                const isActive = selectedCategories.has(cat);
+                const count = exerciseCategoryCounts[cat] ?? 0;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggleCategory(cat)}
+                    aria-pressed={isActive}
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      isActive
+                        ? "border-primary bg-beshaped-green text-primary-foreground"
+                        : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                    }`}
+                  >
+                    {cat}
+                    <span className="ml-1 tabular-nums opacity-70">({count})</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Search Results Info */}
-          {searchQuery && (
-            <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Found {filteredTotal} exercise{filteredTotal !== 1 ? "s" : ""} matching "{searchQuery}"</span>
-              <button 
-                onClick={() => setSearchQuery("")}
+          {/* Filter / search results info */}
+          {hasActiveFilters && (
+            <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>
+                Found {filteredTotal} exercise{filteredTotal !== 1 ? "s" : ""}
+                {searchQuery.trim() ? ` matching "${searchQuery}"` : ""}
+                {selectedCategories.size > 0
+                  ? `${searchQuery.trim() ? " · " : ""}in ${Array.from(selectedCategories).join(", ")}`
+                  : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedCategories(new Set());
+                }}
                 className="text-primary hover:underline"
               >
-                Clear
+                Clear filters
               </button>
             </div>
           )}
@@ -656,8 +745,8 @@ export default function ExercisesPage() {
                 const isExpanded = expandedGroups.has(group);
                 const hasExercises = groupExercises.length > 0;
                 
-                // Hide empty groups when searching
-                if (searchQuery && !hasExercises) return null;
+                // Hide empty groups when a filter is active
+                if (hasActiveFilters && !hasExercises) return null;
                 
                 return (
                   <div 
@@ -667,7 +756,7 @@ export default function ExercisesPage() {
                     {/* Group Header */}
                     <button
                       onClick={() => toggleGroup(group)}
-                      className={`w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors ${
+                      className={`w-full flex items-center justify-between px-5 py-2 hover:bg-muted/50 transition-colors ${
                         !hasExercises ? "opacity-50 cursor-not-allowed" : ""
                       }`}
                       disabled={!hasExercises}
@@ -698,7 +787,7 @@ export default function ExercisesPage() {
                         {groupExercises.map((exercise, idx) => (
                           <div 
                             key={exercise.id}
-                            className={`flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors group ${
+                            className={`flex items-center justify-between px-5 py-1.5 hover:bg-gray-200 dark:hover:bg-gray-800/50 transition-colors group ${
                               idx !== groupExercises.length - 1 ? "border-b border-border/50" : ""
                             }`}
                           >
@@ -710,7 +799,7 @@ export default function ExercisesPage() {
                                 {idx + 1}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="font-medium text-card-foreground truncate">{exercise.name}</p>
+                                <p className="text-sm font-medium text-card-foreground truncate ">{exercise.name}</p>
                                 {/* For not the description is hidden */}
 {/*                                 {exercise.description && (
                                   <p className="text-xs text-muted-foreground truncate">{exercise.description}</p>
@@ -759,14 +848,26 @@ export default function ExercisesPage() {
           )}
 
           {/* Empty State */}
-          {!loading && filteredTotal === 0 && searchQuery && (
+          {!loading && filteredTotal === 0 && hasActiveFilters && (
             <div className="text-center py-12">
-              <p className="text-muted-foreground mb-2">No exercises found matching "{searchQuery}"</p>
+              <p className="text-muted-foreground mb-2">
+                {searchQuery.trim() && selectedCategories.size > 0
+                  ? `No exercises match your search and selected muscle groups.`
+                  : searchQuery.trim()
+                    ? `No exercises found matching "${searchQuery}".`
+                    : selectedCategories.size > 0
+                      ? `No exercises in ${Array.from(selectedCategories).join(", ")}.`
+                      : "No exercises match the current filters."}
+              </p>
               <button
-                onClick={() => setSearchQuery("")}
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedCategories(new Set());
+                }}
                 className="text-primary hover:underline text-sm"
               >
-                Clear search
+                Clear filters
               </button>
             </div>
           )}
@@ -1081,7 +1182,7 @@ export default function ExercisesPage() {
               <button
                 onClick={handleSaveExercise}
                 disabled={saving || !formData.name.trim()}
-                className="h-10 px-5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-5 rounded-lg bg-beshaped-dark-green text-white text-xs font-medium hover:bg-beshaped-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Saving..." : "Save Exercise"}
               </button>

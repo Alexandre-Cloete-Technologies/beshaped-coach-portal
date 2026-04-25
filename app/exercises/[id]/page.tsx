@@ -6,6 +6,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
+import Breadcrumbs from "../../components/Breadcrumbs";
 import AnatomyGifPicker from "../../components/AnatomyGifPicker";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -227,8 +228,16 @@ export default function ExerciseDetailPage() {
     return (
       <div className="min-h-screen bg-background">
         <Sidebar />
-        <main className="ml-[220px] min-h-screen flex items-center justify-center">
-          <p className="text-muted-foreground">Loading exercise...</p>
+        <main className="ml-[220px] min-h-screen">
+          <div className="p-8 w-full">
+            <Breadcrumbs
+              items={[
+                { label: "Exercises", href: "/exercises" },
+                { label: "Loading…" },
+              ]}
+            />
+            <p className="text-muted-foreground text-sm py-8">Loading exercise…</p>
+          </div>
         </main>
       </div>
     );
@@ -238,15 +247,25 @@ export default function ExerciseDetailPage() {
     return (
       <div className="min-h-screen bg-background">
         <Sidebar />
-        <main className="ml-[220px] min-h-screen flex flex-col items-center justify-center gap-4">
-          <p className="text-muted-foreground">{error || "Exercise not found"}</p>
-          <Link
-            href="/exercises"
-            className="flex items-center gap-2 text-primary hover:underline"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Exercise Library
-          </Link>
+        <main className="ml-[220px] min-h-screen">
+          <div className="p-8 w-full">
+            <Breadcrumbs
+              items={[
+                { label: "Exercises", href: "/exercises" },
+                { label: "Not found" },
+              ]}
+            />
+            <div className="flex flex-col items-center justify-center gap-4 py-8">
+              <p className="text-muted-foreground">{error || "Exercise not found"}</p>
+              <Link
+                href="/exercises"
+                className="flex items-center gap-2 text-primary hover:underline"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Exercise Library
+              </Link>
+            </div>
+          </div>
         </main>
       </div>
     );
@@ -258,6 +277,12 @@ export default function ExerciseDetailPage() {
 
       <main className="ml-[220px] min-h-screen">
         <div className="p-8 w-full">
+          <Breadcrumbs
+            items={[
+              { label: "Exercises", href: "/exercises" },
+              { label: exercise.name },
+            ]}
+          />
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
@@ -292,9 +317,8 @@ export default function ExerciseDetailPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save className="w-4 h-4" />
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
