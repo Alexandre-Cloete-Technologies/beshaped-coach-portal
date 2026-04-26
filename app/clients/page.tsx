@@ -6,9 +6,12 @@ import Pagination from "../components/Pagination";
 import AddClientModal from "../components/AddClientModal";
 import AssignProgramModal from "../components/AssignProgramModal";
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { collection, getDocs, getDoc, doc, deleteDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { profilePhotoUrl } from "@/lib/profilePhoto";
+import { setClientProfilePhotoUrl } from "@/lib/clientProfilePhotoCache";
 
 
 
@@ -28,6 +31,8 @@ type ClientListItem = {
   id: string;
   name: string;
   email: string;
+  /** Firestore `profilePhoto` URL or `""` for generated avatar */
+  photo: string;
   avatarGradient: string;
   status: keyof typeof statusColors;
   currentProgram: string;
@@ -36,6 +41,58 @@ type ClientListItem = {
   engagement: string;
   avatarInitials?: string;
 };
+
+const TABLE_AVATAR_PX = 36;
+
+function ClientsTableRowAvatar({
+  name,
+  photo,
+  avatarGradient,
+  avatarInitials,
+}: {
+  name: string;
+  photo: string;
+  avatarGradient: string;
+  avatarInitials?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const url = photo?.trim() ?? "";
+  const show = url.length > 0 && !imageFailed;
+  const initials =
+    avatarInitials ||
+    name
+      .split(" ")
+      .map((n) => n[0])
+      .join("");
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [name, photo]);
+
+  return (
+    <div
+      className={`w-9 h-9 rounded-full flex-shrink-0 overflow-hidden ${
+        show
+          ? "bg-muted"
+          : `${avatarGradient} flex items-center justify-center`
+      }`}
+    >
+      {show ? (
+        <Image
+          src={url}
+          alt={`${name} profile photo`}
+          width={TABLE_AVATAR_PX}
+          height={TABLE_AVATAR_PX}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+          unoptimized
+        />
+      ) : (
+        <span className="text-white text-xs font-semibold">{initials}</span>
+      )}
+    </div>
+  );
+}
 
 // const engagementConfig = {
 //   "Very High": { dots: 3, color: "bg-emerald-500" },
@@ -97,6 +154,7 @@ export default function ClientsPage() {
           id: doc.id,
           name: data.displayName || data.username || "Unknown User",
           email: data.email || "No email",
+          photo: profilePhotoUrl(data.profilePhoto),
           avatarGradient: gradients[gradientIndex],
           status: "Active" as const, // Default for now
           currentProgram: programName,
@@ -106,6 +164,9 @@ export default function ClientsPage() {
         } satisfies ClientListItem;
       }));
 
+      for (const c of fetchedUsers) {
+        if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
+      }
       setClients(fetchedUsers);
       setError(null);
     } catch (err) {
@@ -258,8 +319,6 @@ export default function ClientsPage() {
                   </tr>
                 ) : (
                   filteredClients.map((client, index) => {
-                  const initials = client.avatarInitials || client.name.split(' ').map((n: string) => n[0]).join('');
-                  
                   return (
                     <tr
                       key={client.id}
@@ -270,13 +329,12 @@ export default function ClientsPage() {
                       {/* Client Name */}
                       <td className="py-3 px-4">
                         <Link href={`/clients/${client.id}`} className="flex items-center gap-2.5">
-                          <div
-                            className={`w-9 h-9 rounded-full ${client.avatarGradient} flex items-center justify-center flex-shrink-0`}
-                          >
-                            <span className="text-white text-xs font-semibold">
-                              {initials}
-                            </span>
-                          </div>
+                          <ClientsTableRowAvatar
+                            name={client.name}
+                            photo={client.photo}
+                            avatarGradient={client.avatarGradient}
+                            avatarInitials={client.avatarInitials}
+                          />
                           <div>
                             <p className="text-sm font-semibold text-card-foreground">
                               {client.name}

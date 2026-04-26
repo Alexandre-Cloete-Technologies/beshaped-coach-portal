@@ -174,10 +174,7 @@ export default function Progress({ clientId }: ProgressProps) {
   
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Main Content */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
-
+      <div className="w-full min-w-0 flex flex-col gap-6">
                   {/* Progress Photos */}
           <div className="bg-card rounded-xl p-6 border border-border">
             <div className="flex items-center justify-between mb-6">
@@ -573,79 +570,6 @@ export default function Progress({ clientId }: ProgressProps) {
               </div>
             </div>
           </div>
-        </div>
-  
-        {/* Right Column - Sidebar (same as overview) */}
-        <div className="flex flex-col gap-6">
-          {/* Quick Actions */}
-          {/* <div className="bg-card rounded-xl p-5 border border-border sticky top-24">
-            <h3 className="text-card-foreground text-lg font-bold mb-4">Quick Actions</h3>
-            <div className="flex flex-col gap-3">
-              <button className="flex items-center justify-center gap-2 w-full h-11 bg-primary hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">
-                💬 Send Message
-              </button>
-              <button className="flex items-center justify-center gap-2 w-full h-11 bg-card border border-border font-semibold rounded-lg hover:bg-accent transition-colors">
-                📝 Log Note
-              </button>
-              <button className="flex items-center justify-center gap-2 w-full h-11 bg-card border border-border font-semibold rounded-lg hover:bg-accent transition-colors">
-                ✅ Assign Workout
-              </button>
-            </div>
-          </div> */}
-  
-          {/* Upcoming */}
-          {/* <div className="bg-card rounded-xl p-5 border border-border">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-card-foreground text-lg font-bold">Upcoming</h3>
-              <a className="text-xs font-semibold text-primary hover:underline" href="#">
-                See All
-              </a>
-            </div>
-            <div className="flex flex-col gap-4">
-              <div className="flex gap-3 items-start">
-                <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg p-2 flex flex-col items-center min-w-[50px]">
-                  <span className="text-xs font-bold uppercase">Mon</span>
-                  <span className="text-lg font-bold leading-none">14</span>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-card-foreground">Lower Body Power</p>
-                  <p className="text-xs text-muted-foreground">09:00 AM - 10:30 AM</p>
-                </div>
-              </div>
-              <div className="flex gap-3 items-start">
-                <div className="bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg p-2 flex flex-col items-center min-w-[50px]">
-                  <span className="text-xs font-bold uppercase">Wed</span>
-                  <span className="text-lg font-bold leading-none">15</span>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-card-foreground">Active Recovery</p>
-                  <p className="text-xs text-muted-foreground">Any time</p>
-                </div>
-              </div>
-              <div className="flex gap-3 items-start">
-                <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-lg p-2 flex flex-col items-center min-w-[50px]">
-                  <span className="text-xs font-bold uppercase">Thu</span>
-                  <span className="text-lg font-bold leading-none">16</span>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-card-foreground">Check-in Call</p>
-                  <p className="text-xs text-muted-foreground">04:00 PM (Zoom)</p>
-                </div>
-              </div>
-            </div>
-          </div> */}
-  
-          {/* Coach Note */}
-          {/* <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-5 border border-yellow-100 dark:border-yellow-900/30">
-            <div className="flex items-center gap-2 mb-2 text-yellow-800 dark:text-yellow-500">
-              <span className="text-xl">📋</span>
-              <h3 className="text-sm font-bold uppercase tracking-wide">Coach Note</h3>
-            </div>
-            <p className="text-sm text-card-foreground italic">
-              "Client is experiencing mild knee pain. Monitor squat depth in next session."
-            </p>
-          </div> */}
-        </div>
       </div>
   
       {selectedImage && (

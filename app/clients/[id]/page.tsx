@@ -14,10 +14,16 @@ import {
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { profilePhotoUrl } from "@/lib/profilePhoto";
+import {
+  getClientProfilePhotoUrl,
+  setClientProfilePhotoUrl,
+} from "@/lib/clientProfilePhotoCache";
 import WorkoutHistory from "./WorkoutHistory";
 import Progress from "./Progress";
 import ClientPrograms from "./ClientPrograms";
@@ -29,7 +35,10 @@ const tabs = [
   { id: "programs", label: "Programs", icon: BookOpen },
   { id: "nutrition", label: "Nutrition", icon: Apple },
   { id: "settings", label: "Settings", icon: Settings },
-];
+] as const;
+
+const TAB_IDS = new Set<string>(tabs.map((t) => t.id));
+type TabId = (typeof tabs)[number]["id"];
 
 /** Fields read from a `programs` document when resolving `currentProgram` */
 type ProgramDoc = {
@@ -42,6 +51,8 @@ interface ClientView {
   name: string;
   email: string;
   phone: string;
+  /** Firestore `profilePhoto` download URL, or `""` for initials. */
+  profilePhoto: string;
   avatarGradient: string;
   isOnline: boolean;
   memberSince: string;
@@ -58,8 +69,65 @@ interface ClientView {
   currentPhase: number;
 }
 
+const DETAIL_AVATAR_PX = 96;
+
+function ClientDetailHeaderAvatar({
+  name,
+  photoUrl,
+  avatarGradient,
+  isOnline,
+}: {
+  name: string;
+  photoUrl: string;
+  avatarGradient: string;
+  isOnline: boolean;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const trimmed = photoUrl?.trim() ?? "";
+  const show = trimmed.length > 0 && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [name, photoUrl]);
+
+  return (
+    <div className="relative">
+      <div
+        className={`w-24 h-24 rounded-2xl flex-shrink-0 overflow-hidden ${
+          show
+            ? "bg-muted"
+            : `${avatarGradient} flex items-center justify-center`
+        }`}
+      >
+        {show ? (
+          <Image
+            src={trimmed}
+            alt={`${name} profile photo`}
+            width={DETAIL_AVATAR_PX}
+            height={DETAIL_AVATAR_PX}
+            className="h-full w-full object-cover"
+            onError={() => setImageFailed(true)}
+            unoptimized
+          />
+        ) : (
+          <span className="text-white text-2xl font-semibold">
+            {name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")}
+          </span>
+        )}
+      </div>
+      {isOnline && (
+        <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-4 border-card rounded-full" />
+      )}
+    </div>
+  );
+}
+
 export default function ClientDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const clientId = params?.id as string;
   const [activeTab, setActiveTab] = useState("overview");
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["overview"]));
@@ -72,6 +140,15 @@ export default function ClientDetailPage() {
   };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const cachedHeaderPhoto = clientId ? getClientProfilePhotoUrl(clientId) : null;
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (!tab || !TAB_IDS.has(tab)) return;
+    setActiveTab(tab as TabId);
+    setVisitedTabs((prev) => new Set(prev).add(tab));
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchClient = async () => {
@@ -147,11 +224,15 @@ export default function ClientDetailPage() {
           const goals: string | null =
             g == null || g === "" ? null : typeof g === "string" ? g : String(g);
 
+          const p = profilePhotoUrl(data.profilePhoto);
+          if (p) setClientProfilePhotoUrl(clientDoc.id, p);
+
           setClient({
             id: clientDoc.id,
             name: serializedData.displayName || serializedData.username || "Unknown User",
             email: serializedData.email || "No email",
             phone: serializedData.phoneNumber || "No Phone Number Stored",
+            profilePhoto: p,
             avatarGradient: `bg-gradient-to-br from-${['rose', 'purple', 'emerald', 'amber', 'blue'][clientId.charCodeAt(0) % 5]}-400 to-${['pink', 'purple', 'teal', 'orange', 'indigo'][clientId.charCodeAt(0) % 5]}-600`,
             isOnline: false,
             memberSince: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Unknown",
@@ -177,6 +258,44 @@ export default function ClientDetailPage() {
   }, [clientId]);
 
   if (loading) {
+    if (cachedHeaderPhoto) {
+      return (
+        <div className="min-h-screen bg-background">
+          <Sidebar />
+          <main className="ml-[220px] min-h-screen">
+            <div className="p-4">
+              <Link
+                href="/clients"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Clients
+              </Link>
+              <div className="bg-card rounded-xl border border-border shadow-sm p-6 mb-6">
+                <div className="flex items-start gap-4">
+                  <ClientDetailHeaderAvatar
+                    name="User"
+                    photoUrl={cachedHeaderPhoto}
+                    avatarGradient="bg-gradient-to-br from-slate-400 to-slate-600"
+                    isOnline={false}
+                  />
+                  <div>
+                    <h1 className="text-2xl font-bold text-foreground mb-1">
+                      Loading client…
+                    </h1>
+                    <p className="text-sm text-muted-foreground">Fetching info…</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mb-3" />
+                <p className="text-muted-foreground text-sm">Loading client…</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-background">
         <Sidebar />
@@ -229,16 +348,12 @@ export default function ClientDetailPage() {
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-start gap-4">
                 {/* Avatar */}
-                <div className="relative">
-                  <div className={`w-24 h-24 rounded-2xl ${client.avatarGradient} flex items-center justify-center`}>
-                    <span className="text-white text-2xl font-semibold">
-                      {client.name.split(' ').map((n: string) => n[0]).join('')}
-                    </span>
-                  </div>
-                  {client.isOnline && (
-                    <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-4 border-card rounded-full" />
-                  )}
-                </div>
+                <ClientDetailHeaderAvatar
+                  name={client.name}
+                  photoUrl={client.profilePhoto}
+                  avatarGradient={client.avatarGradient}
+                  isOnline={client.isOnline}
+                />
 
                 {/* Client Info */}
                 <div>

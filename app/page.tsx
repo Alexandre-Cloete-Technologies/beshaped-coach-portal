@@ -8,8 +8,84 @@ import Pagination from "./components/Pagination";
 import AddClientModal from "./components/AddClientModal";
 import AssignProgramModal from "./components/AssignProgramModal";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, getDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  Timestamp,
+  type DocumentData,
+  type DocumentReference,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { profilePhotoUrl } from "@/lib/profilePhoto";
+import {
+  getClientProfilePhotoUrl,
+  setClientProfilePhotoUrl,
+} from "@/lib/clientProfilePhotoCache";
+
+function toDateValue(value: unknown): Date {
+  if (value == null) return new Date(0);
+  if (value instanceof Date) return value;
+  if (value instanceof Timestamp) return value.toDate();
+  if (typeof value === "string" || typeof value === "number") {
+    return new Date(value);
+  }
+  if (
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof (value as { toDate: () => Date }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  return new Date(0);
+}
+
+function parseLogWeight(d: DocumentData): number | null {
+  const w = d.weight;
+  if (w === undefined || w === null) return null;
+  return typeof w === "number" ? w : Number(w) || null;
+}
+
+/** Latest body weight from `bodyWeightLogs` (by `photoTakenDate`), with change vs previous log. */
+async function fetchLatestBodyweight(userRef: DocumentReference) {
+  const bodyWeightLogsRef = collection(db, "bodyWeightLogs");
+  const userIdStr = userRef.id;
+  let snapshot = await getDocs(
+    query(bodyWeightLogsRef, where("userId", "==", userRef))
+  );
+  if (snapshot.empty) {
+    snapshot = await getDocs(
+      query(bodyWeightLogsRef, where("userId", "==", userIdStr))
+    );
+  }
+  if (snapshot.empty) {
+    return { weight: null as number | null, weightUnit: "kg", weightChange: null as number | null };
+  }
+
+  const logs = snapshot.docs.map((d) => d.data());
+  logs.sort((a, b) => toDateValue(b.photoTakenDate).getTime() - toDateValue(a.photoTakenDate).getTime());
+
+  const latestLog = logs[0];
+  const weight = parseLogWeight(latestLog);
+  const weightUnit =
+    typeof latestLog.weightUnit === "string" ? latestLog.weightUnit : "kg";
+
+  if (logs.length < 2) {
+    return { weight, weightUnit, weightChange: null as number | null };
+  }
+  const previousLog = logs[1];
+  const previousWeight = parseLogWeight(previousLog);
+  if (weight === null || previousWeight === null) {
+    return { weight, weightUnit, weightChange: null as number | null };
+  }
+  return {
+    weight,
+    weightUnit,
+    weightChange: Number((weight - previousWeight).toFixed(1)) as number,
+  };
+}
 
 /** Fields read from `programs` docs when resolving a `currentProgram` reference */
 type ProgramDoc = {
@@ -29,7 +105,6 @@ export default function Home() {
         setLoading(true);
         const usersCollection = collection(db, "users");
         const usersSnapshot = await getDocs(usersCollection);
-        const { query, where } = await import("firebase/firestore");
         
         // Fetch all userPrograms
         const userProgramsCollection = collection(db, "userPrograms");
@@ -62,42 +137,14 @@ export default function Home() {
           usersSnapshot.docs.map(async (doc) => {
             const data = doc.data();
             
-            // Fetch latest body weight log
             let weight: number | null = null;
-            let weightChange: number = 0;
+            let weightChange: number | null = null;
             let weightUnit = "kg";
             try {
-              const bodyWeightLogsRef = collection(db, "bodyWeightLogs");
-              const weightQuery = query(
-                bodyWeightLogsRef,
-                where("userId", "==", doc.ref)
-              );
-              const weightSnapshot = await getDocs(weightQuery);
-              
-              if (!weightSnapshot.empty) {
-                // Client-side sort
-                const logs = weightSnapshot.docs.map(d => d.data());
-                logs.sort((a, b) => {
-                  const dateA = a.photoTakenDate?.toDate ? a.photoTakenDate.toDate() : new Date(a.photoTakenDate || 0);
-                  const dateB = b.photoTakenDate?.toDate ? b.photoTakenDate.toDate() : new Date(b.photoTakenDate || 0);
-                  return dateB.getTime() - dateA.getTime();
-                });
-                
-                const latestLog = logs[0];
-                weight = latestLog.weight !== undefined ? latestLog.weight : null;
-                weightUnit = latestLog.weightUnit || "kg";
-
-                if (logs.length > 1) {
-                  const previousLog = logs[1];
-                  const previousWeight = previousLog.weight !== undefined ? previousLog.weight : null;
-                  if (weight !== null && previousWeight !== null) {
-                     // Calculate change: current - previous
-                     // If user lost weight: 80 - 82 = -2
-                     // If user gained weight: 82 - 80 = +2
-                     weightChange = Number((weight - previousWeight).toFixed(1));
-                  }
-                }
-              }
+              const bw = await fetchLatestBodyweight(doc.ref);
+              weight = bw.weight;
+              weightUnit = bw.weightUnit;
+              weightChange = bw.weightChange;
             } catch (err) {
               console.error("Error fetching weight logs for user", doc.id, err);
             }
@@ -137,12 +184,16 @@ export default function Home() {
             
             // Get userProgram data for this user
             const userProgramData = userProgramsMap.get(doc.id);
+
+            const firestorePhoto = profilePhotoUrl(data.profilePhoto);
+            const cachedPhoto = getClientProfilePhotoUrl(doc.id) ?? "";
+            const photo = firestorePhoto || cachedPhoto;
             
             // Transform Firebase user to ClientData format
             return {
               id: doc.id,
               name: data.displayName || data.username || "Unknown User",
-              photo: data.profilePhoto || "", // Use profilePhoto from Firebase or empty string
+              photo,
               avatarGradient: gradients[gradientIndex],
               currentProgram: programName,
               week: userProgramData?.currentWeek || 0,
@@ -164,6 +215,9 @@ export default function Home() {
           })
         );
 
+        for (const c of fetchedUsers) {
+          if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
+        }
         setClients(fetchedUsers);
       } catch (err) {
         console.error("Error fetching users:", err);
@@ -176,6 +230,9 @@ export default function Home() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  /** Only the first load shows a full grid skeleton; refetches keep existing cards (and browser-cached avatars) visible. */
+  const showInitialLoadPlaceholder = loading && clients.length === 0;
 
   // Filter clients based on search query
   const filteredClients = useMemo(() => {
@@ -232,7 +289,7 @@ export default function Home() {
 
           {/* Client Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-            {loading ? (
+            {showInitialLoadPlaceholder ? (
               <div className="col-span-full text-center py-12 text-muted-foreground">
                 Loading clients...
               </div>

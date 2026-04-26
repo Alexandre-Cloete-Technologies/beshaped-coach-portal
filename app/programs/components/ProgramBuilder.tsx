@@ -846,10 +846,6 @@ export default function ProgramBuilder({
                   )}
                   <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{selectedTemplate.exercises} exercises</span>
-                    <span>•</span>
-                    <span>{selectedTemplate.duration} min</span>
-                    <span>•</span>
-                    <span className="capitalize">{selectedTemplate.category}</span>
                   </div>
                 </div>
                 <button
@@ -967,7 +963,7 @@ export default function ProgramBuilder({
                     setSelectedTemplate(null);
                     setShowDeleteTemplateConfirm(false);
                   }}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                  className="rounded-lg px-4 py-2 text-sm font-semibold hover:bg-beshaped-dark-green hover:text-white transition-colors"
                 >
                   Close
                 </button>

@@ -1,6 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 
 export interface ClientData {
   id: string;
@@ -18,7 +22,8 @@ export interface ClientData {
   totalWorkoutsInProgram?: number;
   weight: number | null;
   weightUnit?: string;
-  weightChange: number;
+  /** `null` if fewer than two weigh-ins (no previous entry to compare). */
+  weightChange: number | null;
   lastWorkout: string;
   status: "high" | "medium" | "low" | "critical" | "perfect";
   todayWorkout?: {
@@ -104,8 +109,18 @@ function ProgressBar({ current, total }: ProgressBarProps) {
   );
 }
 
+const AVATAR_PX = 44;
+
 export default function ClientCard({ client }: { client: ClientData }) {
   const router = useRouter();
+  const [imageFailed, setImageFailed] = useState(false);
+  const photoUrl = client.photo?.trim() ?? "";
+  const showProfileImage = photoUrl.length > 0 && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [client.id, client.photo]);
+
   // const colors = statusColors[client.status];
   const isAlert = client.status === "low" || client.status === "critical";
   // const programProgress = Math.round((client.week / client.totalWeeks) * 100);
@@ -133,10 +148,31 @@ export default function ClientCard({ client }: { client: ClientData }) {
       {/* Header: Photo, Name, Status */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className={`w-11 h-11 rounded-full ${client.avatarGradient || 'bg-gradient-to-br from-blue-400 to-blue-600'} overflow-hidden flex-shrink-0 flex items-center justify-center`}>
-            <span className="text-white text-sm font-semibold">
-              {client.name.split(' ').map(n => n[0]).join('')}
-            </span>
+          <div
+            className={`relative w-11 h-11 rounded-full flex-shrink-0 overflow-hidden ${
+              showProfileImage
+                ? "bg-muted"
+                : `${client.avatarGradient || "bg-gradient-to-br from-blue-400 to-blue-600"} flex items-center justify-center`
+            }`}
+          >
+            {showProfileImage ? (
+              <Image
+                src={photoUrl}
+                alt={`${client.name} profile photo`}
+                width={AVATAR_PX}
+                height={AVATAR_PX}
+                className="h-full w-full object-cover"
+                onError={() => setImageFailed(true)}
+                unoptimized
+              />
+            ) : (
+              <span className="text-white text-sm font-semibold">
+                {client.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
+              </span>
+            )}
           </div>
           <div>
             <h3 className="font-semibold text-card-foreground">{client.name}</h3>
@@ -166,10 +202,45 @@ export default function ClientCard({ client }: { client: ClientData }) {
 
           {/* Stats */}
           <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Current Bodyweight</span>
-              <span className="font-medium text-card-foreground">
-                {client.weight !== null ? `${client.weight} ${client.weightUnit || "kg"}` : "N/A"}
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-muted-foreground">Current body weight</span>
+              <span className="font-medium text-card-foreground tabular-nums">
+                {client.weight !== null
+                  ? `${client.weight} ${client.weightUnit || "kg"}`
+                  : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-muted-foreground">Since last log</span>
+              <span
+                className={`font-medium tabular-nums inline-flex items-center gap-0.5 ${
+                  client.weightChange === null
+                    ? "text-muted-foreground"
+                    : client.weightChange < 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : client.weightChange > 0
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-card-foreground"
+                }`}
+              >
+                {client.weight === null || client.weightChange === null ? (
+                  "—"
+                ) : client.weightChange === 0 ? (
+                  <>
+                    <Minus className="w-3 h-3 opacity-70" />
+                    0 {client.weightUnit || "kg"}
+                  </>
+                ) : client.weightChange < 0 ? (
+                  <>
+                    <TrendingDown className="w-3 h-3" />
+                    {client.weightChange} {client.weightUnit || "kg"}
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="w-3 h-3" />
+                    +{client.weightChange} {client.weightUnit || "kg"}
+                  </>
+                )}
               </span>
             </div>
             {/* <div className="flex justify-between">
@@ -217,6 +288,30 @@ export default function ClientCard({ client }: { client: ClientData }) {
           </div>
         </div>
       )}
+
+      <div
+        className="flex flex-wrap gap-2 border-t border-border pt-3 -mx-5 -mb-5 px-5 pb-5 mt-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Link
+          href={`/clients/${client.id}?tab=workout-history`}
+          className="rounded-none border border-border bg-card px-3 py-2 text-xs font-medium text-card-foreground transition-colors hover:border-beshaped-dark-green hover:bg-beshaped-dark-green hover:text-white"
+        >
+          Workout History
+        </Link>
+        <Link
+          href={`/clients/${client.id}?tab=progress`}
+          className="rounded-none border border-border bg-card px-3 py-2 text-xs font-medium text-card-foreground transition-colors hover:border-beshaped-dark-green hover:bg-beshaped-dark-green hover:text-white"
+        >
+          Progress
+        </Link>
+        <Link
+          href={`/clients/${client.id}?tab=programs`}
+          className="rounded-none border border-border bg-card px-3 py-2 text-xs font-medium text-card-foreground transition-colors hover:border-beshaped-dark-green hover:bg-beshaped-dark-green hover:text-white"
+        >
+          Programs
+        </Link>
+      </div>
 
       {/* Footer: Next Workout or Alert */}
       {/* <div className="flex items-center justify-between pt-1 border-t border-border">
