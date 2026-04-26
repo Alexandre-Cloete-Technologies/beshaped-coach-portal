@@ -57,7 +57,7 @@ export default function WorkoutsPage() {
   const [loadingExercises, setLoadingExercises] = useState(true);
 
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editorName, setEditorName] = useState("New workout");
+  const [editorName, setEditorName] = useState("");
   const [editorExercises, setEditorExercises] = useState<ModalExercise[]>([]);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
 

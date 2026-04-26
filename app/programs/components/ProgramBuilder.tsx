@@ -829,7 +829,7 @@ export default function ProgramBuilder({
             workoutName={
               program.phases[selectedSlot.phaseIdx]?.workouts[
                 selectedSlot.dayIdx
-              ]?.workoutName || "New Workout"
+              ]?.workoutName ?? ""
             }
             exercises={
               (program.phases[selectedSlot.phaseIdx]?.workouts[

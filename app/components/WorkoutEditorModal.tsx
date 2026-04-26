@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, doc, Timestamp, updateDoc } from "firebase/firestore";
 import {
   Search,
-  ChevronDown,
-  ChevronRight,
   X,
   Plus,
   Dumbbell,
-  GripVertical,
   Trash2,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -53,15 +50,18 @@ export default function WorkoutEditorModal({
   onDelete,
 }: WorkoutEditorModalProps) {
   const [localWorkoutName, setLocalWorkoutName] = useState(
-    workoutName || "New Workout"
+    workoutName || ""
   );
   const [localExercises, setLocalExercises] = useState<ModalExercise[]>(
     exercises || []
   );
-  const [modalExpandedGroups, setModalExpandedGroups] = useState<Set<string>>(
+  const [modalSearchQuery, setModalSearchQuery] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
     new Set()
   );
-  const [modalSearchQuery, setModalSearchQuery] = useState("");
+  const [inputFocusRowIndex, setInputFocusRowIndex] = useState<number | null>(
+    null
+  );
   const [draggedExerciseIndex, setDraggedExerciseIndex] =
     useState<number | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -69,26 +69,63 @@ export default function WorkoutEditorModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setLocalWorkoutName(workoutName || "New Workout");
+    setLocalWorkoutName(workoutName || "");
     setLocalExercises(exercises || []);
-    setModalExpandedGroups(new Set());
     setModalSearchQuery("");
+    setSelectedCategories(new Set());
+    setInputFocusRowIndex(null);
     setDraggedExerciseIndex(null);
   }, [isOpen, workoutName, exercises]);
 
-  useEffect(() => {
-    if (!modalSearchQuery.trim()) return;
-    const groupsWithMatches = new Set<string>();
-    Object.entries(groupedExercises).forEach(([group, exs]) => {
-      const hasMatch = exs.some(
-        (ex) =>
-          ex.name.toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
-          ex.equipment.toLowerCase().includes(modalSearchQuery.toLowerCase())
-      );
-      if (hasMatch) groupsWithMatches.add(group);
+  const filteredLibrary = useMemo(() => {
+    const q = modalSearchQuery.trim().toLowerCase();
+    const groups =
+      selectedCategories.size === 0
+        ? muscleGroupOrder
+        : muscleGroupOrder.filter((g) => selectedCategories.has(g));
+    const out: ModalExercise[] = [];
+    for (const group of groups) {
+      let exs = groupedExercises[group] || [];
+      if (q) {
+        exs = exs.filter(
+          (ex) =>
+            ex.name.toLowerCase().includes(q) ||
+            ex.muscleGroup.toLowerCase().includes(q) ||
+            ex.equipment.toLowerCase().includes(q)
+        );
+      }
+      out.push(...exs);
+    }
+    return out;
+  }, [
+    groupedExercises,
+    muscleGroupOrder,
+    modalSearchQuery,
+    selectedCategories,
+  ]);
+
+  const totalLibraryCount = useMemo(
+    () =>
+      Object.values(groupedExercises).reduce((sum, arr) => sum + arr.length, 0),
+    [groupedExercises]
+  );
+
+  const libraryCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of muscleGroupOrder) {
+      counts[g] = groupedExercises[g]?.length ?? 0;
+    }
+    return counts;
+  }, [groupedExercises, muscleGroupOrder]);
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
     });
-    setModalExpandedGroups(groupsWithMatches);
-  }, [modalSearchQuery, groupedExercises]);
+  };
 
   if (!isOpen) return null;
 
@@ -148,6 +185,19 @@ export default function WorkoutEditorModal({
       const exercise: ModalExercise = JSON.parse(exerciseData);
       addExerciseToWorkout(exercise);
     }
+  };
+
+  const onExerciseInputsBlur = (rowIndex: number) => {
+    queueMicrotask(() => {
+      const el = document.activeElement;
+      if (
+        el instanceof HTMLInputElement &&
+        el.dataset.inputsRow === String(rowIndex)
+      ) {
+        return;
+      }
+      setInputFocusRowIndex((prev) => (prev === rowIndex ? null : prev));
+    });
   };
 
   const handleDone = () => {
@@ -224,41 +274,201 @@ export default function WorkoutEditorModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-xl shadow-2xl border border-border w-full max-w-6xl max-h-[85vh] flex flex-col overflow-hidden">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
-          <div className="flex-1 mr-4">
+      <div className="bg-card rounded-xl shadow-2xl border border-border w-[90vw] max-w-[90vw] h-[90vh] max-h-[90vh] min-h-0 flex flex-col overflow-hidden">
+        {/* Modal Header — neutral, matches inner section strips */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/40">
+          <div className="flex-1 mr-4 min-w-0">
             <input
               type="text"
               value={localWorkoutName}
               onChange={(e) => setLocalWorkoutName(e.target.value)}
-              className="w-full bg-transparent border-none text-xl font-bold text-white placeholder-blue-200 focus:ring-0 px-0 leading-tight focus:outline-none"
-              placeholder="Enter workout name"
+              className="w-full bg-transparent border-none text-xl font-bold text-card-foreground placeholder:text-muted-foreground px-0 py-0.5 leading-tight rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted/40"
+              placeholder="New Workout"
             />
-            <p className="text-sm text-blue-100">
-              {localExercises.length} exercises
+            <p className="text-sm text-muted-foreground mt-1">
+              {localExercises.length} exercise{localExercises.length === 1 ? "" : "s"}
             </p>
           </div>
           <button
+            type="button"
             onClick={handleDone}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Body - Two Columns */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left: Current Workout Exercises */}
-          <div className="w-1/2 border-r border-border flex flex-col">
-            <div className="px-4 py-3 bg-muted/30 border-b border-border">
-              <h3 className="text-sm font-semibold text-card-foreground">
-                Workout Exercises
-              </h3>
-              <p className="text-xs text-muted-foreground">Drag to reorder</p>
+        {/* Modal Body - Two Columns (match /workouts create page layout) */}
+        <div className="flex flex-1 min-h-0 gap-4 md:gap-6 overflow-hidden px-4 pb-2">
+          {/* Left: exercise library */}
+          <section className="flex min-w-0 flex-[2] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex flex-col gap-0.5 px-4 py-3 border-b border-border bg-muted/40">
+              <h2 className="text-sm font-semibold leading-tight text-card-foreground">
+                Exercise library
+              </h2>
+              <p className="text-xs leading-tight text-muted-foreground">
+                All exercises — search and add to your workout.
+              </p>
+            </div>
+            <div className="p-3 border-b border-border">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={modalSearchQuery}
+                  onChange={(e) => setModalSearchQuery(e.target.value)}
+                  placeholder="Search exercises…"
+                  className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+                />
+              </div>
+              <div
+                className="mt-3 flex flex-wrap gap-1"
+                role="group"
+                aria-label="Filter by muscle group"
+              >
+                {(() => {
+                  const allActive = selectedCategories.size === 0;
+                  return (
+                    <button
+                      key="all"
+                      type="button"
+                      onClick={() => setSelectedCategories(new Set())}
+                      aria-pressed={allActive}
+                      className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                        allActive
+                          ? "border-primary bg-beshaped-green text-primary-foreground"
+                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                      }`}
+                    >
+                      All
+                      <span className="ml-1 tabular-nums opacity-70">
+                        ({totalLibraryCount})
+                      </span>
+                    </button>
+                  );
+                })()}
+                {muscleGroupOrder.map((cat) => {
+                  const isActive = selectedCategories.has(cat);
+                  const count = libraryCategoryCounts[cat] ?? 0;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => toggleCategory(cat)}
+                      aria-pressed={isActive}
+                      className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                        isActive
+                          ? "border-primary bg-beshaped-green text-primary-foreground"
+                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                      }`}
+                    >
+                      {cat}
+                      <span className="ml-1 tabular-nums opacity-70">
+                        ({count})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto">
+              {loadingExercises ? (
+                <p className="p-6 text-sm text-muted-foreground">Loading exercises…</p>
+              ) : filteredLibrary.length === 0 && totalLibraryCount > 0 ? (
+                <p className="p-6 text-sm text-muted-foreground text-center">
+                  {selectedCategories.size > 0
+                    ? `No exercises match ${Array.from(selectedCategories).join(
+                        ", "
+                      )}.`
+                    : "No exercises match your search."}
+                </p>
+              ) : filteredLibrary.length === 0 ? (
+                <p className="p-6 text-sm text-muted-foreground text-center">
+                  No exercises in the library yet.
+                </p>
+              ) : (
+                <table className="w-full min-w-[520px] table-fixed border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30 text-left">
+                      <th
+                        scope="col"
+                        className="w-[10%] px-2 py-2 text-center text-sm font-semibold text-muted-foreground"
+                      >
+                        #
+                      </th>
+                      <th className="px-3 py-2 font-semibold text-muted-foreground w-[32%]">
+                        Exercise
+                      </th>
+                      <th className="px-3 py-2 font-semibold text-muted-foreground w-[20%]">
+                        Muscle
+                      </th>
+                      <th className="px-3 py-2 font-semibold text-muted-foreground w-[26%]">
+                        Equipment
+                      </th>
+                      <th className="px-3 py-2 font-semibold text-muted-foreground w-[12%] text-right">
+                        Add
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLibrary.map((ex, rowIndex) => (
+                      <tr
+                        key={ex.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(
+                            "exercise",
+                            JSON.stringify(ex)
+                          );
+                          e.dataTransfer.effectAllowed = "copy";
+                        }}
+                        className="border-b border-border last:border-b-0 hover:bg-muted/30"
+                      >
+                        <td className="px-2 py-2 align-middle text-center text-sm text-muted-foreground tabular-nums">
+                          {rowIndex + 1}
+                        </td>
+                        <td className="px-3 py-2 align-middle font-medium text-card-foreground truncate">
+                          {ex.name}
+                        </td>
+                        <td className="px-3 py-2 align-middle text-muted-foreground truncate">
+                          {ex.muscleGroup}
+                        </td>
+                        <td className="px-3 py-2 align-middle text-muted-foreground truncate">
+                          {ex.equipment}
+                        </td>
+                        <td className="px-3 py-2 align-middle text-right">
+                          <button
+                            type="button"
+                            onClick={() => addExerciseToWorkout(ex)}
+                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-primary/10 px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+
+          {/* Right: your workout */}
+          <section className="flex min-w-0 flex-[3] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex flex-col gap-0.5 px-4 py-3 border-b border-border bg-muted/40">
+              <h2 className="text-sm font-semibold leading-tight text-card-foreground">
+                Your workout
+              </h2>
+              <p className="text-xs leading-tight text-muted-foreground">
+                {localExercises.length} exercise
+                {localExercises.length === 1 ? "" : "s"} — drag to reorder, or
+                add from the library table.
+              </p>
             </div>
             <div
-              className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 min-h-[280px]"
+              className="flex-1 min-h-0 overflow-y-auto"
               onDragOver={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.add("bg-primary/5");
@@ -269,244 +479,172 @@ export default function WorkoutEditorModal({
               onDrop={handleDropOnWorkoutList}
             >
               {localExercises.length === 0 ? (
-                <div className="flex flex-col items-center justify-center min-h-[200px] text-muted-foreground py-12 border-2 border-dashed border-border rounded-lg">
+                <div className="flex flex-col items-center justify-center min-h-[220px] text-muted-foreground py-8 border-2 border-dashed border-border rounded-lg">
                   <Dumbbell className="w-12 h-12 mb-3 opacity-30" />
                   <p className="text-sm font-medium">No exercises yet</p>
-                  <p className="text-xs">
-                    Drag exercises here or use + button →
+                  <p className="text-xs text-center px-4">
+                    Use <strong>Add</strong> in the table on the left, or drag a
+                    row here.
                   </p>
                 </div>
               ) : (
-                <>
-                {localExercises.map((exercise, index) => (
+                localExercises.map((exercise, index) => (
                   <div
                     key={`${exercise.id}-${index}`}
-                    draggable
+                    draggable={inputFocusRowIndex !== index}
                     onDragStart={() => handleModalExerciseDragStart(index)}
                     onDragOver={(e) => handleModalExerciseDragOver(e, index)}
                     onDragEnd={handleModalExerciseDragEnd}
-                    className={`group rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                    className={`border bg-card px-3 py-3 transition-all ${
+                      inputFocusRowIndex === index
+                        ? "cursor-default"
+                        : "cursor-grab active:cursor-grabbing"
+                    } ${
                       draggedExerciseIndex === index
-                        ? "border-primary bg-primary/10 shadow-lg scale-[1.02]"
-                        : "border-border bg-card hover:border-primary/50 hover:shadow-md"
+                        ? "border-primary bg-primary/10 shadow-md"
+                        : "border-border hover:border-primary/40"
                     }`}
                   >
-                    {/* Exercise Header Row */}
-                    <div className="flex items-center gap-3 p-3">
-                      <div className="flex items-center justify-center w-6 h-6 rounded bg-muted text-xs font-bold text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-xs font-bold text-muted-foreground">
                         {index + 1}
-                      </div>
-                      <GripVertical className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-card-foreground truncate">
-                          {exercise.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {exercise.muscleGroup} • {exercise.equipment}
-                        </p>
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                          <p className="min-w-0 flex-1 text-sm font-medium text-card-foreground truncate">
+                            {exercise.name}
+                          </p>
+                          <span className="min-w-0 max-w-[min(11rem,36vw)] shrink truncate text-xs text-muted-foreground">
+                            {exercise.muscleGroup} · {exercise.equipment}
+                          </span>
+                          <div className="flex shrink-0 items-center">
+                            {[2, 3, 4, 5].map((num) => {
+                              const isActive = (exercise.sets ?? 3) === num;
+                              return (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateExerciseInWorkout(index, "sets", num);
+                                  }}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  className={` border px-2 py-1 text-xs font-medium transition-colors ${
+                                    isActive
+                                      ? "border-primary bg-beshaped-green text-primary-foreground"
+                                      : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                  }`}
+                                >
+                                  {num}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="ml-3 flex shrink-0 items-center gap-2 sm:ml-4">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground whitespace-nowrap">
+                              Sets
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                data-inputs-row={index}
+                                value={
+                                  exercise.sets !== undefined
+                                    ? String(exercise.sets)
+                                    : ""
+                                }
+                                onChange={(e) => {
+                                  const v = e.target.value.trim();
+                                  if (v === "") {
+                                    updateExerciseInWorkout(
+                                      index,
+                                      "sets",
+                                      3
+                                    );
+                                    return;
+                                  }
+                                  const n = parseInt(v, 10);
+                                  if (Number.isFinite(n)) {
+                                    updateExerciseInWorkout(
+                                      index,
+                                      "sets",
+                                      Math.max(1, n)
+                                    );
+                                  }
+                                }}
+                                onFocus={() => setInputFocusRowIndex(index)}
+                                onBlur={() => onExerciseInputsBlur(index)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="ml-1 box-border h-8 w-12 rounded border border-black px-1.5 text-center text-sm tabular-nums leading-8 text-foreground dark:border-neutral-300"
+                              />
+                            </label>
+                            <div className="ml-8 flex shrink-0 items-center">
+                              {["5", "8-10", "8-12", "15-20"].map(
+                                (repShortcut) => {
+                                  const repsStr = (exercise.repsRange ?? "")
+                                    .trim();
+                                  const isActive = repsStr === repShortcut;
+                                  return (
+                                    <button
+                                      key={repShortcut}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateExerciseInWorkout(
+                                          index,
+                                          "repsRange",
+                                          repShortcut
+                                        );
+                                      }}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      className={` border px-2 py-1 text-xs font-medium transition-colors ${
+                                        isActive
+                                          ? "border-primary bg-beshaped-green text-primary-foreground"
+                                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                      }`}
+                                    >
+                                      {repShortcut}
+                                    </button>
+                                  );
+                                }
+                              )}
+                            </div>
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground whitespace-nowrap">
+                              Reps
+                              <input
+                                type="text"
+                                data-inputs-row={index}
+                                value={exercise.repsRange ?? ""}
+                                onChange={(e) =>
+                                  updateExerciseInWorkout(
+                                    index,
+                                    "repsRange",
+                                    e.target.value
+                                  )
+                                }
+                                onFocus={() => setInputFocusRowIndex(index)}
+                                onBlur={() => onExerciseInputsBlur(index)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="ml-1 box-border h-8 w-[4.5rem] rounded border border-black px-1.5 text-center text-sm leading-8 text-foreground dark:border-neutral-300"
+                              />
+                            </label>
+                          </div>
+                        </div>
                       </div>
                       <button
+                        type="button"
                         onClick={() => removeExerciseFromWorkout(index)}
-                        className="opacity-0 group-hover:opacity-100 p-2.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-muted-foreground hover:text-red-500 transition-all min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        className="shrink-0 p-2 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                        aria-label="Remove exercise"
                       >
-                        <X className="w-5 h-5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    {/* Sets & Reps Row */}
-                    <div className="flex flex-col gap-2 px-3 pb-3 pt-0">
-                      <div className="flex items-center gap-1.5 flex-nowrap">
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-12 shrink-0">Sets:</span>
-                        {[2, 3, 4, 5].map((num) => (
-                          <button
-                            key={num}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateExerciseInWorkout(index, "sets", num);
-                            }}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
-                              (exercise.sets || 3) === num
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-muted/50 border-border hover:bg-muted hover:border-primary/50 text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {num}
-                          </button>
-                        ))}
-                        <input
-                          type="number"
-                          min={1}
-                          max={20}
-                          value={exercise.sets || 3}
-                          onChange={(e) =>
-                            updateExerciseInWorkout(
-                              index,
-                              "sets",
-                              parseInt(e.target.value) || 1
-                            )
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-16 px-2 py-1.5 text-center text-sm font-bold border-2 border-primary/40 rounded-md bg-primary/10 text-card-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                        />
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-nowrap">
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-12 shrink-0">Reps:</span>
-                        {["5", "8-12", "15-20", "8-12/15-20", "8-10"].map((reps) => (
-                          <button
-                            key={reps}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateExerciseInWorkout(index, "repsRange", reps);
-                            }}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
-                              (exercise.repsRange || "8-12") === reps
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-muted/50 border-border hover:bg-muted hover:border-primary/50 text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {reps}
-                          </button>
-                        ))}
-                        <input
-                          type="text"
-                          value={exercise.repsRange ?? ""}
-                          onChange={(e) =>
-                            updateExerciseInWorkout(
-                              index,
-                              "repsRange",
-                              e.target.value
-                            )
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="8-12"
-                          className="w-24 px-2 py-1.5 text-center text-sm font-bold border-2 border-primary/40 rounded-md bg-primary/10 text-card-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                        />
-                      </div>
-                    </div>
                   </div>
-                ))}
-                <div className="min-h-[120px] flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg text-muted-foreground">
-                  <Plus className="w-8 h-8 mb-2 opacity-40" />
-                  <p className="text-xs font-medium">Drop exercises here</p>
-                </div>
-                </>
+                ))
               )}
             </div>
-          </div>
-
-          {/* Right: Exercise Library */}
-          <div className="w-1/2 flex flex-col bg-muted/20">
-            <div className="px-4 py-3 bg-muted/30 border-b border-border space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-card-foreground">
-                  Exercise Library
-                </h3>
-                <span className="text-xs text-muted-foreground">Drag or +</span>
-              </div>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                value={modalSearchQuery}
-                onChange={(e) => setModalSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-sm border border-border rounded-lg bg-card placeholder-muted-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                placeholder="Search exercises..."
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            {loadingExercises ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Loading exercises...
-              </div>
-            ) : (
-              muscleGroupOrder.map((group) => {
-                let groupExercises = groupedExercises[group] || [];
-                if (modalSearchQuery.trim()) {
-                  groupExercises = groupExercises.filter(
-                    (ex) =>
-                      ex.name
-                        .toLowerCase()
-                        .includes(modalSearchQuery.toLowerCase()) ||
-                      ex.equipment
-                        .toLowerCase()
-                        .includes(modalSearchQuery.toLowerCase())
-                  );
-                }
-                if (groupExercises.length === 0) return null;
-
-                const isExpanded = modalExpandedGroups.has(group);
-
-                return (
-                  <div
-                    key={group}
-                    className="border border-border rounded-lg overflow-hidden bg-card"
-                  >
-                    <button
-                      onClick={() => {
-                        setModalExpandedGroups((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(group)) next.delete(group);
-                          else next.add(group);
-                          return next;
-                        });
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors text-xs font-semibold text-card-foreground uppercase tracking-wider"
-                    >
-                      <div className="flex items-center gap-2">
-                        {isExpanded ? (
-                          <ChevronDown className="w-3 h-3" />
-                        ) : (
-                          <ChevronRight className="w-3 h-3" />
-                        )}
-                        {group}
-                      </div>
-                      <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                        {groupExercises.length}
-                      </span>
-                    </button>
-
-                    {isExpanded && (
-                      <div className="divide-y divide-border/50">
-                        {groupExercises.map((exercise) => (
-                          <div
-                            key={exercise.id}
-                            className="group flex items-center gap-2 px-3 py-2 hover:bg-muted/30 cursor-grab active:cursor-grabbing"
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData(
-                                "exercise",
-                                JSON.stringify(exercise)
-                              );
-                            }}
-                          >
-                            <GripVertical className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-card-foreground truncate">
-                                {exercise.name}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground truncate">
-                                {exercise.equipment} • {exercise.difficulty}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => addExerciseToWorkout(exercise)}
-                              className="px-5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors min-w-[56px] flex items-center justify-center"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+          </section>
         </div>
-      </div>
 
       {/* Modal Footer */}
       <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
@@ -529,17 +667,18 @@ export default function WorkoutEditorModal({
           <button
             onClick={handleSaveAsTemplate}
             disabled={savingTemplate}
-            className="px-4 py-2 border border-border bg-card text-card-foreground rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className=" px-4 py-2 border border-border bg-card text-card-foreground rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {savingTemplate ? "Saving..." : "Save as Template"}
           </button>
           <button
             onClick={handleDone}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            className="px-6 py-2 bg-beshaped-dark-green text-white rounded-lg font-semibold hover:bg-beshaped-green transition-colors"
           >
             Done
           </button>
         </div>
+      </div>
       </div>
 
       <ConfirmModal
@@ -552,7 +691,11 @@ export default function WorkoutEditorModal({
         message={
           <>
             <p className="mb-1">
-              Are you sure you want to delete <span className="font-semibold text-card-foreground">{localWorkoutName}</span>?
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-card-foreground">
+                {localWorkoutName?.trim() || "this workout"}
+              </span>
+              ?
             </p>
             <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
           </>
@@ -560,7 +703,6 @@ export default function WorkoutEditorModal({
         confirmLabel="Delete Workout"
       />
     </div>
-  </div>
   );
 }
 
