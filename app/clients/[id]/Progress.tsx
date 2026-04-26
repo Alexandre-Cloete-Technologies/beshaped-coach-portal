@@ -2,17 +2,62 @@
 
 import { ArrowRight, Award, Plus, X } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { collection, query, where, getDocs, doc } from "firebase/firestore";
+import Image from "next/image";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  Timestamp,
+  type QueryDocumentSnapshot,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface ProgressProps {
   clientId: string;
 }
 
+interface BodyWeightLog {
+  id: string;
+  weight: number;
+  weightUnit?: string;
+  photoTakenDate?: unknown;
+  photos?: { url: string }[];
+}
+
+/** Normalize Firestore Timestamp / date-like field to a `Date` */
+function toDateValue(value: unknown): Date {
+  if (value == null) return new Date(0);
+  if (value instanceof Date) return value;
+  if (value instanceof Timestamp) return value.toDate();
+  if (typeof value === "string" || typeof value === "number") {
+    return new Date(value);
+  }
+  if (
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof (value as { toDate: () => Date }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  return new Date(0);
+}
+
+function mapDocToBodyWeightLog(d: QueryDocumentSnapshot): BodyWeightLog {
+  const data = d.data() as Record<string, unknown>;
+  return {
+    id: d.id,
+    weight: typeof data.weight === "number" ? data.weight : Number(data.weight) || 0,
+    weightUnit: typeof data.weightUnit === "string" ? data.weightUnit : undefined,
+    photoTakenDate: data.photoTakenDate,
+    photos: data.photos as BodyWeightLog["photos"],
+  };
+}
+
 export default function Progress({ clientId }: ProgressProps) {
   const [selectedLift, setSelectedLift] = useState("Back Squat");
-  const [weightLogs, setWeightLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [weightLogs, setWeightLogs] = useState<BodyWeightLog[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,20 +69,20 @@ export default function Progress({ clientId }: ProgressProps) {
             const q = query(logsRef, where("userId", "==", doc(db, "users", clientId)));
             const snapshot = await getDocs(q);
             
-            const logs: any[] = snapshot.docs.map(d => ({...d.data(), id: d.id}));
+            const logs: BodyWeightLog[] = snapshot.docs.map((docSnap) =>
+              mapDocToBodyWeightLog(docSnap)
+            );
             
             // Sort by date ascending
             logs.sort((a, b) => {
-                const dateA = a.photoTakenDate?.toDate ? a.photoTakenDate.toDate() : new Date(a.photoTakenDate || 0);
-                const dateB = b.photoTakenDate?.toDate ? b.photoTakenDate.toDate() : new Date(b.photoTakenDate || 0);
+                const dateA = toDateValue(a.photoTakenDate);
+                const dateB = toDateValue(b.photoTakenDate);
                 return dateA.getTime() - dateB.getTime();
             });
             
             setWeightLogs(logs);
         } catch (err) {
             console.error("Error fetching weight logs:", err);
-        } finally {
-            setLoading(false);
         }
     };
     fetchWeightLogs();
@@ -65,12 +110,12 @@ export default function Progress({ clientId }: ProgressProps) {
       const maxWeight = Math.max(...weights) + 2; // Buffer
       const weightRange = maxWeight - minWeight || 1; // Avoid division by zero
 
-      const startTime = weightLogs[0].photoTakenDate?.toDate ? weightLogs[0].photoTakenDate.toDate().getTime() : new Date(weightLogs[0].photoTakenDate || 0).getTime();
-      const endTime = weightLogs[weightLogs.length - 1].photoTakenDate?.toDate ? weightLogs[weightLogs.length - 1].photoTakenDate.toDate().getTime() : new Date(weightLogs[weightLogs.length - 1].photoTakenDate || 0).getTime();
+      const startTime = toDateValue(weightLogs[0].photoTakenDate).getTime();
+      const endTime = toDateValue(weightLogs[weightLogs.length - 1].photoTakenDate).getTime();
       const timeRange = endTime - startTime || 1;
 
-      const points = weightLogs.map(log => {
-          const time = log.photoTakenDate?.toDate ? log.photoTakenDate.toDate().getTime() : new Date(log.photoTakenDate || 0).getTime();
+      const points = weightLogs.map((log) => {
+          const time = toDateValue(log.photoTakenDate).getTime();
           
           // X coordinate (0 to 600)
           const x = ((time - startTime) / timeRange) * 600;
@@ -80,7 +125,7 @@ export default function Progress({ clientId }: ProgressProps) {
           // SVG Y: 100 - (normalized * 100)
           const y = 100 - (((log.weight - minWeight) / weightRange) * 100);
           
-          const d = log.photoTakenDate?.toDate ? log.photoTakenDate.toDate() : new Date(log.photoTakenDate || 0);
+          const d = toDateValue(log.photoTakenDate);
           return { x, y, val: log.weight, date: d.toLocaleDateString(), unit: log.weightUnit || unit };
       });
 
@@ -150,21 +195,21 @@ export default function Progress({ clientId }: ProgressProps) {
                   <span className="text-sm font-bold text-card-foreground">Latest Photo</span>
                   {latestPhotoLog && (
                     <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                      {new Date(latestPhotoLog.photoTakenDate?.toDate ? latestPhotoLog.photoTakenDate.toDate() : latestPhotoLog.photoTakenDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {toDateValue(latestPhotoLog.photoTakenDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                   )}
                 </div>
                 
-                {latestPhotoLog ? (
+                {latestPhotoLog && latestPhotoLog.photos?.[0] ? (
                   <div 
                     className="aspect-[3/4] bg-muted rounded-lg border-2 border-border flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer bg-cover bg-center hover:border-primary transition-colors"
-                    style={{ backgroundImage: `url(${latestPhotoLog.photos[0].url})` }}
-                    onClick={() => setSelectedImage(latestPhotoLog.photos[0].url)}
+                    style={{ backgroundImage: `url(${latestPhotoLog.photos![0].url})` }}
+                    onClick={() => setSelectedImage(latestPhotoLog.photos![0].url)}
                   >
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <span className="text-white text-xl font-bold drop-shadow-md">
-                        {new Date(latestPhotoLog.photoTakenDate?.toDate ? latestPhotoLog.photoTakenDate.toDate() : latestPhotoLog.photoTakenDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        {toDateValue(latestPhotoLog.photoTakenDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
                   </div>
@@ -190,7 +235,13 @@ export default function Progress({ clientId }: ProgressProps) {
                      className="aspect-[3/4] bg-muted rounded-lg relative overflow-hidden group cursor-pointer"
                      onClick={() => setSelectedImage("https://images.unsplash.com/photo-1549476464-37392f717541?auto=format&fit=crop&q=80&w=300&h=400")}
                    >
-                      <img src="https://images.unsplash.com/photo-1549476464-37392f717541?auto=format&fit=crop&q=80&w=300&h=400" className="absolute inset-0 w-full h-full object-cover" alt="Progress Photo" />
+                      <Image
+                        src="https://images.unsplash.com/photo-1549476464-37392f717541?auto=format&fit=crop&q=80&w=300&h=400"
+                        alt="Progress Photo"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 50vw, 150px"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-br from-blue-400/50 to-indigo-500/50 flex items-center justify-center">
                          <span className="text-white text-xs font-medium drop-shadow-md">Jun 20</span>
                       </div>
@@ -201,7 +252,13 @@ export default function Progress({ clientId }: ProgressProps) {
                      className="aspect-[3/4] bg-muted rounded-lg relative overflow-hidden group cursor-pointer"
                      onClick={() => setSelectedImage("https://images.unsplash.com/photo-1550259979-ed79b48d2a30?auto=format&fit=crop&q=80&w=300&h=400")}
                    >
-                      <img src="https://images.unsplash.com/photo-1550259979-ed79b48d2a30?auto=format&fit=crop&q=80&w=300&h=400" className="absolute inset-0 w-full h-full object-cover" alt="Progress Photo" />
+                      <Image
+                        src="https://images.unsplash.com/photo-1550259979-ed79b48d2a30?auto=format&fit=crop&q=80&w=300&h=400"
+                        alt="Progress Photo"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 50vw, 150px"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/50 to-teal-500/50 flex items-center justify-center">
                          <span className="text-white text-xs font-medium drop-shadow-md">Jun 15</span>
                       </div>
@@ -212,7 +269,13 @@ export default function Progress({ clientId }: ProgressProps) {
                      className="aspect-[3/4] bg-muted rounded-lg relative overflow-hidden group cursor-pointer"
                      onClick={() => setSelectedImage("https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300&h=400")}
                    >
-                      <img src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300&h=400" className="absolute inset-0 w-full h-full object-cover" alt="Progress Photo" />
+                      <Image
+                        src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300&h=400"
+                        alt="Progress Photo"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 50vw, 150px"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-br from-orange-400/50 to-red-500/50 flex items-center justify-center">
                          <span className="text-white text-xs font-medium drop-shadow-md">Jun 10</span>
                       </div>
@@ -223,7 +286,13 @@ export default function Progress({ clientId }: ProgressProps) {
                      className="aspect-[3/4] bg-muted rounded-lg relative overflow-hidden group cursor-pointer"
                      onClick={() => setSelectedImage("https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300&h=400")}
                    >
-                      <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300&h=400" className="absolute inset-0 w-full h-full object-cover" alt="Progress Photo" />
+                      <Image
+                        src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300&h=400"
+                        alt="Progress Photo"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 50vw, 150px"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-br from-purple-400/50 to-pink-500/50 flex items-center justify-center">
                          <span className="text-white text-xs font-medium drop-shadow-md">Jun 05</span>
                       </div>
@@ -584,7 +653,7 @@ export default function Progress({ clientId }: ProgressProps) {
           className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4"
           onClick={() => setSelectedImage(null)}
         >
-          <div className="relative max-w-4xl w-full max-h-[90vh]">
+          <div className="relative max-w-4xl w-full min-h-[200px] h-[min(90vh,900px)]">
             <button 
               className="absolute -top-12 right-0 text-white hover:text-gray-300 p-2"
               onClick={() => setSelectedImage(null)}
@@ -592,10 +661,12 @@ export default function Progress({ clientId }: ProgressProps) {
               <span className="sr-only">Close</span>
               <X className="w-8 h-8" />
             </button>
-            <img 
-              src={selectedImage} 
-              alt="Full screen progress" 
-              className="w-full h-full object-contain rounded-lg max-h-[90vh]"
+            <Image
+              src={selectedImage}
+              alt="Full screen progress"
+              unoptimized
+              fill
+              className="object-contain rounded-lg"
             />
           </div>
         </div>

@@ -11,6 +11,11 @@ import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+/** Fields read from `programs` docs when resolving a `currentProgram` reference */
+type ProgramDoc = {
+  name?: string;
+  programName?: string;
+};
 
 export default function Home() {
   const [clients, setClients] = useState<ClientData[]>([]);
@@ -117,8 +122,8 @@ export default function Home() {
                   // It's a reference, fetch the document
                   const programDoc = await getDoc(data.currentProgram);
                   if (programDoc.exists()) {
-                    const programData: any = programDoc.data();
-                    programName = programData?.name || programData?.programName || "Unknown Program";
+                    const programData = programDoc.data() as ProgramDoc;
+                    programName = programData.name || programData.programName || "Unknown Program";
                   }
                 } else if (typeof data.currentProgram === 'string') {
                   // It's already a string

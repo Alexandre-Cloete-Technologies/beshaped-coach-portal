@@ -25,7 +25,7 @@ export default function ConfirmModal({
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
   confirmLoadingLabel = "Deleting...",
-  variant = "danger",
+  // variant = "danger",
 }: ConfirmModalProps) {
   const [loading, setLoading] = useState(false);
 

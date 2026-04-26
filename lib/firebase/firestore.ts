@@ -15,9 +15,6 @@ import {
   DocumentData,
   QueryConstraint,
   Timestamp,
-  WhereFilterOp,
-  OrderByDirection,
-  DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -142,47 +139,6 @@ export const deleteDocument = async (
     console.error('Error deleting document:', error);
     throw error;
   }
-};
-
-/**
- * Query builder helper
- */
-export const buildQuery = (
-  filters?: Array<{
-    field: string;
-    operator: WhereFilterOp;
-    value: any;
-  }>,
-  orderByField?: string,
-  orderDirection: OrderByDirection = 'asc',
-  limitCount?: number,
-  startAfterDoc?: DocumentSnapshot
-): QueryConstraint[] => {
-  const constraints: QueryConstraint[] = [];
-
-  // Add where clauses
-  if (filters) {
-    filters.forEach((filter) => {
-      constraints.push(where(filter.field, filter.operator, filter.value));
-    });
-  }
-
-  // Add orderBy
-  if (orderByField) {
-    constraints.push(orderBy(orderByField, orderDirection));
-  }
-
-  // Add pagination
-  if (startAfterDoc) {
-    constraints.push(startAfter(startAfterDoc));
-  }
-
-  // Add limit
-  if (limitCount) {
-    constraints.push(limit(limitCount));
-  }
-
-  return constraints;
 };
 
 // Export Firestore utilities

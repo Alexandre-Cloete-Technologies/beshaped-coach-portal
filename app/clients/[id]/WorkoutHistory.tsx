@@ -90,6 +90,88 @@ const mockWorkouts: Workout[] = [
   },
 ];
 
+function isValidDate(date: unknown): date is Date {
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+function isSameDay(
+  date1: Date | null | undefined,
+  date2: Date | null | undefined
+): boolean {
+  if (!date1 || !date2 || !isValidDate(date1) || !isValidDate(date2)) {
+    return false;
+  }
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+}
+
+function isWithinWeek(
+  date: Date | null | undefined,
+  weekStart: Date,
+  weekEnd: Date
+): boolean {
+  if (!date || !isValidDate(date)) return false;
+  const time = date.getTime();
+  return time >= weekStart.getTime() && time <= weekEnd.getTime();
+}
+
+function isWithinMonth(
+  date: Date | null | undefined,
+  month: number,
+  year: number
+): boolean {
+  if (!date || !isValidDate(date)) return false;
+  return date.getMonth() === month && date.getFullYear() === year;
+}
+
+/** Program `programs` doc shape (phases → workouts) used when building client program list */
+interface ProgramTemplateExercise {
+  exerciseId?: string;
+  exerciseName?: string;
+  order?: number;
+  sets?: number;
+  repsRange?: string;
+  tempo?: string;
+  restPeriod?: string;
+  notes?: string | null;
+}
+
+interface ProgramTemplateWorkout {
+  workoutName?: string;
+  dayName?: string;
+  isRestDay?: boolean;
+  dayNumber?: number;
+  description?: string;
+  exercises?: ProgramTemplateExercise[];
+}
+
+interface ProgramTemplatePhase {
+  name?: string;
+  order?: number;
+  workouts?: ProgramTemplateWorkout[];
+}
+
+interface ProgramDocumentData {
+  phases?: ProgramTemplatePhase[];
+}
+
+type CalendarDayCell = {
+  day: number;
+  isCurrentMonth: boolean;
+  isPreviousMonth: boolean;
+  isNextMonth: boolean;
+  date: Date;
+  status: "completed" | "in-progress" | "skipped" | null;
+  phaseNumber?: number;
+  weekNumber?: number;
+  dayNumber?: number;
+  isToday: boolean;
+  isSelected: boolean;
+};
+
 const normalizeWorkoutLogExercises = (
   data: Record<string, unknown>
 ): WorkoutLogExercise[] => {
@@ -128,9 +210,8 @@ export default function WorkoutHistory() {
   const params = useParams();
   const clientId = params?.id as string;
   
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
-  const [expandedWorkout, setExpandedWorkout] = useState<number>(0);
-  
+  // const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
+
   // Program and workout data from Firestore
   const [programWorkouts, setProgramWorkouts] = useState<Array<{ 
     workoutName: string;
@@ -155,11 +236,11 @@ export default function WorkoutHistory() {
   // WorkoutLogs from Firebase
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   
-  // Calendar state
-  const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-11
+  // Calendar state — stable "today" for the session (avoids exhaustive-deps on `new Date()` each render)
+  const today = useMemo(() => new Date(), []);
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(today); // Default to today
+  const [selectedDate, setSelectedDate] = useState<Date | null>(today);
   const [timePeriod, setTimePeriod] = useState<"day" | "week" | "month">("month");
 
   // Fetch client's program and extract workout names from phase maps
@@ -189,7 +270,7 @@ export default function WorkoutHistory() {
             }
             
             if (programDoc && programDoc.exists()) {
-              const programData: any = programDoc.data();
+              const programData = programDoc.data() as ProgramDocumentData;
               
               // Extract workouts with exercises from phase maps
               const workouts: Array<{ 
@@ -213,15 +294,16 @@ export default function WorkoutHistory() {
               
               if (programData.phases && Array.isArray(programData.phases)) {
                 // Iterate through phases
-                programData.phases.forEach((phase: any, phaseIndex: number) => {
+                programData.phases.forEach((phase, phaseIndex) => {
                   const phaseName = phase.name || `Phase ${phaseIndex + 1}`;
                   const phaseOrder = phase.order || phaseIndex + 1;
                   
                   // Each phase has workouts array
                   if (phase.workouts && Array.isArray(phase.workouts)) {
-                    phase.workouts.forEach((workout: any) => {
+                    phase.workouts.forEach((workout) => {
                       // Skip rest days or workouts without names
                       if (workout.workoutName && !workout.isRestDay) {
+                        const exercises: ProgramTemplateExercise[] = workout.exercises || [];
                         workouts.push({ 
                           workoutName: workout.workoutName || workout.dayName || '',
                           phase: phaseName,
@@ -229,7 +311,7 @@ export default function WorkoutHistory() {
                           dayNumber: workout.dayNumber || 0,
                           isRestDay: workout.isRestDay || false,
                           description: workout.description,
-                          exercises: (workout.exercises || []).map((ex: any) => ({
+                          exercises: exercises.map((ex) => ({
                             exerciseId: ex.exerciseId || '',
                             exerciseName: ex.exerciseName || '',
                             order: ex.order || 0,
@@ -237,7 +319,7 @@ export default function WorkoutHistory() {
                             repsRange: ex.repsRange || '',
                             tempo: ex.tempo,
                             restPeriod: ex.restPeriod || '',
-                            notes: ex.notes || null,
+                            notes: ex.notes ?? null,
                           })),
                         });
                       }
@@ -354,7 +436,7 @@ export default function WorkoutHistory() {
   };
 
   // Handle day click
-  const handleDayClick = (dayData: any) => {
+  const handleDayClick = (dayData: CalendarDayCell) => {
     if (dayData.isCurrentMonth) {
       setSelectedDate(dayData.date);
       setTimePeriod("day");
@@ -369,32 +451,6 @@ export default function WorkoutHistory() {
     }
     return years;
   }, [today]);
-
-  // Helper function to check if a value is a valid Date
-  const isValidDate = (date: unknown): date is Date => {
-    return date instanceof Date && !isNaN(date.getTime());
-  };
-
-  // Helper function to check if two dates are the same day
-  const isSameDay = (date1: Date | null | undefined, date2: Date | null | undefined): boolean => {
-    if (!date1 || !date2 || !isValidDate(date1) || !isValidDate(date2)) return false;
-    return date1.getFullYear() === date2.getFullYear() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getDate() === date2.getDate();
-  };
-
-  // Helper function to check if a date is within a week
-  const isWithinWeek = (date: Date | null | undefined, weekStart: Date, weekEnd: Date): boolean => {
-    if (!date || !isValidDate(date)) return false;
-    const time = date.getTime();
-    return time >= weekStart.getTime() && time <= weekEnd.getTime();
-  };
-
-  // Helper function to check if a date is within a month
-  const isWithinMonth = (date: Date | null | undefined, month: number, year: number): boolean => {
-    if (!date || !isValidDate(date)) return false;
-    return date.getMonth() === month && date.getFullYear() === year;
-  };
 
   // Filter workouts based on selected time period
   const filteredWorkouts = useMemo(() => {
@@ -539,19 +595,7 @@ export default function WorkoutHistory() {
       }
     });
 
-    const days: Array<{
-      day: number;
-      isCurrentMonth: boolean;
-      isPreviousMonth: boolean;
-      isNextMonth: boolean;
-      date: Date;
-      status: "completed" | "in-progress" | "skipped" | null;
-      phaseNumber?: number;
-      weekNumber?: number;
-      dayNumber?: number;
-      isToday: boolean;
-      isSelected: boolean;
-    }> = [];
+    const days: CalendarDayCell[] = [];
 
     // Add days from previous month
     if (startingDayOfWeek > 0) {
@@ -648,13 +692,6 @@ export default function WorkoutHistory() {
     "December",
   ];
   const currentMonthName = monthNames[currentMonth];
-
-  const getStatusDotColor = (status: string | null) => {
-    if (status === "completed") return "bg-green-500";
-    if (status === "partial" || status === "in-progress") return "bg-orange-500";
-    if (status === "skipped") return "bg-red-500";
-    return "";
-  };
 
   const getStatusBadge = (status: string) => {
     if (status === "completed") {
@@ -912,7 +949,7 @@ export default function WorkoutHistory() {
 
               <details
                 className="group bg-card rounded-xl border border-border overflow-hidden opacity-90 hover:opacity-100 transition-opacity"
-                open={index === expandedWorkout}
+                open={index === 0}
               >
                 <summary className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-2 cursor-pointer hover:bg-accent/50 transition-colors select-none relative list-none">
                   <div className="flex items-center gap-4 min-w-[120px]  ">

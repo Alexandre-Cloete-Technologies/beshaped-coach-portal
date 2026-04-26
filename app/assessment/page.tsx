@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, User, Calendar, Ruler, Camera, RotateCcw } from "lucide-react";
+import Image from "next/image";
 import Sidebar from "../components/Sidebar";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -112,7 +113,6 @@ export default function AssessmentPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [assessmentDate, setAssessmentDate] = useState<string>(
     new Date().toISOString().split("T")[0]
@@ -251,14 +251,11 @@ export default function AssessmentPage() {
 
   useEffect(() => {
     if (selectedClientId) {
-      const client = clients.find((c) => c.id === selectedClientId);
-      setSelectedClient(client || null);
       fetchLastAssessment(selectedClientId);
     } else {
-      setSelectedClient(null);
       setLastAssessmentDate(null);
     }
-  }, [selectedClientId, clients]);
+  }, [selectedClientId]);
 
   const filteredClients = useMemo(() => {
     if (!searchQuery.trim()) return clients;
@@ -622,10 +619,13 @@ export default function AssessmentPage() {
                       key={index}
                       className="relative aspect-square rounded-lg border border-border overflow-hidden bg-muted/30"
                     >
-                      <img
+                      <Image
                         src={URL.createObjectURL(file)}
                         alt={`Progress ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                        sizes="(max-width: 640px) 50vw, 25vw"
                       />
                       <button
                         type="button"

@@ -11,14 +11,16 @@ interface PaginationProps {
 }
 
 export default function Pagination({ 
-  currentPage, 
+  // currentPage, 
   // totalPages, 
-  totalItems, 
-  itemsPerPage,
+  // totalItems, 
+  // itemsPerPage,
   // onPageChange 
 }: PaginationProps) {
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+
+  // const startItem = (currentPage - 1) * itemsPerPage + 1;
+  // const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
     <div className="flex items-center justify-between py-4">

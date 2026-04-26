@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpen, Plus, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   doc,
   getDoc,
@@ -30,7 +30,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [selectedProgramId, setSelectedProgramId] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!clientId) return;
 
     try {
@@ -80,11 +80,11 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clientId]);
 
   useEffect(() => {
     fetchData();
-  }, [clientId]);
+  }, [fetchData]);
 
   const programsToAdd = allPrograms.filter(
     (p) => !availablePrograms.some((ap) => ap.id === p.id)

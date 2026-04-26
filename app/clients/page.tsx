@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search, SlidersHorizontal, MoreVertical, UserPlus, Edit, Trash2, AlertTriangle } from "lucide-react";
+import {  Search, UserPlus, Edit, Trash2, AlertTriangle } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Pagination from "../components/Pagination";
 import AddClientModal from "../components/AddClientModal";
@@ -18,15 +18,34 @@ const statusColors = {
   Inactive: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
 
-const engagementConfig = {
-  "Very High": { dots: 3, color: "bg-emerald-500" },
-  High: { dots: 3, color: "bg-emerald-500" },
-  Medium: { dots: 2, color: "bg-amber-500" },
-  Low: { dots: 1, color: "bg-red-500" },
+/** Fields read from a `programs` document when resolving `currentProgram` */
+type ProgramDoc = {
+  name?: string;
+  programName?: string;
 };
 
+type ClientListItem = {
+  id: string;
+  name: string;
+  email: string;
+  avatarGradient: string;
+  status: keyof typeof statusColors;
+  currentProgram: string;
+  programProgress: number;
+  lastActive: string;
+  engagement: string;
+  avatarInitials?: string;
+};
+
+// const engagementConfig = {
+//   "Very High": { dots: 3, color: "bg-emerald-500" },
+//   High: { dots: 3, color: "bg-emerald-500" },
+//   Medium: { dots: 2, color: "bg-amber-500" },
+//   Low: { dots: 1, color: "bg-red-500" },
+// };
+
 export default function ClientsPage() {
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<ClientListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -65,7 +84,8 @@ export default function ClientsPage() {
             try {
               const programDoc = await getDoc(data.currentProgram);
               if (programDoc.exists()) {
-                programName = (programDoc.data() as any)?.name || "Unknown Program";
+                const programData = programDoc.data() as ProgramDoc;
+                programName = programData.name || programData.programName || "Unknown Program";
               }
             } catch (err) {
               console.error("Error fetching program name:", err);
@@ -78,12 +98,12 @@ export default function ClientsPage() {
           name: data.displayName || data.username || "Unknown User",
           email: data.email || "No email",
           avatarGradient: gradients[gradientIndex],
-          status: "Active", // Default for now
+          status: "Active" as const, // Default for now
           currentProgram: programName,
           programProgress: 0,
           lastActive: "Recently",
           engagement: "Medium",
-        };
+        } satisfies ClientListItem;
       }));
 
       setClients(fetchedUsers);

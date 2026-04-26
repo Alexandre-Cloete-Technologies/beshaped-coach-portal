@@ -4,7 +4,6 @@ import {
   ArrowLeft, 
   Mail, 
   Phone, 
-  Edit, 
   LayoutGrid,
   History,
   TrendingUp,
@@ -32,13 +31,40 @@ const tabs = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
+/** Fields read from a `programs` document when resolving `currentProgram` */
+type ProgramDoc = {
+  name?: string;
+  programName?: string;
+};
+
+interface ClientView {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatarGradient: string;
+  isOnline: boolean;
+  memberSince: string;
+  streak: number;
+  currentProgram: string;
+  stats: {
+    totalWorkouts: number;
+    currentStreak: number;
+    longestStreak: number;
+  };
+  goals: string | null;
+  currentDay: number;
+  currentWeek: number;
+  currentPhase: number;
+}
+
 export default function ClientDetailPage() {
   const params = useParams();
   const clientId = params?.id as string;
   const [activeTab, setActiveTab] = useState("overview");
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["overview"]));
 
-  const [client, setClient] = useState<any>(null);
+  const [client, setClient] = useState<ClientView | null>(null);
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -77,8 +103,8 @@ export default function ClientDetailPage() {
                 // It's a reference, fetch the document
                 const programDoc = await getDoc(data.currentProgram);
                 if (programDoc.exists()) {
-                  const programData: any = programDoc.data();
-                  programName = programData?.name || programData?.programName || "Unknown Program";
+                  const programData = programDoc.data() as ProgramDoc;
+                  programName = programData.name || programData.programName || "Unknown Program";
                 }
               } else if (typeof data.currentProgram === 'string') {
                 // It's already a string
@@ -117,6 +143,10 @@ export default function ClientDetailPage() {
             console.error("Error fetching user program progress:", err);
           }
           
+          const g = serializedData.goals;
+          const goals: string | null =
+            g == null || g === "" ? null : typeof g === "string" ? g : String(g);
+
           setClient({
             id: clientDoc.id,
             name: serializedData.displayName || serializedData.username || "Unknown User",
@@ -128,7 +158,7 @@ export default function ClientDetailPage() {
             streak: stats.currentStreak,
             currentProgram: programName,
             stats: stats,
-            goals: serializedData.goals || null,
+            goals,
             ...programProgress,
           });
           setError(null);

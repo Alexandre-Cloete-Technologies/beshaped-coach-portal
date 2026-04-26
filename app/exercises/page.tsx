@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search, ChevronDown, ChevronRight, Edit, Trash2, Dumbbell, ChevronsUpDown, X } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Edit, Trash2, Dumbbell, ChevronsUpDown, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Breadcrumbs from "../components/Breadcrumbs";
 import Link from "next/link";
@@ -219,40 +219,50 @@ const getCategoryFromMuscle = (muscle: string): string => {
   return "Other";
 };
 
-const getRawMuscleFromExerciseData = (data: any): string => {
-  let rawMuscle =
-    data.musclesInvolved?.[0] ||
-    data.primaryMuscles?.[0] ||
-    data.secondaryMuscles?.[0] ||
-    data.muscleGroup ||
-    data.muscle_group ||
-    data.muscle ||
-    data.muscles ||
-    data.target ||
-    data.bodyPart ||
-    data.primaryMuscle ||
-    data.primary_muscle ||
-    data.muscles_involved ||
-    data.muscleGroups ||
-    data.muscle_groups ||
-    data.category ||
-    data.primaryGroup ||
-    "";
-
-  if (Array.isArray(rawMuscle) && rawMuscle.length > 0) {
-    rawMuscle = rawMuscle[0];
-  } else if (rawMuscle && typeof rawMuscle === "object") {
-    const muscleObj = rawMuscle as any;
-    rawMuscle =
-      muscleObj.name ||
-      muscleObj.title ||
-      muscleObj.slug ||
-      muscleObj.label ||
-      muscleObj.toString?.() ||
-      "";
+function normalizeMuscleish(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value) && value.length > 0) {
+    return normalizeMuscleish(value[0]);
   }
+  if (typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    const n = o.name ?? o.title ?? o.slug ?? o.label;
+    if (typeof n === "string" && n) return n;
+    if (typeof o.toString === "function") {
+      const s = (o as { toString: () => string }).toString();
+      if (s && s !== "[object Object]") return s;
+    }
+  }
+  return "";
+}
 
-  return String(rawMuscle || "");
+const MUSCLE_FIELD_KEYS = [
+  "musclesInvolved",
+  "primaryMuscles",
+  "secondaryMuscles",
+  "muscleGroup",
+  "muscle_group",
+  "muscle",
+  "muscles",
+  "target",
+  "bodyPart",
+  "primaryMuscle",
+  "primary_muscle",
+  "muscles_involved",
+  "muscleGroups",
+  "muscle_groups",
+  "category",
+  "primaryGroup",
+] as const;
+
+const getRawMuscleFromExerciseData = (data: Record<string, unknown>): string => {
+  for (const key of MUSCLE_FIELD_KEYS) {
+    const s = normalizeMuscleish(data[key]);
+    if (s) return s;
+  }
+  return "";
 };
 
 // Mock exercises for fallback
@@ -292,7 +302,6 @@ export default function ExercisesPage() {
   // Add exercise modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState<ExerciseFormData>(emptyFormData);
-  const [newTip, setNewTip] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Edit exercise modal state
@@ -316,8 +325,7 @@ export default function ExercisesPage() {
         if (!exercisesSnapshot.empty) {
           const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
             const data = doc.data();
-            
-            const rawMuscle = getRawMuscleFromExerciseData(data);
+            const rawMuscle = getRawMuscleFromExerciseData(data as Record<string, unknown>);
             
             // Use helper to categorize specific muscles (e.g. "Biceps" -> "Arms")
             const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
@@ -461,7 +469,6 @@ export default function ExercisesPage() {
   const closeModal = () => {
     setShowAddModal(false);
     setFormData(emptyFormData);
-    setNewTip("");
   };
 
   const openEditModal = (exercise: Exercise) => {
@@ -566,7 +573,7 @@ export default function ExercisesPage() {
       const exercisesSnapshot = await getDocs(collection(db, "exercises"));
       const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
         const data = doc.data();
-        const rawMuscle = getRawMuscleFromExerciseData(data);
+        const rawMuscle = getRawMuscleFromExerciseData(data as Record<string, unknown>);
         const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
         return {
           id: doc.id,
@@ -593,18 +600,18 @@ export default function ExercisesPage() {
     }
   };
 
-  const getDifficultyBadge = (difficulty: string) => {
-    switch (difficulty) {
-      case "beginner":
-        return "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300";
-      case "intermediate":
-        return "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
-      case "advanced":
-        return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
+  // const getDifficultyBadge = (difficulty: string) => {
+  //   switch (difficulty) {
+  //     case "beginner":
+  //       return "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300";
+  //     case "intermediate":
+  //       return "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
+  //     case "advanced":
+  //       return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+  //     default:
+  //       return "bg-muted text-muted-foreground";
+  //   }
+  // };
 
   const totalExercises = exercises.length;
   const filteredTotal = Object.values(groupedExercises).reduce((sum, exs) => sum + exs.length, 0);
@@ -1198,7 +1205,11 @@ export default function ExercisesPage() {
             <div className="px-6 py-5 border-b border-border">
               <h2 className="text-lg font-semibold text-card-foreground">Delete Exercise</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Are you sure you want to delete <span className="font-medium text-card-foreground">"{deletingExercise.name}"</span>?
+                Are you sure you want to delete{" "}
+                <span className="font-medium text-card-foreground">
+                  &ldquo;{deletingExercise.name}&rdquo;
+                </span>
+                ?
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 This action cannot be undone.

@@ -140,10 +140,10 @@ export default function WorkoutEditorModal({
     ]);
   };
 
-  const updateExerciseInWorkout = (
+  const updateExerciseInWorkout = <K extends keyof ModalExercise>(
     index: number,
-    field: keyof ModalExercise,
-    value: any
+    field: K,
+    value: ModalExercise[K]
   ) => {
     setLocalExercises((prev) =>
       prev.map((ex, i) => (i === index ? { ...ex, [field]: value } : ex))

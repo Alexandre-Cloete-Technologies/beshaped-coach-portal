@@ -2,7 +2,6 @@
 
 import {
   ArrowLeft,
-  Save,
   ExternalLink,
 } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
@@ -80,6 +79,16 @@ const sanitizeMuscles = (
   return Array.from(deduped);
 };
 
+const CANONICAL_MUSCLE_MAP: Record<string, string> = muscleCategoryDetails.reduce(
+  (acc, { muscles }) => {
+    muscles.forEach((muscle) => {
+      acc[muscle.toLowerCase()] = muscle;
+    });
+    return acc;
+  },
+  {} as Record<string, string>
+);
+
 export default function ExerciseDetailPage() {
   const params = useParams();
   const exerciseId = params?.id as string;
@@ -87,15 +96,6 @@ export default function ExerciseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const canonicalMuscleMap = muscleCategoryDetails.reduce<
-    Record<string, string>
-  >((acc, { muscles }) => {
-    muscles.forEach((muscle) => {
-      acc[muscle.toLowerCase()] = muscle;
-    });
-    return acc;
-  }, {});
 
   useEffect(() => {
     const fetchExercise = async () => {
@@ -124,11 +124,11 @@ export default function ExerciseDetailPage() {
           muscleGroup: muscleCategory,
           musclesInvolved: sanitizeMuscles(
             data.musclesInvolved ?? data.primaryMuscles,
-            canonicalMuscleMap
+            CANONICAL_MUSCLE_MAP
           ),
           secondaryMuscles: sanitizeMuscles(
             data.secondaryMuscles,
-            canonicalMuscleMap
+            CANONICAL_MUSCLE_MAP
           ),
           equipment: (data.equipment as string) || "",
           difficulty: (data.difficulty as Difficulty) || "intermediate",

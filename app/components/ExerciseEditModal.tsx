@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
 import AnatomyGifPicker from "./AnatomyGifPicker";
 
@@ -41,6 +41,51 @@ interface ExerciseEditModalProps {
   onSave: (values: ExerciseEditValues) => void;
 }
 
+function buildCanonicalMap(
+  muscleCategoryDetails: Array<{ category: string; muscles: string[] }>
+): Record<string, string> {
+  return muscleCategoryDetails.reduce<Record<string, string>>((acc, { muscles }) => {
+    muscles.forEach((muscle) => {
+      acc[muscle.toLowerCase()] = muscle;
+    });
+    return acc;
+  }, {});
+}
+
+function sanitizeMusclesList(
+  muscles: string[] | undefined,
+  canonicalMap: Record<string, string>
+): string[] {
+  if (!Array.isArray(muscles)) return [];
+  const deduped = new Set<string>();
+  muscles.forEach((muscle) => {
+    const canonical = canonicalMap[String(muscle).toLowerCase().trim()];
+    if (canonical) deduped.add(canonical);
+  });
+  return Array.from(deduped);
+}
+
+function buildInitialFormValues(
+  exercise: ExerciseSummary,
+  muscleCategoryDetails: Array<{ category: string; muscles: string[] }>
+): ExerciseEditValues {
+  const map = buildCanonicalMap(muscleCategoryDetails);
+  return {
+    name: exercise.name || "",
+    description: exercise.description || "",
+    muscleGroup: exercise.muscleGroup || "",
+    musclesInvolved: sanitizeMusclesList(
+      exercise.musclesInvolved ?? exercise.primaryMuscles,
+      map
+    ),
+    secondaryMuscles: sanitizeMusclesList(exercise.secondaryMuscles, map),
+    equipment: exercise.equipment || "",
+    difficulty: exercise.difficulty || "intermediate",
+    videoUrl: exercise.videoUrl || "",
+    anatomyExerciseWalkthrough: exercise.anatomyExerciseWalkthrough || "",
+  };
+}
+
 export default function ExerciseEditModal({
   isOpen,
   exercise,
@@ -49,6 +94,33 @@ export default function ExerciseEditModal({
   onClose,
   onSave,
 }: ExerciseEditModalProps) {
+  if (!isOpen || !exercise) return null;
+
+  return (
+    <ExerciseEditModalContent
+      key={exercise.id}
+      exercise={exercise}
+      muscleCategoryDetails={muscleCategoryDetails}
+      saving={saving}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+}
+
+function ExerciseEditModalContent({
+  exercise,
+  muscleCategoryDetails,
+  saving = false,
+  onClose,
+  onSave,
+}: {
+  exercise: ExerciseSummary;
+  muscleCategoryDetails: Array<{ category: string; muscles: string[] }>;
+  saving?: boolean;
+  onClose: () => void;
+  onSave: (values: ExerciseEditValues) => void;
+}) {
   const resolveMuscleGroup = (
     musclesInvolved: string[],
     secondaryMuscles: string[],
@@ -69,59 +141,9 @@ export default function ExerciseEditModal({
     return fallback || "Other";
   };
 
-  const canonicalMuscleMap = muscleCategoryDetails.reduce<Record<string, string>>(
-    (acc, { muscles }) => {
-      muscles.forEach((muscle) => {
-        acc[muscle.toLowerCase()] = muscle;
-      });
-      return acc;
-    },
-    {}
+  const [form, setForm] = useState<ExerciseEditValues>(() =>
+    buildInitialFormValues(exercise, muscleCategoryDetails)
   );
-
-  const sanitizeMuscles = (muscles?: string[]) => {
-    if (!Array.isArray(muscles)) return [];
-    const deduped = new Set<string>();
-
-    muscles.forEach((muscle) => {
-      const canonical = canonicalMuscleMap[String(muscle).toLowerCase().trim()];
-      if (canonical) {
-        deduped.add(canonical);
-      }
-    });
-
-    return Array.from(deduped);
-  };
-
-  const [form, setForm] = useState<ExerciseEditValues>({
-    name: "",
-    description: "",
-    muscleGroup: "",
-    musclesInvolved: [],
-    secondaryMuscles: [],
-    equipment: "",
-    difficulty: "intermediate",
-    videoUrl: "",
-    anatomyExerciseWalkthrough: "",
-  });
-
-  useEffect(() => {
-    if (!isOpen || !exercise) return;
-
-    setForm({
-      name: exercise.name || "",
-      description: exercise.description || "",
-      muscleGroup: exercise.muscleGroup || "",
-      musclesInvolved: sanitizeMuscles(exercise.musclesInvolved ?? exercise.primaryMuscles),
-      secondaryMuscles: sanitizeMuscles(exercise.secondaryMuscles),
-      equipment: exercise.equipment || "",
-      difficulty: exercise.difficulty || "intermediate",
-      videoUrl: exercise.videoUrl || "",
-      anatomyExerciseWalkthrough: exercise.anatomyExerciseWalkthrough || "",
-    });
-  }, [isOpen, exercise, muscleCategoryDetails]);
-
-  if (!isOpen || !exercise) return null;
 
   const handleChange = <K extends keyof ExerciseEditValues>(
     field: K,

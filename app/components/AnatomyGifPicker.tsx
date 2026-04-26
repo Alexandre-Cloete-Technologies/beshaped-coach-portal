@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { X, Upload, ImageIcon } from "lucide-react";
 import { listFilesWithUrls, uploadFile } from "@/lib/firebase";
 
 const ANATOMY_STORAGE_PATH = "videos/exercises/anatomy";
+
+function isMp4Url(nameOrUrl: string) {
+  return /\.mp4($|\?|#)/i.test(nameOrUrl);
+}
 
 interface AnatomyGifPickerProps {
   value: string;
@@ -101,11 +106,24 @@ export default function AnatomyGifPicker({
       >
         {value ? (
           <>
-            <img
-              src={value}
-              alt="Selected anatomy"
-              className="w-16 h-16 object-cover rounded border border-border flex-shrink-0"
-            />
+            {isMp4Url(value) ? (
+              <video
+                src={value}
+                className="w-16 h-16 object-cover rounded border border-border flex-shrink-0"
+                muted
+                playsInline
+                aria-label="Selected anatomy"
+              />
+            ) : (
+              <Image
+                src={value}
+                alt="Selected anatomy"
+                width={64}
+                height={64}
+                unoptimized
+                className="w-16 h-16 object-cover rounded border border-border flex-shrink-0"
+              />
+            )}
             <span className="text-sm text-muted-foreground flex-1 truncate">
               Click to change
             </span>
@@ -159,17 +177,30 @@ export default function AnatomyGifPicker({
                       key={url}
                       type="button"
                       onClick={() => handleSelect(url)}
-                      className={`aspect-square rounded-lg border-2 overflow-hidden transition-all hover:ring-2 hover:ring-primary ${
+                      className={`relative aspect-square rounded-lg border-2 overflow-hidden transition-all hover:ring-2 hover:ring-primary ${
                         value === url
                           ? "border-primary ring-2 ring-primary"
                           : "border-border hover:border-primary/50"
                       }`}
                     >
-                      <img
-                        src={url}
-                        alt={name}
-                        className="w-full h-full object-cover"
-                      />
+                      {isMp4Url(name) || isMp4Url(url) ? (
+                        <video
+                          src={url}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          muted
+                          playsInline
+                          aria-label={name}
+                        />
+                      ) : (
+                        <Image
+                          src={url}
+                          alt={name}
+                          fill
+                          unoptimized
+                          className="object-cover"
+                          sizes="(max-width: 640px) 28vw, 200px"
+                        />
+                      )}
                     </button>
                   ))}
                 </div>

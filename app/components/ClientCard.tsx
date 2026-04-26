@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowRight, AlertTriangle, Check, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export interface ClientData {
@@ -31,58 +30,58 @@ export interface ClientData {
   goals?: string;
 }
 
-const statusColors = {
-  high: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "High", labelColor: "text-emerald-600" },
-  medium: { ring: "text-amber-500", dot: "bg-amber-500", label: "Medium", labelColor: "text-amber-600" },
-  low: { ring: "text-red-400", dot: "bg-red-400", label: "Low", labelColor: "text-red-500" },
-  critical: { ring: "text-red-500", dot: "bg-red-500", label: "Critical", labelColor: "text-red-600" },
-  perfect: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "Perfect", labelColor: "text-emerald-600" },
-};
+// const statusColors = {
+//   high: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "High", labelColor: "text-emerald-600" },
+//   medium: { ring: "text-amber-500", dot: "bg-amber-500", label: "Medium", labelColor: "text-amber-600" },
+//   low: { ring: "text-red-400", dot: "bg-red-400", label: "Low", labelColor: "text-red-500" },
+//   critical: { ring: "text-red-500", dot: "bg-red-500", label: "Critical", labelColor: "text-red-600" },
+//   perfect: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "Perfect", labelColor: "text-emerald-600" },
+// };
 
-interface CircularProgressProps {
-  percentage: number;
-  status: keyof typeof statusColors;
-}
+// interface CircularProgressProps {
+//   percentage: number;
+//   status: keyof typeof statusColors;
+// }
 
-function CircularProgress({ percentage, status }: CircularProgressProps) {
-  const radius = 36;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
-  const colors = statusColors[status];
+// function CircularProgress({ percentage, status }: CircularProgressProps) {
+//   const radius = 36;
+//   const circumference = 2 * Math.PI * radius;
+//   const strokeDashoffset = circumference - (percentage / 100) * circumference;
+//   const colors = statusColors[status];
 
-  return (
-    <div className="relative w-20 h-20 flex-shrink-0">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
-        {/* Background circle */}
-        <circle
-          cx="40"
-          cy="40"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="6"
-          className="text-gray-200 dark:text-gray-700"
-        />
-        {/* Progress circle */}
-        <circle
-          cx="40"
-          cy="40"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className={colors.ring}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-lg font-bold text-card-foreground">{percentage}%</span>
-      </div>
-    </div>
-  );
-}
+//   return (
+//     <div className="relative w-20 h-20 flex-shrink-0">
+//       <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
+//         {/* Background circle */}
+//         <circle
+//           cx="40"
+//           cy="40"
+//           r={radius}
+//           fill="none"
+//           stroke="currentColor"
+//           strokeWidth="6"
+//           className="text-gray-200 dark:text-gray-700"
+//         />
+//         {/* Progress circle */}
+//         <circle
+//           cx="40"
+//           cy="40"
+//           r={radius}
+//           fill="none"
+//           stroke="currentColor"
+//           strokeWidth="6"
+//           strokeLinecap="round"
+//           strokeDasharray={circumference}
+//           strokeDashoffset={strokeDashoffset}
+//           className={colors.ring}
+//         />
+//       </svg>
+//       <div className="absolute inset-0 flex items-center justify-center">
+//         <span className="text-lg font-bold text-card-foreground">{percentage}%</span>
+//       </div>
+//     </div>
+//   );
+// }
 
 interface ProgressBarProps {
   current: number;
@@ -107,15 +106,15 @@ function ProgressBar({ current, total }: ProgressBarProps) {
 
 export default function ClientCard({ client }: { client: ClientData }) {
   const router = useRouter();
-  const colors = statusColors[client.status];
+  // const colors = statusColors[client.status];
   const isAlert = client.status === "low" || client.status === "critical";
-  const programProgress = Math.round((client.week / client.totalWeeks) * 100);
+  // const programProgress = Math.round((client.week / client.totalWeeks) * 100);
 
-  const formatLastWorkout = (lastWorkout: string) => {
-    if (lastWorkout === "Today") return <span className="flex items-center gap-1">Today <Check className="w-3 h-3 text-emerald-500" /></span>;
-    if (lastWorkout === "Yesterday") return "Yesterday";
-    return <span className="text-red-500">{lastWorkout}</span>;
-  };
+  // const formatLastWorkout = (lastWorkout: string) => {
+  //   if (lastWorkout === "Today") return <span className="flex items-center gap-1">Today <Check className="w-3 h-3 text-emerald-500" /></span>;
+  //   if (lastWorkout === "Yesterday") return "Yesterday";
+  //   return <span className="text-red-500">{lastWorkout}</span>;
+  // };
 
   // Format program info with phase, day, and week
   const formatProgramInfo = () => {

@@ -6,7 +6,7 @@ import ProgramCard, { ProgramData } from "../components/ProgramCard";
 import ProgramsListSkeleton from "./components/ProgramsListSkeleton";
 import AssignProgramModal from "../components/AssignProgramModal";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -59,6 +59,18 @@ const mockPrograms: ProgramData[] = [
   },
 ];
 
+function formatDate(date: Timestamp): string {
+  const d = date.toDate();
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${diffDays >= 14 ? "s" : ""} ago`;
+  return `${Math.floor(diffDays / 30)} month${diffDays >= 60 ? "s" : ""} ago`;
+}
+
 export default function ProgramsPage() {
   const [programs, setPrograms] = useState<ProgramData[]>(mockPrograms);
   const [loading, setLoading] = useState(true);
@@ -104,7 +116,10 @@ export default function ProgramsPage() {
               isTemplate: data.isTemplate ?? true,
               activeClients: data.activeClients || 0,
               clientAvatars: data.clientAvatars || [],
-              updatedAt: data.updatedAt ? `Updated ${formatDate(data.updatedAt)}` : undefined,
+              updatedAt:
+                data.updatedAt instanceof Timestamp
+                  ? `Updated ${formatDate(data.updatedAt)}`
+                  : undefined,
               createdBy: data.createdBy ? (userMap[data.createdBy] || data.createdBy) : undefined,
               accessType: data.accessType || "free",
               price: data.price ?? null,
@@ -123,20 +138,6 @@ export default function ProgramsPage() {
 
     fetchPrograms();
   }, []);
-
-  // Format date helper
-  const formatDate = (date: any): string => {
-    if (!date) return "";
-    const d = date.toDate ? date.toDate() : new Date(date);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return "today";
-    if (diffDays === 1) return "yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${diffDays >= 14 ? "s" : ""} ago`;
-    return `${Math.floor(diffDays / 30)} month${diffDays >= 60 ? "s" : ""} ago`;
-  };
 
   // Filter programs based on search
   const filteredPrograms = useMemo(() => {
