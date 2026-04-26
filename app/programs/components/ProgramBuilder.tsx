@@ -25,7 +25,6 @@ import PhaseDescriptionModal from "../../components/PhaseDescriptionModal";
 import ConfirmModal from "../../components/ConfirmModal";
 import { ProgramBuilderFooterBar } from "./ProgramBuilderFooterBar";
 import {
-  mockTemplates,
   muscleGroupOrder,
   useProgramEditor,
   type ProgramFormData,
@@ -125,28 +124,12 @@ export default function ProgramBuilder({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [phaseMenuOpenId, setPhaseMenuOpenId]);
 
-  // Derived: filtered templates (aside variant)
-  const allTemplates = useMemo(
-    () => [...savedTemplates, ...mockTemplates],
-    [savedTemplates]
-  );
-
   const filteredTemplates = useMemo(
     () =>
-      allTemplates.filter((t) =>
+      savedTemplates.filter((t) =>
         t.name.toLowerCase().includes(searchQuery.toLowerCase())
       ),
-    [allTemplates, searchQuery]
-  );
-
-  const savedTemplateResults = filteredTemplates.filter(
-    (t) => t.category === "saved"
-  );
-  const recentTemplates = filteredTemplates.filter(
-    (t) => t.category === "recent"
-  );
-  const strengthTemplates = filteredTemplates.filter(
-    (t) => t.category === "strength"
+    [savedTemplates, searchQuery]
   );
 
   const totalDuration = useMemo(
@@ -310,12 +293,12 @@ export default function ProgramBuilder({
         </div>
       )}
 
-      {!loadingTemplates && savedTemplateResults.length > 0 && (
+      {!loadingTemplates && filteredTemplates.length > 0 && (
         <>
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
             Saved Workouts
           </div>
-          {savedTemplateResults.map(renderWorkoutRow)}
+          {filteredTemplates.map(renderWorkoutRow)}
         </>
       )}
 
@@ -328,28 +311,10 @@ export default function ProgramBuilder({
           </div>
         )}
 
-      {recentTemplates.length > 0 && (
-        <>
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
-            Recent
-          </div>
-          {recentTemplates.map(renderWorkoutRow)}
-        </>
-      )}
-
-      {strengthTemplates.length > 0 && (
-        <>
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-4">
-            Strength
-          </div>
-          {strengthTemplates.map(renderWorkoutRow)}
-        </>
-      )}
-
       {!loadingTemplates &&
-        recentTemplates.length === 0 &&
-        strengthTemplates.length === 0 &&
-        savedTemplateResults.length === 0 && (
+        searchQuery.trim() &&
+        filteredTemplates.length === 0 &&
+        !templateFetchError && (
           <div className="text-center py-8 text-muted-foreground text-sm">
             No templates found matching &quot;{searchQuery}&quot;
           </div>

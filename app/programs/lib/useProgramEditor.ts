@@ -61,7 +61,7 @@ export interface EditExercise {
   repsRange?: string;
 }
 
-export type TemplateCategory = "recent" | "strength" | "saved";
+export type TemplateCategory = "saved";
 
 export interface WorkoutTemplateExercise {
   exerciseId?: string;
@@ -139,14 +139,6 @@ export const getCategoryFromMuscle = (muscle: string): string => {
 };
 
 // === Mock data (fallbacks) ===
-
-export const mockTemplates: WorkoutTemplate[] = [
-  { id: "1", name: "Upper Body Power", exercises: 4, duration: 45, category: "recent" },
-  { id: "2", name: "Leg Day Hypertrophy", exercises: 6, duration: 60, category: "recent" },
-  { id: "3", name: "Full Body Circuit", exercises: 8, duration: 30, category: "recent" },
-  { id: "4", name: "5x5 Stronglifts A", exercises: 3, duration: 50, category: "strength" },
-  { id: "5", name: "Deadlift Focus", exercises: 4, duration: 45, category: "strength" },
-];
 
 export const mockExercises: EditExercise[] = [
   { id: "1", name: "Barbell Bench Press", muscleGroup: "Chest", equipment: "Barbell", difficulty: "intermediate" },
