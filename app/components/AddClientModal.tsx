@@ -36,33 +36,33 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     goals: "",
   });
 
-  // Fetch programs from Firebase when modal opens
+  // Prefetch programs on mount so the dropdown label is stable when the modal opens
   useEffect(() => {
+    let cancelled = false;
+
     const fetchPrograms = async () => {
-      if (!isOpen) return;
-      
       try {
-        setLoadingPrograms(true);
-        const programsCollection = collection(db, "programs");
-        const programsSnapshot = await getDocs(programsCollection);
-        
-        const programList = programsSnapshot.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name || "Unnamed Program",
-        }));
-        
-        setPrograms(programList);
+        const programsSnapshot = await getDocs(collection(db, "programs"));
+        if (cancelled) return;
+        setPrograms(
+          programsSnapshot.docs.map((d) => ({
+            id: d.id,
+            name: d.data().name || "Unnamed Program",
+          }))
+        );
       } catch (error) {
         console.error("Error fetching programs:", error);
-        // Fallback to just "No Program" if there's an error
-        setPrograms([]);
+        if (!cancelled) setPrograms([]);
       } finally {
-        setLoadingPrograms(false);
+        if (!cancelled) setLoadingPrograms(false);
       }
     };
 
     fetchPrograms();
-  }, [isOpen]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -381,10 +381,10 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                     name="currentProgram"
                     value={formData.currentProgram}
                     onChange={(e) => setFormData(prev => ({ ...prev, currentProgram: e.target.value }))}
-                    disabled={loadingPrograms}
+                    disabled={loadingPrograms && programs.length === 0}
                     className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
                   >
-                    <option value="">{loadingPrograms ? "Loading programs..." : "Select a Program"}</option>
+                    <option value="">Select a Program</option>
                     {programs.map((program) => (
                       <option key={program.id} value={program.id}>
                         {program.name}

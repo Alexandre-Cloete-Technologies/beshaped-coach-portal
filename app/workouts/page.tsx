@@ -234,7 +234,7 @@ export default function WorkoutsPage() {
         <div className="p-2 w-full max-w-none">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-2 ">
             <div>
-              <Breadcrumbs items={[{ label: "Workouts" }]} />
+              {/* <Breadcrumbs items={[{ label: "Workouts" }]} /> */}
               <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">Workouts</h1>
               <p className="text-muted-foreground max-w-3xl">
                 Build reusable workout templates from your exercise library. Saved workouts appear in

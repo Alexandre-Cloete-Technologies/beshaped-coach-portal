@@ -211,7 +211,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
               </span>
             </div>
             <div className="flex justify-between items-center gap-2">
-              <span className="text-muted-foreground">Since last log</span>
+              {/* <span className="text-muted-foreground">Since last log</span>
               <span
                 className={`font-medium tabular-nums inline-flex items-center gap-0.5 ${
                   client.weightChange === null
@@ -241,7 +241,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
                     +{client.weightChange} {client.weightUnit || "kg"}
                   </>
                 )}
-              </span>
+              </span> */}
             </div>
             {/* <div className="flex justify-between">
               <span className="text-muted-foreground">Last Workout</span>

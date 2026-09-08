@@ -168,7 +168,6 @@ type CalendarDayCell = {
   phaseNumber?: number;
   weekNumber?: number;
   dayNumber?: number;
-  isToday: boolean;
   isSelected: boolean;
 };
 
@@ -616,7 +615,6 @@ export default function WorkoutHistory() {
           phaseNumber: workoutData?.phaseNumber,
           weekNumber: workoutData?.weekNumber,
           dayNumber: workoutData?.dayNumber,
-          isToday: false,
           isSelected: false,
         });
       }
@@ -626,8 +624,6 @@ export default function WorkoutHistory() {
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentYear, currentMonth, day);
       const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      const isToday =
-        day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
       const isSelected =
         selectedDate !== null &&
         day === selectedDate.getDate() &&
@@ -646,7 +642,6 @@ export default function WorkoutHistory() {
         phaseNumber: workoutData?.phaseNumber,
         weekNumber: workoutData?.weekNumber,
         dayNumber: workoutData?.dayNumber,
-        isToday,
         isSelected,
       });
     }
@@ -668,13 +663,12 @@ export default function WorkoutHistory() {
         phaseNumber: workoutData?.phaseNumber,
         weekNumber: workoutData?.weekNumber,
         dayNumber: workoutData?.dayNumber,
-        isToday: false,
         isSelected: false,
       });
     }
 
     return days;
-  }, [currentMonth, currentYear, today, selectedDate, workoutLogs]);
+  }, [currentMonth, currentYear, selectedDate, workoutLogs]);
 
   // Get month name
   const monthNames = [
@@ -717,7 +711,7 @@ export default function WorkoutHistory() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-2">
       {loadingProgram && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
           Loading workout names from program...
@@ -732,11 +726,6 @@ export default function WorkoutHistory() {
             placeholder="Search by workout name..."
             type="text"
           />
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-
-
-
         </div>
       </div>
 
@@ -840,10 +829,8 @@ export default function WorkoutHistory() {
                   key={index}
                   onClick={() => handleDayClick(dayData)}
                   className={`aspect-square flex flex-col items-center justify-center relative cursor-pointer rounded-lg transition-all ${
-                    dayData.isToday && !dayData.isSelected
-                      ? "bg-primary text-white shadow-lg shadow-blue-500/30"
-                      : dayData.isSelected
-                      ? "bg-primary/80 text-white ring-2 ring-primary ring-offset-2 ring-offset-card"
+                    dayData.isSelected
+                      ? "bg-beshaped-dark-green text-white ring-2 ring-beshaped-dark-green ring-offset-2 ring-offset-card shadow-sm"
                       : dayData.isCurrentMonth
                       ? "hover:bg-accent hover:scale-105"
                       : "opacity-40"
@@ -851,8 +838,8 @@ export default function WorkoutHistory() {
                 >
                   <span
                     className={`text-sm font-medium ${
-                      dayData.isToday || dayData.isSelected
-                        ? "font-bold"
+                      dayData.isSelected
+                        ? "font-bold text-white"
                         : dayData.isCurrentMonth
                         ? "text-card-foreground"
                         : "text-gray-300 dark:text-gray-600"
@@ -863,7 +850,7 @@ export default function WorkoutHistory() {
                   {dayData.status && (
                     <span
                       className={`text-[8px] font-bold mt-0.5 leading-tight whitespace-nowrap px-1 rounded ${
-                        dayData.isToday || dayData.isSelected 
+                        dayData.isSelected 
                           ? "text-white/90" 
                           : dayData.status === "completed" 
                             ? "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
@@ -948,7 +935,7 @@ export default function WorkoutHistory() {
               )}
 
               <details
-                className="group bg-card rounded-xl border border-border overflow-hidden opacity-90 hover:opacity-100 transition-opacity"
+                className="group bg-card rounded-xl border border-border overflow-hidden opacity-90 hover:opacity-100 transition-opacity "
                 open={index === 0}
               >
                 <summary className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-2 cursor-pointer hover:bg-accent/50 transition-colors select-none relative list-none">
@@ -959,7 +946,9 @@ export default function WorkoutHistory() {
                     </div>
                     <div>
                       <h4 className="text-card-foreground font-bold text-base">{workout.dayOfWeek}</h4>
-                      <p className="text-muted-foreground text-xs">{workout.time}</p>
+                      <p className="text-muted-foreground text-xs">Started at: {workout.time}</p>
+                      <p className="text-muted-foreground text-xs">Completed at: {workout.time}</p>
+                      <p className="text-muted-foreground text-xs">Duration: {workout.time}</p>
                     </div>
                   </div>
 
@@ -967,29 +956,19 @@ export default function WorkoutHistory() {
                     <div className="flex flex-col gap-1">
                       <h3 className="text-card-foreground font-bold text-lg">{workout.name}</h3>
                       {workout.phase && (
-                        <p className="text-xs font-bold text-foreground mt-1">
+                        <p className="text-xs font-bold text-foreground mt-1 ">
                           {workout.phase}
                         </p>
                       )}
-                      {index === 0 && workout.duration && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {/* {index === 0 && workout.duration && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground ">
                           <span>{workout.duration} duration</span>
                           <span className="w-1 h-1 rounded-full bg-border"></span>
                           <span>{workout.volume} vol</span>
                         </div>
-                      )}
+                      )} */}
                       {index !== 0 && <div className="flex items-center gap-2">{getStatusBadge(workout.status)}</div>}
                     </div>
-                    {/* <div className="flex items-center gap-6 mr-8">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                          Avg RPE
-                        </span>
-                        <span className="text-lg font-bold text-card-foreground">
-                          {workout.avgRpe ? workout.avgRpe.toFixed(1) : "--"}
-                        </span>
-                      </div>
-                    </div> */}
                   </div>
 
                   <div className="absolute right-5 top-5 md:static md:right-auto md:top-auto">
@@ -1000,12 +979,6 @@ export default function WorkoutHistory() {
                 {/* Display exercises from workoutLogs (primary) */}
                 {workout.workoutLogExercises && workout.workoutLogExercises.length > 0 ? (
                   <div className="border-t border-border bg-muted/30 p-2">
-                    {/* Phase Info Header */}
-                    {workout.phase && (
-                      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                        <span className="text-sm font-medium text-card-foreground">{workout.phase}</span>
-                      </div>
-                    )}
                     <div className="grid gap-3">
                       {workout.workoutLogExercises.map((exercise, exIdx) => (
                         <div key={exIdx} className="bg-card rounded-lg p-4 border border-border">

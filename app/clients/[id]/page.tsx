@@ -358,7 +358,7 @@ export default function ClientDetailPage() {
                 {/* Client Info */}
                 <div>
                   <h1 className="text-2xl font-bold text-foreground mb-2">{String(client.name)}</h1>
-                  <div className="flex flex-col gap-1 mb-3">
+                  <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Mail className="w-4 h-4" />
                       {String(client.email)}
@@ -376,15 +376,10 @@ export default function ClientDetailPage() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-
-
-              </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 border-t border-border pt-4">
+            <div className="flex items-center gap-1 border-t border-border pt-3">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
