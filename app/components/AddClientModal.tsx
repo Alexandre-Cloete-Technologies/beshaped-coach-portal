@@ -22,7 +22,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
   // Static coaches data
   const staticCoaches = [
     { id: "c1", name: "Dewald" },
-    { id: "c2", name: "Sarah Connor" },
+    { id: "c2", name: "Pieter van Zyl" },
   ];
 
   const [formData, setFormData] = useState({
@@ -225,8 +225,8 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="text-lg font-semibold text-card-foreground">Add a New Client</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Create a new client profile</p>
+            <h2 className="text-lg font-semibold text-card-foreground">Add a New User</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Create a new user's profile</p>
           </div>
           <button
             onClick={onClose}

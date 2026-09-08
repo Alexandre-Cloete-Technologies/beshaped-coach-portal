@@ -31,27 +31,33 @@ interface Exercise {
 
 // WorkoutLog exercise structure from Firebase
 interface WorkoutLogExerciseSet {
-  done: boolean;
+  setNumber: number;
+  completed: boolean;
   reps: string;
   weight: string;
 }
 
 interface WorkoutLogExercise {
   name: string;
+  order: number;
   sets: WorkoutLogExerciseSet[];
 }
 
 interface WorkoutLog {
   id: string;
-  completedAt: Date;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  /** Calendar date of the session from dateCompleted, else timeCompletedAt. */
+  logDate: Date;
   userId: string;
   programName: string;
   phaseNumber: number;
   workoutName: string;
   dayNumber: number;
   weekNumber: number;
+  /** Session length in seconds. */
   totalDuration: number | null;
-  status: "completed" | "in-progress" | "skipped";
+  status: "completed" | "to-be-completed" | "in-progress" | "skipped";
   exercises: WorkoutLogExercise[];
   totalVolume: number;
   totalSets: number;
@@ -63,6 +69,8 @@ interface Workout {
   date: string;
   dayOfWeek: string;
   time: string;
+  startedTime: string;
+  completedTime: string;
   name: string;
   status: "completed" | "partial" | "skipped";
   duration?: string;
@@ -84,6 +92,9 @@ const mockWorkouts: Workout[] = [
     date: "N/A",
     dayOfWeek: "N/A",
     time: "--:--",
+    startedTime: "--",
+    completedTime: "--",
+    duration: "--",
     name: "No workouts found",
     status: "skipped",
     phase: "No program assigned",
@@ -125,6 +136,66 @@ function isWithinMonth(
 ): boolean {
   if (!date || !isValidDate(date)) return false;
   return date.getMonth() === month && date.getFullYear() === year;
+}
+
+function toDateValue(val: unknown): Date | null {
+  if (!val) return null;
+  if (typeof val === "object" && val !== null && "toDate" in val && typeof (val as { toDate: () => Date }).toDate === "function") {
+    return (val as { toDate: () => Date }).toDate();
+  }
+  if (val instanceof Date) return val;
+  if (typeof val === "string" || typeof val === "number") return new Date(val);
+  return null;
+}
+
+function formatClockTime(date: Date | null | undefined): string {
+  if (!date || !isValidDate(date)) return "--";
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const formattedHours = hours % 12 || 12;
+  const formattedMinutes = String(minutes).padStart(2, "0");
+  return `${formattedHours}:${formattedMinutes} ${ampm}`;
+}
+
+function formatDurationFromMs(ms: number): string | null {
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const totalMinutes = Math.max(1, Math.round(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${minutes}m`;
+}
+
+/** `totalDuration` on workoutLogs is seconds. Fall back to elapsed start→end if needed. */
+function formatWorkoutDuration(
+  totalDurationSeconds: number | null,
+  startedAt: Date | null,
+  completedAt: Date | null
+): string {
+  if (totalDurationSeconds != null && totalDurationSeconds > 0) {
+    const formatted = formatDurationFromMs(totalDurationSeconds * 1000);
+    if (formatted) return formatted;
+  }
+
+  if (startedAt && completedAt && isValidDate(startedAt) && isValidDate(completedAt)) {
+    const elapsed = completedAt.getTime() - startedAt.getTime();
+    const eightHours = 8 * 60 * 60 * 1000;
+    if (elapsed >= 1_000 && elapsed <= eightHours) {
+      const formatted = formatDurationFromMs(elapsed);
+      if (formatted) return formatted;
+    }
+  }
+
+  return "--";
+}
+
+/** Build a local calendar Date from a date-only Firestore value (midnight UTC stays on that day). */
+function calendarDateFromValue(val: unknown): Date | null {
+  const d = toDateValue(val);
+  if (!d || !isValidDate(d)) return null;
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 /** Program `programs` doc shape (phases → workouts) used when building client program list */
@@ -174,33 +245,29 @@ type CalendarDayCell = {
 const normalizeWorkoutLogExercises = (
   data: Record<string, unknown>
 ): WorkoutLogExercise[] => {
-  const candidateCollections: unknown[] = [
-    data.exercises,
-    data.workoutExercises,
-    data.workout,
-    data.exerciseList,
-  ];
-
-  const rawExercises = candidateCollections.find((candidate) => Array.isArray(candidate));
-  if (!Array.isArray(rawExercises)) return [];
+  const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
 
   return rawExercises
     .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
-    .map((exercise) => {
+    .map((exercise, index) => {
       const rawSets = Array.isArray(exercise.sets) ? exercise.sets : [];
       const normalizedSets: WorkoutLogExerciseSet[] = rawSets
         .filter((set): set is Record<string, unknown> => Boolean(set && typeof set === "object"))
-        .map((set) => ({
-          done: Boolean(set.done ?? set.completed ?? false),
-          reps: String(set.reps ?? set.targetReps ?? ""),
-          weight: String(set.weight ?? set.weightKg ?? ""),
-        }));
+        .map((set, setIndex) => ({
+          setNumber: Number(set.setNumber ?? setIndex + 1),
+          completed: Boolean(set.completed ?? set.done ?? false),
+          reps: String(set.reps ?? ""),
+          weight: String(set.weight ?? ""),
+        }))
+        .sort((a, b) => a.setNumber - b.setNumber);
 
       return {
-        name: String(exercise.name ?? exercise.exerciseName ?? exercise.title ?? "Unknown Exercise"),
+        name: String(exercise.exerciseName ?? exercise.name ?? "Unknown Exercise"),
+        order: Number(exercise.order ?? index + 1),
         sets: normalizedSets,
       };
-    });
+    })
+    .sort((a, b) => a.order - b.order);
 };
 
 
@@ -341,55 +408,56 @@ export default function WorkoutHistory() {
     fetchProgramWorkouts();
   }, [clientId]);
 
-  // Fetch workout logs for this client
+  // Fetch completed workoutLogs for this client (userId is the Auth UID string)
   useEffect(() => {
     const fetchWorkoutLogs = async () => {
       if (!clientId) return;
       
       try {
-        const workoutLogsRef = collection(db, "workoutLogs");
-        const userRef = doc(db, "users", clientId);
+        const snapshot = await getDocs(
+          query(collection(db, "workoutLogs"), where("userId", "==", clientId))
+        );
 
-        // Query with BOTH formats: userId can be stored as string (clientId) or DocumentReference
-        const [stringSnapshot, refSnapshot] = await Promise.all([
-          getDocs(query(workoutLogsRef, where("userId", "==", clientId))),
-          getDocs(query(workoutLogsRef, where("userId", "==", userRef))),
-        ]);
-
-        const seenIds = new Set<string>();
-        const allDocs = [...stringSnapshot.docs, ...refSnapshot.docs].filter((d) => {
-          if (seenIds.has(d.id)) return false;
-          seenIds.add(d.id);
-          return true;
-        });
-
-        const logs: WorkoutLog[] = allDocs.map((docSnap) => {
+        const logs: WorkoutLog[] = snapshot.docs.map((docSnap) => {
           const data = docSnap.data() as Record<string, unknown>;
-          const toDate = (val: unknown): Date | null => {
-            if (!val) return null;
-            if (typeof val === "object" && val !== null && "toDate" in val && typeof (val as { toDate: () => Date }).toDate === "function") {
-              return (val as { toDate: () => Date }).toDate();
-            }
-            if (val instanceof Date) return val;
-            if (typeof val === "string" || typeof val === "number") return new Date(val);
-            return null;
-          };
-          // Use completedAt, dateCompleted (client app), or startedAt for in-progress logs
-          const completedAt = toDate(data.completedAt) ?? toDate(data.dateCompleted) ?? toDate(data.startedAt) ?? new Date();
+          const startedAt =
+            toDateValue(data.timeStartedAt) ?? toDateValue(data.startedAt);
+          const completedAt =
+            toDateValue(data.timeCompletedAt) ??
+            toDateValue(data.completedAt) ??
+            toDateValue(data.dateCompleted);
+          const dateCompleted = calendarDateFromValue(data.dateCompleted);
+          const logDate = dateCompleted ?? calendarDateFromValue(completedAt) ?? calendarDateFromValue(startedAt) ?? new Date(0);
+          const rawDuration = data.totalDuration;
+          const totalDuration =
+            typeof rawDuration === "number"
+              ? rawDuration
+              : rawDuration != null
+                ? Number(rawDuration) || null
+                : null;
+          const statusRaw = String(data.status || "");
+          const status = (
+            statusRaw === "completed" ||
+            statusRaw === "to-be-completed" ||
+            statusRaw === "in-progress" ||
+            statusRaw === "skipped"
+              ? statusRaw
+              : "to-be-completed"
+          ) as WorkoutLog["status"];
+
           return {
             id: docSnap.id,
+            startedAt,
             completedAt,
+            logDate,
             userId: String(data.userId || ""),
             programName: String(data.programName || ""),
             phaseNumber: Number(data.phaseNumber || 1),
-            workoutName: String(data.workoutName || ""),
+            workoutName: String(data.workoutName || data.routineName || ""),
             dayNumber: Number(data.dayNumber || 0),
             weekNumber: Number(data.weekNumber || 0),
-            totalDuration: (data.totalDuration as number | null) || null,
-            status: (() => {
-              const s = String(data.status || "");
-              return (s === "completed" || s === "in-progress" || s === "skipped" ? s : "in-progress") as "completed" | "in-progress" | "skipped";
-            })(),
+            totalDuration,
+            status,
             exercises: normalizeWorkoutLogExercises(data),
             totalVolume: Number(data.totalVolume || 0),
             totalSets: Number(data.totalSets || 0),
@@ -398,14 +466,15 @@ export default function WorkoutHistory() {
           };
         });
 
-        // Only include completed workouts
-        const completedLogs = logs.filter((log) => log.status === "completed");
+        const completedLogs = logs.filter((log) => {
+          if (log.status === "to-be-completed") return false;
+          if (log.status !== "completed") return false;
+          return isValidDate(log.completedAt);
+        });
 
-        // Sort by date (most recent first)
-        completedLogs.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
+        completedLogs.sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
 
         setWorkoutLogs(completedLogs);
-        console.log("Fetched workout logs:", completedLogs);
       } catch (error) {
         console.error("Error fetching workout logs:", error);
       }
@@ -459,7 +528,7 @@ export default function WorkoutHistory() {
     // If we have workoutLogs, use those as the primary data source
     if (workoutLogs.length > 0) {
       // Filter out logs with invalid completedAt dates first
-      const validLogs = workoutLogs.filter((log) => isValidDate(log.completedAt));
+      const validLogs = workoutLogs.filter((log) => isValidDate(log.logDate) && log.logDate.getTime() > 0);
       
       // First, filter workout logs based on selected time period and date
       let filteredLogs = validLogs;
@@ -467,7 +536,7 @@ export default function WorkoutHistory() {
       if (timePeriod === "day" && selectedDate) {
         // Filter to show only workouts completed on the selected day
         filteredLogs = validLogs.filter((log) => 
-          isSameDay(log.completedAt, selectedDate)
+          isSameDay(log.logDate, selectedDate)
         );
       } else if (timePeriod === "week" && selectedDate) {
         // Get week boundaries (Monday to Sunday)
@@ -481,36 +550,33 @@ export default function WorkoutHistory() {
         weekEnd.setHours(23, 59, 59, 999);
         
         filteredLogs = validLogs.filter((log) => 
-          isWithinWeek(log.completedAt, weekStart, weekEnd)
+          isWithinWeek(log.logDate, weekStart, weekEnd)
         );
       } else if (timePeriod === "month") {
         // Filter to show only workouts completed in the current selected month
         filteredLogs = validLogs.filter((log) => 
-          isWithinMonth(log.completedAt, currentMonth, currentYear)
+          isWithinMonth(log.logDate, currentMonth, currentYear)
         );
       }
 
       // Map filtered logs to Workout format
       const workoutsFromLogs: Workout[] = filteredLogs.map((log) => {
-        const date = log.completedAt;
-        
-        // Format time manually to ensure consistency
-        const hours = date.getHours();
-        const minutes = date.getMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const formattedHours = hours % 12 || 12;
-        const formattedMinutes = String(minutes).padStart(2, '0');
-        const timeString = `${formattedHours}:${formattedMinutes} ${ampm}`;
+        const date = log.logDate;
+        const completedTime = formatClockTime(log.completedAt);
+        const startedTime = formatClockTime(log.startedAt);
+        const duration = formatWorkoutDuration(log.totalDuration, log.startedAt, log.completedAt);
         
         return {
           date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
           dayOfWeek: dayNames[date.getDay()],
-          time: timeString,
+          time: completedTime,
+          startedTime,
+          completedTime,
           name: log.workoutName,
           status: log.status === "in-progress" ? "partial" : log.status as "completed" | "partial" | "skipped",
           phase: `Day ${log.dayNumber} - Week ${log.weekNumber} - Phase ${log.phaseNumber}`,
           workoutLogExercises: log.exercises,
-          duration: log.totalDuration ? `${log.totalDuration}m` : undefined,
+          duration,
           volume: log.totalVolume ? `${log.totalVolume.toLocaleString()} lb` : undefined,
           workoutLogId: log.id,
           programName: log.programName,
@@ -532,12 +598,14 @@ export default function WorkoutHistory() {
       return {
         date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
         dayOfWeek: programWorkout.workoutName || dayNames[date.getDay()],
-        time: index === 0 ? "9:00 AM" : "--:--",
+        time: "--",
+        startedTime: "--",
+        completedTime: "--",
         name: programWorkout.workoutName,
         status: (index === 0 ? "completed" : "completed") as "completed" | "partial" | "skipped",
         phase: `Day ${programWorkout.dayNumber} - Phase ${programWorkout.phaseOrder}`, // Fallback mock
         programExercises: programWorkout.exercises,
-        duration: index === 0 ? "1h 15m" : undefined,
+        duration: "--",
         volume: index === 0 ? "15,240 lb" : undefined,
         avgRpe: index === 0 ? 8.5 : undefined,
         // Mock values for fallback
@@ -579,8 +647,8 @@ export default function WorkoutHistory() {
     // would incorrectly show as Feb 28 in timezones west of UTC with local methods
     const workoutDates = new Map();
     workoutLogs.forEach(log => {
-      if (isValidDate(log.completedAt)) {
-        const dateKey = `${log.completedAt.getUTCFullYear()}-${String(log.completedAt.getUTCMonth() + 1).padStart(2, "0")}-${String(log.completedAt.getUTCDate()).padStart(2, "0")}`;
+      if (isValidDate(log.logDate) && log.logDate.getTime() > 0) {
+        const dateKey = `${log.logDate.getFullYear()}-${String(log.logDate.getMonth() + 1).padStart(2, "0")}-${String(log.logDate.getDate()).padStart(2, "0")}`;
         // Store the workout details
         // If multiple workouts on same day, prioritize "completed" or simply take the first one found
         if (!workoutDates.has(dateKey) || log.status === "completed") {
@@ -686,24 +754,6 @@ export default function WorkoutHistory() {
     "December",
   ];
   const currentMonthName = monthNames[currentMonth];
-
-  const getStatusBadge = (status: string) => {
-    if (status === "completed") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
-          Completed
-        </span>
-      );
-    }
-    if (status === "skipped") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          Skipped
-        </span>
-      );
-    }
-    return null;
-  };
 
   const getRpeColor = (rpe: number) => {
     if (rpe >= 9) return "text-orange-500";
@@ -921,19 +971,8 @@ export default function WorkoutHistory() {
             </div>
           </div>
 
-          {/* Today's Workout - Expanded by Default */}
           {filteredWorkouts.map((workout, index) => (
-            <div key={index}>
-              {index === 1 && (
-                <div className="flex items-center gap-4 my-6">
-                  <div className="h-px bg-border flex-1"></div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Previous days
-                  </span>
-                  <div className="h-px bg-border flex-1"></div>
-                </div>
-              )}
-
+            <div key={workout.workoutLogId || index}>
               <details
                 className="group bg-card rounded-xl border border-border overflow-hidden opacity-90 hover:opacity-100 transition-opacity "
                 open={index === 0}
@@ -946,9 +985,9 @@ export default function WorkoutHistory() {
                     </div>
                     <div>
                       <h4 className="text-card-foreground font-bold text-base">{workout.dayOfWeek}</h4>
-                      <p className="text-muted-foreground text-xs">Started at: {workout.time}</p>
-                      <p className="text-muted-foreground text-xs">Completed at: {workout.time}</p>
-                      <p className="text-muted-foreground text-xs">Duration: {workout.time}</p>
+                      <p className="text-muted-foreground text-xs">Started at: {workout.startedTime}</p>
+                      <p className="text-muted-foreground text-xs">Completed at: {workout.completedTime}</p>
+                      <p className="text-muted-foreground text-xs">Duration: {workout.duration ?? "--"}</p>
                     </div>
                   </div>
 
@@ -967,7 +1006,6 @@ export default function WorkoutHistory() {
                           <span>{workout.volume} vol</span>
                         </div>
                       )} */}
-                      {index !== 0 && <div className="flex items-center gap-2">{getStatusBadge(workout.status)}</div>}
                     </div>
                   </div>
 
@@ -987,7 +1025,7 @@ export default function WorkoutHistory() {
                               {exIdx + 1}. {exercise.name}
                             </h5>
                             <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                              {exercise.sets.length} Sets
+                              {exercise.sets.filter((s) => s.completed).length} / {exercise.sets.length} Sets
                             </span>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
@@ -995,22 +1033,22 @@ export default function WorkoutHistory() {
                               <div
                                 key={setIdx}
                                 className={`p-2 rounded flex flex-col items-center justify-center text-center ${
-                                  set.done 
+                                  set.completed 
                                     ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800" 
                                     : "bg-muted border border-border"
                                 }`}
                               >
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
-                                  Set {setIdx + 1}
+                                  Set {set.setNumber || setIdx + 1}
                                 </span>
-                                {set.done && set.weight && set.reps ? (
+                                {set.completed && set.weight && set.reps ? (
                                   <span className="font-bold text-card-foreground">
                                     {set.weight} x {set.reps}
                                   </span>
                                 ) : (
                                   <span className="text-muted-foreground text-sm">--</span>
                                 )}
-                                {set.done ? (
+                                {set.completed ? (
                                   <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">✓ Done</span>
                                 ) : (
                                   <span className="text-[10px] text-muted-foreground">Not done</span>

@@ -276,7 +276,7 @@ export default function Home() {
                 onClick={() => setIsModalOpen(true)}
                 className="h-10 px-4 rounded-lg bg-beshaped-dark-green text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-beshaped-green transition-colors shadow-sm"
               >
-                Add New Client
+                Add New User
               </button>
             </div>
           </div>
