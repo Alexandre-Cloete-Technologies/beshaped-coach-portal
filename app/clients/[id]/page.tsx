@@ -27,6 +27,7 @@ import {
 import WorkoutHistory from "./WorkoutHistory";
 import Progress from "./Progress";
 import ClientPrograms from "./ClientPrograms";
+import Nutrition from "./Nutrition";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
@@ -401,7 +402,7 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {/* Tab Content - WorkoutHistory and Progress stay mounted once visited to avoid re-fetch on tab switch */}
+          {/* Tab Content - heavy tabs stay mounted once visited to avoid re-fetch on tab switch */}
           {visitedTabs.has("workout-history") && (
             <div style={{ display: activeTab === "workout-history" ? "block" : "none" }}>
               <WorkoutHistory />
@@ -415,6 +416,11 @@ export default function ClientDetailPage() {
           {visitedTabs.has("programs") && (
             <div style={{ display: activeTab === "programs" ? "block" : "none" }}>
               <ClientPrograms clientId={clientId} />
+            </div>
+          )}
+          {visitedTabs.has("nutrition") && (
+            <div style={{ display: activeTab === "nutrition" ? "block" : "none" }}>
+              <Nutrition clientId={clientId} />
             </div>
           )}
           {activeTab === "overview" && (
@@ -468,11 +474,9 @@ export default function ClientDetailPage() {
               
             </div>
           )}
-          {["nutrition", "settings"].includes(activeTab) && (
+          {activeTab === "settings" && (
             <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center">
-              <p className="text-muted-foreground">
-                {tabs.find((t) => t.id === activeTab)?.label} content coming soon...
-              </p>
+              <p className="text-muted-foreground">Settings content coming soon...</p>
             </div>
           )}
         </div>

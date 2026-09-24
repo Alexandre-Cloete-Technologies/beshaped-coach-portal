@@ -974,7 +974,7 @@ export default function WorkoutHistory() {
           {filteredWorkouts.map((workout, index) => (
             <div key={workout.workoutLogId || index}>
               <details
-                className="group bg-card rounded-xl border border-border overflow-hidden opacity-90 hover:opacity-100 transition-opacity "
+                className="group rounded-xl border border-muted-foreground/25 bg-muted shadow-sm overflow-hidden"
                 open={index === 0}
               >
                 <summary className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-2 cursor-pointer hover:bg-accent/50 transition-colors select-none relative list-none">
