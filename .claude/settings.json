@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/serviceAccount*.json)",
+      "Read(./**/*service-account*.json)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(netlify deploy:*)",
+      "Bash(eas build:*)",
+      "Bash(eas submit:*)",
+      "Bash(eas update:*)"
+    ]
+  }
+}
