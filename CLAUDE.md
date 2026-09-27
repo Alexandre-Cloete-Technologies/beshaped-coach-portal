@@ -37,7 +37,8 @@ any Firestore/Storage work.
   (`lib/workoutLogSeed.ts`). The seeded logs use `startedAt`/`completedAt` and a **reference** `programId`;
   mobile writes `timeStartedAt`/`timeCompletedAt` and a **string** `programId`. Readers must handle both until unified.
 - `AddClientModal` creates the Auth user with the client SDK (`createUserWithEmailAndPassword`), which
-  signs the coach in as the new client (inferred from Firebase client SDK behaviour). Moving client
+  signs the coach in as the new client (confirmed in the emulator 2026-09-28: the auth guard then signs
+  them out, and with sign-in-required rules the `users` doc write is denied, leaving an orphan Auth user). Moving client
   creation to a Cloud Function / Admin SDK is the fix; don't copy this pattern.
 - `createdBy` on programs/exercises/workouts is a literal (`"coach"` / `"admin"`), not a uid.
 
