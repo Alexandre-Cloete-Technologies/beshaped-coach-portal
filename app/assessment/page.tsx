@@ -6,6 +6,8 @@ import Sidebar from "../components/Sidebar";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
+import { fetchScopedClients } from "@/lib/coachScope";
 
 interface Client {
   id: string;
@@ -24,6 +26,11 @@ const JACKSON_POLLOCK_SITES = [
 ];
 
 const ASSESSMENT_DRAFT_KEY = "beshaped-coach-assessment-draft";
+
+/** One draft per coach, so a shared browser doesn't show one coach's client measurements to another. */
+function assessmentDraftKey(uid: string): string {
+  return `${ASSESSMENT_DRAFT_KEY}:${uid}`;
+}
 
 const CIRCUMFERENCE_FIELDS = [
   { key: "shoulder", label: "Shoulder" },
@@ -96,10 +103,10 @@ function classificationFromBmi(bmi: number): (typeof BMI_CLASSIFICATION_ROWS)[nu
   return "Obesity Class 3";
 }
 
-function readAssessmentDraft(): Partial<AssessmentDraftV1> | null {
+function readAssessmentDraft(uid: string): Partial<AssessmentDraftV1> | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(ASSESSMENT_DRAFT_KEY);
+    const raw = localStorage.getItem(assessmentDraftKey(uid));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return null;
@@ -110,6 +117,7 @@ function readAssessmentDraft(): Partial<AssessmentDraftV1> | null {
 }
 
 export default function AssessmentPage() {
+  const { uid, role } = useSignedInCoach();
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -138,7 +146,7 @@ export default function AssessmentPage() {
   const [draftReady, setDraftReady] = useState(false);
 
   useEffect(() => {
-    const d = readAssessmentDraft();
+    const d = readAssessmentDraft(uid);
     if (d) {
       if (typeof d.searchQuery === "string") setSearchQuery(d.searchQuery);
       if (typeof d.selectedClientId === "string") setSelectedClientId(d.selectedClientId);
@@ -158,7 +166,7 @@ export default function AssessmentPage() {
       setSkinfolds(mergeSkinfolds(d.skinfolds));
     }
     setDraftReady(true);
-  }, []);
+  }, [uid]);
 
   useEffect(() => {
     if (!draftReady || typeof window === "undefined") return;
@@ -174,11 +182,12 @@ export default function AssessmentPage() {
       skinfolds,
     };
     try {
-      localStorage.setItem(ASSESSMENT_DRAFT_KEY, JSON.stringify(payload));
+      localStorage.setItem(assessmentDraftKey(uid), JSON.stringify(payload));
     } catch (err) {
       console.error("Failed to persist assessment draft:", err);
     }
   }, [
+    uid,
     draftReady,
     searchQuery,
     selectedClientId,
@@ -193,8 +202,9 @@ export default function AssessmentPage() {
   const fetchClients = async () => {
     try {
       setLoadingClients(true);
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      const fetched: Client[] = usersSnapshot.docs.map((doc) => {
+      // Only this coach's clients (all clients for an admin)
+      const clientDocs = await fetchScopedClients({ uid, role });
+      const fetched: Client[] = clientDocs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -247,15 +257,19 @@ export default function AssessmentPage() {
 
   useEffect(() => {
     fetchClients();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the signed-in coach changes
+  }, [uid, role]);
+
+  // A draft may name a client from before scoping; only look up clients in this coach's set.
+  const selectedInScope = clients.some((c) => c.id === selectedClientId);
 
   useEffect(() => {
-    if (selectedClientId) {
+    if (selectedClientId && selectedInScope) {
       fetchLastAssessment(selectedClientId);
     } else {
       setLastAssessmentDate(null);
     }
-  }, [selectedClientId]);
+  }, [selectedClientId, selectedInScope]);
 
   const filteredClients = useMemo(() => {
     if (!searchQuery.trim()) return clients;

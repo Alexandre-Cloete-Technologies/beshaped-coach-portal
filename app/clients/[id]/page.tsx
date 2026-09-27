@@ -18,6 +18,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
+import { isClientInScope } from "@/lib/coachScope";
 import { useParams, useSearchParams } from "next/navigation";
 import { profilePhotoUrl } from "@/lib/profilePhoto";
 import {
@@ -127,6 +129,7 @@ function ClientDetailHeaderAvatar({
 }
 
 export default function ClientDetailPage() {
+  const { uid, role } = useSignedInCoach();
   const params = useParams();
   const searchParams = useSearchParams();
   const clientId = params?.id as string;
@@ -159,7 +162,9 @@ export default function ClientDetailPage() {
         setLoading(true);
         const clientDoc = await getDoc(doc(db, "users", clientId));
         
-        if (clientDoc.exists()) {
+        // Another coach's client looks the same as a missing one. The tabs below (history,
+        // nutrition, progress, programs) only mount once `client` is set, so they never load for it.
+        if (clientDoc.exists() && isClientInScope({ uid, role }, clientDoc.data())) {
           const data = clientDoc.data();
           
           // Serialize and deserialize to remove all Firestore references
@@ -256,7 +261,7 @@ export default function ClientDetailPage() {
     };
 
     fetchClient();
-  }, [clientId]);
+  }, [clientId, uid, role]);
 
   if (loading) {
     if (cachedHeaderPhoto) {

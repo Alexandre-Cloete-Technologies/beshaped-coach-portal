@@ -6,6 +6,7 @@ import { CheckCircle, AlertCircle, X } from "lucide-react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useParams } from "next/navigation";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { cn } from "@/lib/utils";
 import Navbar from "../../components/Navbar";
 import ProgramBuilder from "../components/ProgramBuilder";
@@ -17,6 +18,7 @@ import {
 import { syncWorkoutLogsForProgramChange } from "../lib/workoutLogSync";
 
 export default function ProgramDetailPage() {
+  const { uid, role } = useSignedInCoach();
   const params = useParams();
   const programId = (params?.id as string) || "";
 
@@ -105,7 +107,7 @@ export default function ProgramDetailPage() {
 
       await updateDoc(programRef, toFirestorePayload(data));
 
-      await syncWorkoutLogsForProgramChange(previousProgram, data, programRef);
+      await syncWorkoutLogsForProgramChange(previousProgram, data, programRef, { uid, role });
 
       setProgram(data);
       setSaveToast({

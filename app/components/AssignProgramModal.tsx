@@ -4,6 +4,8 @@ import { X, Users, BookOpen, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { collection, getDocs, doc, updateDoc, addDoc, query, where, Timestamp, getDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
+import { fetchScopedClients } from "@/lib/coachScope";
 import { buildProgramWorkoutSlots, seedMissingWorkoutLogsForUserProgram } from "@/lib/workoutLogSeed";
 
 interface AssignProgramModalProps {
@@ -24,6 +26,7 @@ interface ProgramOption {
 }
 
 export default function AssignProgramModal({ isOpen, onClose, onAssigned }: AssignProgramModalProps) {
+  const { uid, role } = useSignedInCoach();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
@@ -39,8 +42,9 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
 
       try {
         setLoadingData(true);
-        const [usersSnapshot, programsSnapshot] = await Promise.all([
-          getDocs(collection(db, "users")),
+        // Only this coach's clients (all clients for an admin)
+        const [clientDocs, programsSnapshot] = await Promise.all([
+          fetchScopedClients({ uid, role }),
           getDocs(collection(db, "programs")),
         ]);
 
@@ -50,7 +54,7 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
           programNameMap[d.id] = d.data().name || "Unnamed Program";
         });
 
-        const fetchedUsers: UserOption[] = usersSnapshot.docs.map((d) => {
+        const fetchedUsers: UserOption[] = clientDocs.map((d) => {
           const data = d.data();
           let currentProgram: string | undefined;
 
@@ -86,7 +90,7 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
     };
 
     fetchData();
-  }, [isOpen]);
+  }, [isOpen, uid, role]);
 
   // Derive warning for the selected user
   const selectedUser = users.find((u) => u.id === selectedUserId);
