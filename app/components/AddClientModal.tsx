@@ -246,7 +246,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
             <h2 className="text-lg font-semibold text-card-foreground">Add a New User</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Create a new user's profile</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Create a new user&apos;s profile</p>
           </div>
           <button
             onClick={onClose}

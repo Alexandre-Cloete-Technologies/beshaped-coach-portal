@@ -192,31 +192,34 @@ export default function Nutrition({ clientId }: NutritionProps) {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [logs, setLogs] = useState<NutritionLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Result of the last fetch, tagged with the client/day it was for; anything else is still loading.
+  const [result, setResult] = useState<{
+    key: string;
+    logs: NutritionLog[];
+    error: string | null;
+  } | null>(null);
   const [selectedLog, setSelectedLog] = useState<NutritionLog | null>(null);
   const [failedPhotos, setFailedPhotos] = useState<Set<string>>(new Set());
 
   const dateKey = formatDateKey(selectedDate);
   const isToday = dateKey === formatDateKey(today);
+  const requestKey = `${clientId}|${dateKey}`;
+  const loading = result?.key !== requestKey;
+  const logs = !loading && result ? result.logs : [];
+  const error = !loading && result ? result.error : null;
 
   useEffect(() => {
     if (!clientId) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    const key = `${clientId}|${dateKey}`;
 
     fetchNutritionLogs(clientId, dateKey)
       .then((nextLogs) => {
-        if (!cancelled) setLogs(nextLogs);
+        if (!cancelled) setResult({ key, logs: nextLogs, error: null });
       })
       .catch((err) => {
         console.error("Error fetching nutrition logs:", err);
-        if (!cancelled) setError("Couldn’t load meal photos for this day.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setResult({ key, logs: [], error: "Couldn’t load meal photos for this day." });
       });
 
     return () => {

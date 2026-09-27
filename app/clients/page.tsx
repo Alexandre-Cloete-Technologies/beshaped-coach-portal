@@ -57,19 +57,16 @@ function ClientsTableRowAvatar({
   avatarGradient: string;
   avatarInitials?: string;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
+  // The URL that failed to load; a new photo URL gets a fresh attempt.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const url = photo?.trim() ?? "";
-  const show = url.length > 0 && !imageFailed;
+  const show = url.length > 0 && failedUrl !== url;
   const initials =
     avatarInitials ||
     name
       .split(" ")
       .map((n) => n[0])
       .join("");
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [name, photo]);
 
   return (
     <div
@@ -86,7 +83,7 @@ function ClientsTableRowAvatar({
           width={TABLE_AVATAR_PX}
           height={TABLE_AVATAR_PX}
           className="h-full w-full object-cover"
-          onError={() => setImageFailed(true)}
+          onError={() => setFailedUrl(url)}
           unoptimized
         />
       ) : (

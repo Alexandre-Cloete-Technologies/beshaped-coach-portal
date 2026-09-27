@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -113,13 +113,10 @@ const AVATAR_PX = 44;
 
 export default function ClientCard({ client }: { client: ClientData }) {
   const router = useRouter();
-  const [imageFailed, setImageFailed] = useState(false);
+  // The URL that failed to load; a new photo URL gets a fresh attempt.
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
   const photoUrl = client.photo?.trim() ?? "";
-  const showProfileImage = photoUrl.length > 0 && !imageFailed;
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [client.id, client.photo]);
+  const showProfileImage = photoUrl.length > 0 && failedPhotoUrl !== photoUrl;
 
   // const colors = statusColors[client.status];
   const isAlert = client.status === "low" || client.status === "critical";
@@ -162,7 +159,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
                 width={AVATAR_PX}
                 height={AVATAR_PX}
                 className="h-full w-full object-cover"
-                onError={() => setImageFailed(true)}
+                onError={() => setFailedPhotoUrl(photoUrl)}
                 unoptimized
               />
             ) : (
