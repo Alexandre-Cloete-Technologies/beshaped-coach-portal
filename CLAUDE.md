@@ -8,7 +8,9 @@ any Firestore/Storage work.
 - Framework: Next.js 16.1 (App Router, React 19.2); pages are client components that call Firestore
   directly · UI: Tailwind v4 + shadcn/ui config (`components.json`, new-york), lucide-react icons
 - Firebase: client SDK only (`lib/firebase/`); no Admin SDK, no server actions or API routes
-- Hosting: Netlify (inferred: no `netlify.toml` in this repo). Env vars: `NEXT_PUBLIC_FIREBASE_*`
+- Hosting: Netlify site `beshaped-coach-portal` (https://beshaped-coach-portal.netlify.app): builds from `master`,
+  deploy previews on PRs. Production env vars (`NEXT_PUBLIC_FIREBASE_*`, prod project) are set in Netlify;
+  `NEXT_PUBLIC_USE_EMULATORS` must never be set there (the build refuses it). No `netlify.toml`.
 - Default branch is `master` (the other two repos use `main`)
 
 ## Commands
