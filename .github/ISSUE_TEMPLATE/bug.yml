@@ -1,0 +1,48 @@
+name: Bug
+description: Something is broken or behaves unexpectedly
+type: Bug
+projects: ["Alexandre-Cloete-Technologies/3"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as …
+        2. Open …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Device and OS or browser, app version, and account type (client, member, coach).
+      placeholder: iPhone 13, iOS 18, app 1.0.3, coached client
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Production
+        - Local dev
+        - Emulator
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or logs
+      description: Don't paste secrets, tokens or clients' personal data.
