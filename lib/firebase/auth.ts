@@ -1,4 +1,8 @@
+import { deleteApp, initializeApp } from 'firebase/app';
 import {
+  connectAuthEmulator,
+  inMemoryPersistence,
+  initializeAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -7,7 +11,7 @@ import {
   User,
   UserCredential,
 } from 'firebase/auth';
-import { auth } from './config';
+import { app, auth, AUTH_EMULATOR_URL, USE_EMULATORS } from './config';
 
 /**
  * Sign in with email and password
@@ -48,6 +52,44 @@ export const signUp = async (
   } catch (error) {
     console.error('Error signing up:', error);
     throw error;
+  }
+};
+
+/**
+ * Creates another person's Auth account without signing the coach out (interim until BSF-72 moves
+ * this to a Cloud Function). The account is created on a throwaway app instance with in-memory
+ * persistence, so the coach's session on the main app is untouched and nothing is stored in the
+ * browser. `writeProfile` runs while the new account still exists on the throwaway instance and
+ * should do its writes through the main app (as the coach); if it throws, the new Auth user is
+ * deleted again so no account is left without a profile.
+ */
+export const createAccountForClient = async (
+  email: string,
+  password: string,
+  displayName: string,
+  writeProfile: (uid: string) => Promise<void>
+): Promise<string> => {
+  const secondaryApp = initializeApp(app.options, `create-account-${Date.now()}`);
+  const secondaryAuth = initializeAuth(secondaryApp, { persistence: inMemoryPersistence });
+  if (USE_EMULATORS) {
+    connectAuthEmulator(secondaryAuth, AUTH_EMULATOR_URL, { disableWarnings: true });
+  }
+
+  try {
+    const { user } = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await updateProfile(user, { displayName });
+    try {
+      await writeProfile(user.uid);
+    } catch (error) {
+      await user.delete().catch((deleteError) => {
+        console.error('Could not roll back the new Auth account:', deleteError);
+      });
+      throw error;
+    }
+    return user.uid;
+  } finally {
+    await signOut(secondaryAuth).catch(() => {});
+    await deleteApp(secondaryApp).catch(() => {});
   }
 };
 

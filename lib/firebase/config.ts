@@ -13,6 +13,8 @@ if (USE_EMULATORS && process.env.NODE_ENV === 'production') {
   throw new Error('NEXT_PUBLIC_USE_EMULATORS must not be set in a production build.');
 }
 
+export const AUTH_EMULATOR_URL = 'http://127.0.0.1:9099';
+
 // Must match the emulator project in beshaped-backend/.firebaserc. demo-* IDs never reach real services.
 const EMULATOR_PROJECT_ID = 'demo-beshaped';
 
@@ -48,7 +50,7 @@ if (!getApps().length) {
 
   // Connect once, right after init (connecting twice throws).
   if (USE_EMULATORS) {
-    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectAuthEmulator(auth, AUTH_EMULATOR_URL, { disableWarnings: true });
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
     connectStorageEmulator(storage, '127.0.0.1', 9199);
   }

@@ -2,9 +2,9 @@
 
 import { X, Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { collection, addDoc, setDoc, Timestamp, getDocs, doc, query, where, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { createAccountForClient } from "@/lib/firebase/auth";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { buildProgramWorkoutSlots, seedMissingWorkoutLogsForUserProgram } from "@/lib/workoutLogSeed";
 
@@ -19,7 +19,6 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
   const [showPassword, setShowPassword] = useState(false);
   const [programs, setPrograms] = useState<{id: string; name: string}[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
-  // Captured before createUserWithEmailAndPassword, which replaces the signed-in user (BSF-72).
   const { uid: coachUid, role: coachRole } = useSignedInCoach();
   // Admin only: staff accounts a new client can be assigned to. A coach always assigns to themselves.
   const [coaches, setCoaches] = useState<{ id: string; name: string }[]>([]);
@@ -108,49 +107,44 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     setLoading(true);
 
     try {
-      // Create user in Firebase Auth first to get UID
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
+      // Create the Auth account without signing the coach out (interim until BSF-72), then write
+      // the users doc as the coach. If that write fails, the new Auth account is rolled back.
+      const uid = await createAccountForClient(
         formData.email,
-        formData.password
+        formData.password,
+        formData.username,
+        (newUid) => setDoc(doc(db, "users", newUid), {
+          displayName: formData.username,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
+          username: formData.username,
+          profilePhoto: "",
+          role: formData.role,
+          // BSF-71 scoping: the coach's uid (string). Defaults to whoever is adding the client.
+          assignedCoachId: formData.role === "client" ? formData.assignedCoach || coachUid : null,
+          goals: formData.goals,
+          onboardingCompleted: false,
+          createdAt: Timestamp.now(),
+          lastActive: Timestamp.now(),
+          settings: {
+            weightUnit: "kg",
+            notifications: true,
+            theme: "light",
+            restTimerEnabled: true,
+            soundEffects: true,
+          },
+          stats: {
+            totalWorkouts: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+          },
+          currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
+          availablePrograms: formData.currentProgram
+            ? [doc(db, "programs", formData.currentProgram)]
+            : [],
+        })
       );
-      const uid = userCredential.user.uid;
-
-      // Update Auth profile with display name
-      await updateProfile(userCredential.user, { displayName: formData.username });
-
-      // Create user document in Firestore using Auth UID as document ID
       const userDocRef = doc(db, "users", uid);
-      await setDoc(userDocRef, {
-        displayName: formData.username,
-        email: formData.email,
-        phoneNumber: formData.phoneNumber,
-        username: formData.username,
-        profilePhoto: "",
-        role: formData.role,
-        // BSF-71 scoping: the coach's uid (string). Defaults to whoever is adding the client.
-        assignedCoachId: formData.role === "client" ? formData.assignedCoach || coachUid : null,
-        goals: formData.goals,
-        onboardingCompleted: false,
-        createdAt: Timestamp.now(),
-        lastActive: Timestamp.now(),
-        settings: {
-          weightUnit: "kg",
-          notifications: true,
-          theme: "light",
-          restTimerEnabled: true,
-          soundEffects: true,
-        },
-        stats: {
-          totalWorkouts: 0,
-          currentStreak: 0,
-          longestStreak: 0,
-        },
-        currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
-        availablePrograms: formData.currentProgram
-          ? [doc(db, "programs", formData.currentProgram)]
-          : [],
-      });
 
       // If a program was selected, create a userPrograms entry (only if none exists)
       if (formData.currentProgram) {

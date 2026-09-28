@@ -36,10 +36,10 @@ any Firestore/Storage work.
   creates one `userPrograms` doc on first assignment, and seeds `to-be-completed` `workoutLogs`
   (`lib/workoutLogSeed.ts`). The seeded logs use `startedAt`/`completedAt` and a **reference** `programId`;
   mobile writes `timeStartedAt`/`timeCompletedAt` and a **string** `programId`. Readers must handle both until unified.
-- `AddClientModal` creates the Auth user with the client SDK (`createUserWithEmailAndPassword`), which
-  signs the coach in as the new client (confirmed in the emulator 2026-09-28: the auth guard then signs
-  them out, and with sign-in-required rules the `users` doc write is denied, leaving an orphan Auth user). Moving client
-  creation to a Cloud Function / Admin SDK is the fix; don't copy this pattern.
+- `AddClientModal` creates the Auth user via `createAccountForClient` (`lib/firebase/auth.ts`): a throwaway
+  Firebase app with in-memory persistence, so the coach stays signed in; the `users` doc is written as the coach,
+  and the Auth user is deleted again if that write fails. Interim only: BSF-72 moves client creation to a
+  Cloud Function (Admin SDK). Don't reuse this pattern elsewhere.
 - `createdBy` on programs/exercises/workouts is a literal (`"coach"` / `"admin"`), not a uid.
 
 ## Don't
