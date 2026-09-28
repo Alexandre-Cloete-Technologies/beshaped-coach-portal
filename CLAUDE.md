@@ -13,6 +13,8 @@ any Firestore/Storage work.
 
 ## Commands
 - Dev: `npm run dev` · Build: `npm run build` · Typecheck: `npx tsc --noEmit` · Lint: `npm run lint` · Test: none
+- Emulators: `npm run dev:emulators` + `npm run seed:emulator` (see README). `firebase-admin` is a devDependency
+  for the seed script only; the app itself stays client-SDK-only.
 
 ## Structure
 - `app/page.tsx`: dashboard · `app/clients/` list + `[id]/` (programs, workout history, nutrition, progress)
@@ -23,18 +25,21 @@ any Firestore/Storage work.
 - `lib/firebase/`: `config`, `auth`, generic `firestore` CRUD, `storage` upload helpers · `lib/workoutLogSeed.ts`
 
 ## Conventions
-- Every query must be scoped to the signed-in coach's clients (multi-coach). Security rules enforce
-  this too; never rely on UI filtering alone. **Not true yet:** there is no login or auth guard, and pages
-  read all of `users` / `userPrograms`. Treat any change here as a chance to add scoping, not copy the pattern.
+- Auth (BSF-71): `lib/auth/AuthProvider` + `AuthGuard` wrap every route except `/login`. Access needs the Auth
+  custom claim `role` = `coach` | `admin` (`users.role` is not trusted). Pages call `useSignedInCoach()`.
+- Every client query goes through `lib/coachScope.ts`: a coach sees `users` with `assignedCoachId == uid`,
+  an admin sees all clients; child data (userPrograms, logs) is read only for that set, in chunks of 30
+  for `in` queries. Until owner/coach security rules exist this is UI-only; don't read `users` unscoped.
 - Programs created here are consumed by the mobile app and the webapp store; changing their shape is a
   cross-repo change (use /schema-change).
 - Assigning a program writes `users.availablePrograms` (array of program refs) + `users.currentProgram` (ref),
   creates one `userPrograms` doc on first assignment, and seeds `to-be-completed` `workoutLogs`
   (`lib/workoutLogSeed.ts`). The seeded logs use `startedAt`/`completedAt` and a **reference** `programId`;
   mobile writes `timeStartedAt`/`timeCompletedAt` and a **string** `programId`. Readers must handle both until unified.
-- `AddClientModal` creates the Auth user with the client SDK (`createUserWithEmailAndPassword`), which
-  signs the coach in as the new client (inferred from Firebase client SDK behaviour). Moving client
-  creation to a Cloud Function / Admin SDK is the fix; don't copy this pattern.
+- `AddClientModal` creates the Auth user via `createAccountForClient` (`lib/firebase/auth.ts`): a throwaway
+  Firebase app with in-memory persistence, so the coach stays signed in; the `users` doc is written as the coach,
+  and the Auth user is deleted again if that write fails. Interim only: BSF-72 moves client creation to a
+  Cloud Function (Admin SDK). Don't reuse this pattern elsewhere.
 - `createdBy` on programs/exercises/workouts is a literal (`"coach"` / `"admin"`), not a uid.
 
 ## Don't

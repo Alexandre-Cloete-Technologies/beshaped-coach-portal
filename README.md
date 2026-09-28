@@ -20,6 +20,23 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Local testing against the Firebase emulators
+
+Sign-in needs an account whose Firebase Auth custom claim `role` is `coach` or `admin`.
+To test without touching prod:
+
+1. Start the emulators from `../beshaped-backend` (`npm run emulators`; auth 9099, firestore 8080, storage 9199).
+2. Seed test accounts and data (refuses to run unless the emulator hosts are set):
+
+   ```bash
+   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 npm run seed:emulator
+   ```
+
+   Accounts: `coach-a@beshaped.test`, `coach-b@beshaped.test` (coaches), `admin@beshaped.test` (admin),
+   `client-only@beshaped.test` (no role, must be refused). Password: `TEST_PASSWORD` in `scripts/seed-emulator.mjs`.
+3. `npm run dev:emulators` (sets `NEXT_PUBLIC_USE_EMULATORS=true`; the app then uses project `demo-beshaped`).
+   Add `-- --webpack` if Turbopack dev crashes on your machine. `next build` refuses to run with the flag on.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

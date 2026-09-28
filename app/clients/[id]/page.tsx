@@ -18,6 +18,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
+import { isClientInScope } from "@/lib/coachScope";
 import { useParams, useSearchParams } from "next/navigation";
 import { profilePhotoUrl } from "@/lib/profilePhoto";
 import {
@@ -83,13 +85,10 @@ function ClientDetailHeaderAvatar({
   avatarGradient: string;
   isOnline: boolean;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
+  // The URL that failed to load; a new photo URL gets a fresh attempt.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const trimmed = photoUrl?.trim() ?? "";
-  const show = trimmed.length > 0 && !imageFailed;
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [name, photoUrl]);
+  const show = trimmed.length > 0 && failedUrl !== trimmed;
 
   return (
     <div className="relative">
@@ -107,7 +106,7 @@ function ClientDetailHeaderAvatar({
             width={DETAIL_AVATAR_PX}
             height={DETAIL_AVATAR_PX}
             className="h-full w-full object-cover"
-            onError={() => setImageFailed(true)}
+            onError={() => setFailedUrl(trimmed)}
             unoptimized
           />
         ) : (
@@ -127,6 +126,7 @@ function ClientDetailHeaderAvatar({
 }
 
 export default function ClientDetailPage() {
+  const { uid, role } = useSignedInCoach();
   const params = useParams();
   const searchParams = useSearchParams();
   const clientId = params?.id as string;
@@ -159,7 +159,9 @@ export default function ClientDetailPage() {
         setLoading(true);
         const clientDoc = await getDoc(doc(db, "users", clientId));
         
-        if (clientDoc.exists()) {
+        // Another coach's client looks the same as a missing one. The tabs below (history,
+        // nutrition, progress, programs) only mount once `client` is set, so they never load for it.
+        if (clientDoc.exists() && isClientInScope({ uid, role }, clientDoc.data())) {
           const data = clientDoc.data();
           
           // Serialize and deserialize to remove all Firestore references
@@ -256,7 +258,7 @@ export default function ClientDetailPage() {
     };
 
     fetchClient();
-  }, [clientId]);
+  }, [clientId, uid, role]);
 
   if (loading) {
     if (cachedHeaderPhoto) {

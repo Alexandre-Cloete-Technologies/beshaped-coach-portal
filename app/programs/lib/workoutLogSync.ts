@@ -4,13 +4,17 @@ import {
   deleteDoc,
   doc,
   DocumentReference,
-  getDocs,
-  query,
   Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import {
+  type CoachScope,
+  fetchScopedClients,
+  fetchUserProgramsForClients,
+  getDocsWhereIn,
+} from "@/lib/coachScope";
 import type {
   InternalExercise,
   InternalWorkout,
@@ -107,10 +111,16 @@ export const buildWorkoutLogExercises = (exercises: InternalExercise[]) =>
       })),
     }));
 
+/**
+ * Rewrites the open workoutLogs of clients on this program. Only the signed-in coach's clients
+ * (all clients for an admin) are read and synced; other coaches' clients on the same program
+ * keep their current open logs until their coach (or an admin) saves the program.
+ */
 export const syncWorkoutLogsForProgramChange = async (
   previousProgram: ProgramFormData,
   updatedProgram: ProgramFormData,
-  programRef: DocumentReference
+  programRef: DocumentReference,
+  scope: CoachScope
 ): Promise<void> => {
   const previousSlots = buildWorkoutSlotMap(previousProgram);
   const updatedSlots = buildWorkoutSlotMap(updatedProgram);
@@ -141,32 +151,28 @@ export const syncWorkoutLogsForProgramChange = async (
   void addedKeys;
 
   try {
-    const [usersSnapshot, userProgramsSnapshot, workoutLogsSnapshot] =
-      await Promise.all([
-        getDocs(
-          query(collection(db, "users"), where("currentProgram", "==", programRef))
-        ),
-        getDocs(
-          query(
-            collection(db, "userPrograms"),
-            where("programId", "==", programRef)
-          )
-        ),
-        getDocs(
-          query(
-            collection(db, "workoutLogs"),
-            where("programId", "==", programRef)
-          )
-        ),
-      ]);
+    const clientDocs = await fetchScopedClients(scope);
+    const clientIds = clientDocs.map((d) => d.id);
+    if (clientIds.length === 0) return;
+
+    // workoutLogs.userId is the uid string; userPrograms.userId is a reference (or legacy string).
+    const [userProgramDocs, workoutLogDocs] = await Promise.all([
+      fetchUserProgramsForClients(clientIds, [where("programId", "==", programRef)]),
+      getDocsWhereIn("workoutLogs", "userId", clientIds, [
+        where("programId", "==", programRef),
+      ]),
+    ]);
 
     const assignedUserIds = new Set<string>();
 
-    usersSnapshot.docs.forEach((userDoc) => {
-      assignedUserIds.add(userDoc.id);
+    clientDocs.forEach((clientDoc) => {
+      const currentProgram = clientDoc.data().currentProgram;
+      if (currentProgram?.path === programRef.path) {
+        assignedUserIds.add(clientDoc.id);
+      }
     });
 
-    userProgramsSnapshot.docs.forEach((userProgramDoc) => {
+    userProgramDocs.forEach((userProgramDoc) => {
       const userIdField = userProgramDoc.data().userId;
       if (typeof userIdField === "string" && userIdField) {
         assignedUserIds.add(userIdField);
@@ -184,7 +190,7 @@ export const syncWorkoutLogsForProgramChange = async (
       { openLogId: string | null; openLogIds: string[] }
     >();
 
-    workoutLogsSnapshot.docs.forEach((workoutLogDoc) => {
+    workoutLogDocs.forEach((workoutLogDoc) => {
       const data = workoutLogDoc.data();
       const userId =
         typeof data.userId === "string" ? data.userId : data.userId?.id;

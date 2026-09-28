@@ -10,6 +10,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { collection, getDocs, getDoc, doc, deleteDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
+import { fetchScopedClients } from "@/lib/coachScope";
 import { profilePhotoUrl } from "@/lib/profilePhoto";
 import { setClientProfilePhotoUrl } from "@/lib/clientProfilePhotoCache";
 
@@ -55,19 +57,16 @@ function ClientsTableRowAvatar({
   avatarGradient: string;
   avatarInitials?: string;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
+  // The URL that failed to load; a new photo URL gets a fresh attempt.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const url = photo?.trim() ?? "";
-  const show = url.length > 0 && !imageFailed;
+  const show = url.length > 0 && failedUrl !== url;
   const initials =
     avatarInitials ||
     name
       .split(" ")
       .map((n) => n[0])
       .join("");
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [name, photo]);
 
   return (
     <div
@@ -84,7 +83,7 @@ function ClientsTableRowAvatar({
           width={TABLE_AVATAR_PX}
           height={TABLE_AVATAR_PX}
           className="h-full w-full object-cover"
-          onError={() => setImageFailed(true)}
+          onError={() => setFailedUrl(url)}
           unoptimized
         />
       ) : (
@@ -102,6 +101,7 @@ function ClientsTableRowAvatar({
 // };
 
 export default function ClientsPage() {
+  const { uid, role } = useSignedInCoach();
   const [clients, setClients] = useState<ClientListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,10 +115,10 @@ export default function ClientsPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const usersCollection = collection(db, "users");
-      const usersSnapshot = await getDocs(usersCollection);
+      // Only this coach's clients (all clients for an admin)
+      const clientDocs = await fetchScopedClients({ uid, role });
       
-      const fetchedUsers = await Promise.all(usersSnapshot.docs.map(async (doc) => {
+      const fetchedUsers = await Promise.all(clientDocs.map(async (doc) => {
         const data = doc.data();
         
         // Generate avatar gradient based on user ID
@@ -179,7 +179,8 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the signed-in coach changes
+  }, [uid, role]);
 
   const filteredClients = clients.filter(client => {
     const query = searchQuery.toLowerCase();

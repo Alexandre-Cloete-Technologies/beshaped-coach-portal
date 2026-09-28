@@ -19,6 +19,8 @@ import {
   type DocumentReference,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
+import { fetchScopedClients, fetchUserProgramsForClients } from "@/lib/coachScope";
 import { profilePhotoUrl } from "@/lib/profilePhoto";
 import {
   getClientProfilePhotoUrl,
@@ -94,6 +96,7 @@ type ProgramDoc = {
 };
 
 export default function Home() {
+  const { uid, role } = useSignedInCoach();
   const [clients, setClients] = useState<ClientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -103,16 +106,13 @@ export default function Home() {
   const fetchUsers = async () => {
       try {
         setLoading(true);
-        const usersCollection = collection(db, "users");
-        const usersSnapshot = await getDocs(usersCollection);
-        
-        // Fetch all userPrograms
-        const userProgramsCollection = collection(db, "userPrograms");
-        const userProgramsSnapshot = await getDocs(userProgramsCollection);
+        // Only this coach's clients (all clients for an admin), and only their userPrograms
+        const clientDocs = await fetchScopedClients({ uid, role });
+        const userProgramDocs = await fetchUserProgramsForClients(clientDocs.map((d) => d.id));
         
         // Create a map of userId -> userProgram data
         const userProgramsMap = new Map();
-        for (const upDoc of userProgramsSnapshot.docs) {
+        for (const upDoc of userProgramDocs) {
           const upData = upDoc.data();
           // Get the userId from the reference
           let userId = null;
@@ -134,7 +134,7 @@ export default function Home() {
         }
         
         const fetchedUsers: ClientData[] = await Promise.all(
-          usersSnapshot.docs.map(async (doc) => {
+          clientDocs.map(async (doc) => {
             const data = doc.data();
             
             let weight: number | null = null;
@@ -229,7 +229,8 @@ export default function Home() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the signed-in coach changes
+  }, [uid, role]);
 
   /** Only the first load shows a full grid skeleton; refetches keep existing cards (and browser-cached avatars) visible. */
   const showInitialLoadPlaceholder = loading && clients.length === 0;

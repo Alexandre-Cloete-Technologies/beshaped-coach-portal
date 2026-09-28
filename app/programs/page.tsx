@@ -87,20 +87,9 @@ export default function ProgramsPage() {
       try {
         setLoading(true);
         const programsCollection = collection(db, "programs");
-        const usersCollection = collection(db, "users");
-        
-        // Fetch programs and users in parallel
-        const [programsSnapshot, usersSnapshot] = await Promise.all([
-          getDocs(programsCollection),
-          getDocs(usersCollection),
-        ]);
-        
-        // Build userId -> username lookup map
-        const userMap: Record<string, string> = {};
-        usersSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          userMap[doc.id] = data.displayName || data.username || "Unknown";
-        });
+        // No `users` read here: `createdBy` is a literal ("coach" / "admin"), not a uid, so the old
+        // all-users lookup only exposed every client's name to every coach.
+        const programsSnapshot = await getDocs(programsCollection);
         
         if (!programsSnapshot.empty) {
           const fetchedPrograms: ProgramData[] = programsSnapshot.docs.map((doc) => {
@@ -120,7 +109,7 @@ export default function ProgramsPage() {
                 data.updatedAt instanceof Timestamp
                   ? `Updated ${formatDate(data.updatedAt)}`
                   : undefined,
-              createdBy: data.createdBy ? (userMap[data.createdBy] || data.createdBy) : undefined,
+              createdBy: data.createdBy || undefined,
               accessType: data.accessType || "free",
               price: data.price ?? null,
             };

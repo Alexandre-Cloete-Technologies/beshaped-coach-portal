@@ -11,6 +11,7 @@ import {
   Dumbbell,
   ClipboardList,
 } from "lucide-react";
+import SignedInUser from "./SignedInUser";
 
 interface NavItem {
   icon: React.ReactNode;
@@ -75,14 +76,8 @@ export default function Navbar() {
           </ul>
         </nav>
 
-        <div className="hidden shrink-0 items-center gap-3 border-l border-border pl-4 sm:flex">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500">
-            <span className="text-sm font-medium text-white">JC</span>
-          </div>
-          <div className="hidden md:block">
-            <p className="text-sm font-medium text-foreground">Dewald</p>
-            <p className="text-xs text-muted-foreground">Head Coach</p>
-          </div>
+        <div className="hidden max-w-[240px] shrink-0 border-l border-border pl-4 sm:block">
+          <SignedInUser compact />
         </div>
       </div>
     </header>

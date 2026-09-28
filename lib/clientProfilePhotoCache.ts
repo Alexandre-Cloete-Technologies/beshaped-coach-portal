@@ -11,6 +11,11 @@ export function setClientProfilePhotoUrl(userId: string, url: string): void {
   byUserId.set(userId, t);
 }
 
+/** Called on sign-out so the next coach in this tab doesn't see the previous coach's clients. */
+export function clearClientProfilePhotoCache(): void {
+  byUserId.clear();
+}
+
 export function getClientProfilePhotoUrl(userId: string): string | null {
   if (!userId) return null;
   const u = byUserId.get(userId);

@@ -2,9 +2,10 @@
 
 import { X, Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { collection, addDoc, setDoc, Timestamp, getDocs, doc, query, where, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { createAccountForClient } from "@/lib/firebase/auth";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { buildProgramWorkoutSlots, seedMissingWorkoutLogsForUserProgram } from "@/lib/workoutLogSeed";
 
 interface AddClientModalProps {
@@ -18,12 +19,9 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
   const [showPassword, setShowPassword] = useState(false);
   const [programs, setPrograms] = useState<{id: string; name: string}[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
-
-  // Static coaches data
-  const staticCoaches = [
-    { id: "c1", name: "Dewald" },
-    { id: "c2", name: "Pieter van Zyl" },
-  ];
+  const { uid: coachUid, role: coachRole } = useSignedInCoach();
+  // Admin only: staff accounts a new client can be assigned to. A coach always assigns to themselves.
+  const [coaches, setCoaches] = useState<{ id: string; name: string }[]>([]);
 
   const [formData, setFormData] = useState({
     username: "",
@@ -58,11 +56,31 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
       }
     };
 
+    const fetchCoaches = async () => {
+      if (coachRole !== "admin") return;
+      try {
+        const staffSnapshot = await getDocs(
+          query(collection(db, "users"), where("role", "in", ["coach", "admin"]))
+        );
+        if (cancelled) return;
+        setCoaches(
+          staffSnapshot.docs.map((d) => {
+            const data = d.data();
+            const name = data.displayName || data.username || data.email || "Unnamed coach";
+            return { id: d.id, name: d.id === coachUid ? `${name} (you)` : name };
+          })
+        );
+      } catch (error) {
+        console.error("Error fetching coaches:", error);
+      }
+    };
+
     fetchPrograms();
+    fetchCoaches();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coachRole, coachUid]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -89,48 +107,44 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     setLoading(true);
 
     try {
-      // Create user in Firebase Auth first to get UID
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
+      // Create the Auth account without signing the coach out (interim until BSF-72), then write
+      // the users doc as the coach. If that write fails, the new Auth account is rolled back.
+      const uid = await createAccountForClient(
         formData.email,
-        formData.password
+        formData.password,
+        formData.username,
+        (newUid) => setDoc(doc(db, "users", newUid), {
+          displayName: formData.username,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
+          username: formData.username,
+          profilePhoto: "",
+          role: formData.role,
+          // BSF-71 scoping: the coach's uid (string). Defaults to whoever is adding the client.
+          assignedCoachId: formData.role === "client" ? formData.assignedCoach || coachUid : null,
+          goals: formData.goals,
+          onboardingCompleted: false,
+          createdAt: Timestamp.now(),
+          lastActive: Timestamp.now(),
+          settings: {
+            weightUnit: "kg",
+            notifications: true,
+            theme: "light",
+            restTimerEnabled: true,
+            soundEffects: true,
+          },
+          stats: {
+            totalWorkouts: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+          },
+          currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
+          availablePrograms: formData.currentProgram
+            ? [doc(db, "programs", formData.currentProgram)]
+            : [],
+        })
       );
-      const uid = userCredential.user.uid;
-
-      // Update Auth profile with display name
-      await updateProfile(userCredential.user, { displayName: formData.username });
-
-      // Create user document in Firestore using Auth UID as document ID
       const userDocRef = doc(db, "users", uid);
-      await setDoc(userDocRef, {
-        displayName: formData.username,
-        email: formData.email,
-        phoneNumber: formData.phoneNumber,
-        username: formData.username,
-        profilePhoto: "",
-        role: formData.role,
-        assignedCoachId: formData.assignedCoach || null,
-        goals: formData.goals,
-        onboardingCompleted: false,
-        createdAt: Timestamp.now(),
-        lastActive: Timestamp.now(),
-        settings: {
-          weightUnit: "kg",
-          notifications: true,
-          theme: "light",
-          restTimerEnabled: true,
-          soundEffects: true,
-        },
-        stats: {
-          totalWorkouts: 0,
-          currentStreak: 0,
-          longestStreak: 0,
-        },
-        currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
-        availablePrograms: formData.currentProgram
-          ? [doc(db, "programs", formData.currentProgram)]
-          : [],
-      });
 
       // If a program was selected, create a userPrograms entry (only if none exists)
       if (formData.currentProgram) {
@@ -226,7 +240,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
             <h2 className="text-lg font-semibold text-card-foreground">Add a New User</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Create a new user's profile</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Create a new user&apos;s profile</p>
           </div>
           <button
             onClick={onClose}
@@ -334,20 +348,22 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
             </div>
 
             {/* Assigned Coach */}
-            {formData.role === "client" ? (
+            {formData.role === "client" && coachRole === "admin" ? (
               <div>
                 <label className="block text-xs font-medium text-card-foreground mb-2">
                   Assigned Coach
                 </label>
                 <select
                   name="assignedCoach"
-                  value={formData.assignedCoach}
+                  value={formData.assignedCoach || coachUid}
                   onChange={(e) => setFormData(prev => ({ ...prev, assignedCoach: e.target.value }))}
                   className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
                 >
-                  <option value="">Select a Coach</option>
-                  {staticCoaches.map((coach) => (
-                    <option key={coach.id} value={coach.name}>
+                  {!coaches.some((coach) => coach.id === coachUid) && (
+                    <option value={coachUid}>Me</option>
+                  )}
+                  {coaches.map((coach) => (
+                    <option key={coach.id} value={coach.id}>
                       {coach.name}
                     </option>
                   ))}

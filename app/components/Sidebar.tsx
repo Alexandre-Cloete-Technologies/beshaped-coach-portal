@@ -10,6 +10,7 @@ import {
   ClipboardList
 } from "lucide-react";
 import Image from "next/image";
+import SignedInUser from "./SignedInUser";
 
 interface NavItem {
   icon: React.ReactNode;
@@ -86,15 +87,7 @@ export default function Sidebar() {
         </a> */}
 
         {/* User Profile */}
-        <div className="flex items-center gap-3 px-3 py-3 mt-2">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-            <span className="text-white text-sm font-medium">JC</span>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-sidebar-foreground">Dewald</p>
-            <p className="text-xs text-muted-foreground">Head Coach</p>
-          </div>
-        </div>
+        <SignedInUser />
       </div>
     </aside>
   );
