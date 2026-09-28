@@ -1,0 +1,17 @@
+name: Chore
+description: Maintenance, tooling or cleanup with no user-facing change
+type: Chore
+projects: ["Alexandre-Cloete-Technologies/3"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+    validations:
+      required: true
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+    validations:
+      required: true

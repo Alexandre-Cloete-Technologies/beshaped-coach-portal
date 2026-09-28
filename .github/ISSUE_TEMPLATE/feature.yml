@@ -1,0 +1,51 @@
+name: Feature
+description: New functionality, or a change to how something works
+type: Feature
+projects: ["Alexandre-Cloete-Technologies/3"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One issue per piece of work in one repo. Cross-repo work gets a parent issue labelled `epic` (in `beshaped-backend` when the data model or security rules change) with one sub-issue per repo.
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+      description: What should it do, for whom, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: Acceptance criteria, one per line.
+      placeholder: |
+        - A coach can …
+        - Works the same on mobile and in the members area
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Copy this to the Project's Scope field. A change request needs a price agreed with Dewald before work starts.
+      options:
+        - SOW
+        - Website (N$30k)
+        - Change request
+        - Unclear
+    validations:
+      required: false
+  - type: checkboxes
+    id: shared-backend
+    attributes:
+      label: Shared backend
+      description: If either applies, add the label and read the collection's data contract in Notion first.
+      options:
+        - label: Changes the Firestore data model (label `data-model`)
+        - label: Changes Firestore or Storage security rules (label `security-rules`)
+  - type: textarea
+    id: links
+    attributes:
+      label: Links
+      description: Notion spec, old Backlog ticket (BSF-N), designs, related issues.
