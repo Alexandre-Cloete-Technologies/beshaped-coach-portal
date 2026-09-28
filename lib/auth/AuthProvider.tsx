@@ -38,16 +38,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Force-refresh a token at most once per uid, so a missing claim set after the token was issued
   // is picked up without looping on onIdTokenChanged.
   const refreshedFor = useRef<string | null>(null);
+  // Bumped on every auth event. A role check that finds a newer event has started (e.g. the one its
+  // own forced token refresh fires) stops, so only one check per sign-in can sign the user out.
+  const latestEvent = useRef(0);
 
   useEffect(() => {
     // onIdTokenChanged (not onAuthStateChanged) also fires on the hourly token refresh,
     // so a role that's removed takes effect without a reload.
     return onIdTokenChanged(auth, async (user) => {
+      const eventId = ++latestEvent.current;
+      const isStale = () => eventId !== latestEvent.current;
+
       if (!user) {
         refreshedFor.current = null;
         clearClientProfilePhotoCache();
-        setState({ status: "signedOut", reason: pendingReason.current });
+        const reason = pendingReason.current;
         pendingReason.current = null;
+        // signOut() notifies token listeners even when nobody is signed in, so a repeat event with
+        // no new reason must not wipe the message that's already showing.
+        setState((prev) =>
+          prev.status === "signedOut" && reason === null ? prev : { status: "signedOut", reason }
+        );
         return;
       }
 
@@ -62,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           refreshedFor.current = user.uid;
           role = portalRole((await user.getIdTokenResult(true)).claims.role);
         }
-        if (auth.currentUser?.uid !== user.uid) return; // a newer auth event won
+        if (isStale() || auth.currentUser?.uid !== user.uid) return; // a newer auth event takes over
 
         if (role) {
           setState({ status: "signedIn", user, role });
@@ -71,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await logout();
         }
       } catch (err) {
+        if (isStale()) return;
         console.error("Error checking portal role:", err);
         pendingReason.current = "error";
         await logout().catch(() => {});

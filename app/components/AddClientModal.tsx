@@ -67,7 +67,12 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           staffSnapshot.docs.map((d) => {
             const data = d.data();
             const name = data.displayName || data.username || data.email || "Unnamed coach";
-            return { id: d.id, name: d.id === coachUid ? `${name} (you)` : name };
+            // Role and email too: staff names in `users` aren't reliable (e.g. a coach named "Admin").
+            const details = [data.role === "admin" ? "Admin" : "Coach", d.id === coachUid ? "you" : null]
+              .filter(Boolean)
+              .join(", ");
+            const email = data.email && data.email !== name ? ` · ${data.email}` : "";
+            return { id: d.id, name: `${name} (${details})${email}` };
           })
         );
       } catch (error) {
