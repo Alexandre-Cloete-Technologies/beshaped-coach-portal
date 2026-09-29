@@ -40,7 +40,8 @@ any Firestore/Storage work.
   mobile writes `timeStartedAt`/`timeCompletedAt` and a **string** `programId`. Readers must handle both until unified.
 - `AddClientModal` creates the Auth user via `createAccountForClient` (`lib/firebase/auth.ts`): a throwaway
   Firebase app with in-memory persistence, so the coach stays signed in; the `users` doc is written as the coach,
-  and the Auth user is deleted again if that write fails. Interim only: BSF-72 (beshaped-backend#36) moves client creation to a
+  and the Auth user is deleted again if that write fails. It creates clients only (`role: "client"`); staff
+  accounts are made with `set-role-claims.ts` in beshaped-backend (#42). Interim only: BSF-72 (beshaped-backend#36) moves client creation to a
   Cloud Function (Admin SDK). Don't reuse this pattern elsewhere.
 - `createdBy` on programs/exercises/workouts is a literal (`"coach"` / `"admin"`), not a uid.
 
