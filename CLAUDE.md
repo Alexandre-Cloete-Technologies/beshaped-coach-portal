@@ -11,7 +11,7 @@ any Firestore/Storage work.
 - Hosting: Netlify site `beshaped-coach-portal` (https://beshaped-coach-portal.netlify.app): builds from `master`,
   deploy previews on PRs. Production env vars (`NEXT_PUBLIC_FIREBASE_*`, prod project) are set in Netlify;
   `NEXT_PUBLIC_USE_EMULATORS` must never be set there (the build refuses it). No `netlify.toml`.
-- Default branch is `master` (the other two repos use `main`)
+- Default branch is `master` (the other three repos use `main`)
 
 ## Commands
 - Dev: `npm run dev` · Build: `npm run build` · Typecheck: `npx tsc --noEmit` · Lint: `npm run lint` · Test: none
