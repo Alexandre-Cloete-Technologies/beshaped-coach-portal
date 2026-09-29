@@ -9,14 +9,21 @@ Use the `orders` contract as the reference for format and level of detail.
 
 1. Fetch the contract page for this collection (query the data source by the Collection title) and the
    collection's section on the DB schema page.
-2. Search all three repos (bespoke-fitness, beshaped-coach-portal, beshaped-webapp), functions/ and the
-   rules files for every read and write of the collection. List them with file:line.
+2. Search all four repos for every read and write of the collection and every rule and index covering it:
+   `bespoke-fitness/` (GitHub: beshaped-app), `beshaped-coach-portal/`, `beshaped-webapp/` and `beshaped-backend/`.
+   In `beshaped-backend/`, always check `firestore.rules`, `storage.rules`, `firestore.indexes.json`, `functions/`
+   and `scripts/`. List them with file:line. If the current directory is a single repo, use the sibling folders
+   under ../ for the others.
 3. Draft the contract in the same structure as `orders`: Purpose, Document ID, Fields table
    (Field | Type | Req | Written by | Why / rules), Invariants, Access, Queries & indexes, Lifecycle, Change log.
    - "Written by" = which repo/function actually writes the field, from the code.
    - "Why / rules": only state a rationale you can see in code, comments, commit messages or the Notion
      pages. Otherwise write "(inferred)" before your best guess, or "? ask Luke/Francois". Never present a
      guess as fact.
+   - Access: cite the matching rules in `beshaped-backend/firestore.rules` (and `storage.rules` for the
+     collection's Storage paths) with file:line.
+   - Queries & indexes: list each query in the code with its `beshaped-backend/firestore.indexes.json` entry,
+     or say that none is needed or that it's missing.
    - Flag fields in code but missing from the schema page, and vice versa. Flag type mismatches between repos.
 4. Show me the draft and the list of open questions. Wait for approval.
 5. On approval, replace the contract page content, set Status = Draft (Agreed only if I say so), set
