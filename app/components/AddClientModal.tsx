@@ -29,7 +29,6 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     password: "",
     phoneNumber: "",
     currentProgram: "",
-    role: "client",
     assignedCoach: "",
     goals: "",
   });
@@ -101,7 +100,6 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
       password: "",
       phoneNumber: "",
       currentProgram: "",
-      role: "client",
       assignedCoach: "",
       goals: "",
     });
@@ -124,9 +122,10 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           phoneNumber: formData.phoneNumber,
           username: formData.username,
           profilePhoto: "",
-          role: formData.role,
+          // Always a client. Staff accounts are made with set-role-claims.ts in beshaped-backend.
+          role: "client",
           // BSF-71 scoping: the coach's uid (string). Defaults to whoever is adding the client.
-          assignedCoachId: formData.role === "client" ? formData.assignedCoach || coachUid : null,
+          assignedCoachId: formData.assignedCoach || coachUid,
           goals: formData.goals,
           onboardingCompleted: false,
           createdAt: Timestamp.now(),
@@ -217,7 +216,6 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
         password: "",
         phoneNumber: "",
         currentProgram: "",
-        role: "client",
         assignedCoach: "",
         goals: "",
       });
@@ -336,85 +334,67 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
               />
             </div>
 
-            {/* Role */}
-            <div>
-              <label className="block text-xs font-medium text-card-foreground mb-2">
-                Role
-              </label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
-              >
-                <option value="client">Client</option>
-                <option value="coach">Coach</option>
-              </select>
-            </div>
-
-            {/* Assigned Coach */}
-            {formData.role === "client" && coachRole === "admin" ? (
-              <div>
-                <label className="block text-xs font-medium text-card-foreground mb-2">
-                  Assigned Coach
-                </label>
-                <select
-                  name="assignedCoach"
-                  value={formData.assignedCoach || coachUid}
-                  onChange={(e) => setFormData(prev => ({ ...prev, assignedCoach: e.target.value }))}
-                  className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
-                >
-                  {!coaches.some((coach) => coach.id === coachUid) && (
-                    <option value={coachUid}>Me</option>
-                  )}
-                  {coaches.map((coach) => (
-                    <option key={coach.id} value={coach.id}>
-                      {coach.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : <div />}
-
-            {/* Goals & Program - only for clients */}
-            {formData.role === "client" && (
+            {/* Assigned Coach (admin only), with an empty cell so Goals and Program stay on one row */}
+            {coachRole === "admin" && (
               <>
-                {/* Goals */}
                 <div>
                   <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Goals
-                  </label>
-                  <textarea
-                    name="goals"
-                    value={formData.goals}
-                    onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
-                    className="w-full h-28 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-                    placeholder="e.g. Lose 5kg, Improve squat form..."
-                  />
-                </div>
-
-                {/* Training Program */}
-                <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Training Program
+                    Assigned Coach
                   </label>
                   <select
-                    name="currentProgram"
-                    value={formData.currentProgram}
-                    onChange={(e) => setFormData(prev => ({ ...prev, currentProgram: e.target.value }))}
-                    disabled={loadingPrograms && programs.length === 0}
+                    name="assignedCoach"
+                    value={formData.assignedCoach || coachUid}
+                    onChange={(e) => setFormData(prev => ({ ...prev, assignedCoach: e.target.value }))}
                     className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
                   >
-                    <option value="">Select a Program</option>
-                    {programs.map((program) => (
-                      <option key={program.id} value={program.id}>
-                        {program.name}
+                    {!coaches.some((coach) => coach.id === coachUid) && (
+                      <option value={coachUid}>Me</option>
+                    )}
+                    {coaches.map((coach) => (
+                      <option key={coach.id} value={coach.id}>
+                        {coach.name}
                       </option>
                     ))}
                   </select>
                 </div>
+                <div />
               </>
             )}
+
+            {/* Goals */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Goals
+              </label>
+              <textarea
+                name="goals"
+                value={formData.goals}
+                onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
+                className="w-full h-28 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                placeholder="e.g. Lose 5kg, Improve squat form..."
+              />
+            </div>
+
+            {/* Training Program */}
+            <div>
+              <label className="block text-xs font-medium text-card-foreground mb-2">
+                Training Program
+              </label>
+              <select
+                name="currentProgram"
+                value={formData.currentProgram}
+                onChange={(e) => setFormData(prev => ({ ...prev, currentProgram: e.target.value }))}
+                disabled={loadingPrograms && programs.length === 0}
+                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+              >
+                <option value="">Select a Program</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>
+                    {program.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </form>
 
