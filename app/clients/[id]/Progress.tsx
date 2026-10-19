@@ -8,7 +8,6 @@ import {
   query,
   where,
   getDocs,
-  doc,
   Timestamp,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -66,7 +65,7 @@ export default function Progress({ clientId }: ProgressProps) {
         try {
             // Using logic from page.tsx: fetch all and sort client-side to avoid index issues
             const logsRef = collection(db, "bodyWeightLogs");
-            const q = query(logsRef, where("userId", "==", doc(db, "users", clientId)));
+            const q = query(logsRef, where("userId", "==", clientId));
             const snapshot = await getDocs(q);
             
             const logs: BodyWeightLog[] = snapshot.docs.map((docSnap) =>

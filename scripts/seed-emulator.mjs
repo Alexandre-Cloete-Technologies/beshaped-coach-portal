@@ -3,7 +3,8 @@
  *
  * Creates two coaches, one admin, clients for each coach, one client-only account (no role claim),
  * a few unassigned/legacy clients, programs, userPrograms and logs. Safe to re-run: fixed IDs,
- * overwritten each time.
+ * overwritten each time. Logs and links use the 2026-10-19 shapes (workoutLogs data contract): id strings
+ * for userId/programId, program log ids by workoutLogId(), timeStartedAt/timeCompletedAt.
  *
  * Refuses to run unless both emulator hosts are set, so it can never write to a real project:
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 npm run seed:emulator
@@ -50,7 +51,7 @@ const staff = [
   { uid: "admin", email: "admin@beshaped.test", displayName: "Admin Dewald", role: "admin" },
 ];
 
-// Coach A gets 17 clients, so userPrograms lookups (2 values per client) need two `in` chunks.
+// Coach A gets 17 clients.
 const clients = [
   ...Array.from({ length: 17 }, (_, i) => {
     const n = String(i + 1).padStart(2, "0");
@@ -82,10 +83,10 @@ const exercises = [
   { id: "ex-row", name: "Barbell Row", muscleGroup: "Back" },
 ];
 
-function programWorkout(dayNumber, workoutName, exerciseIds) {
+function programWorkout(weekNumber, dayNumber, workoutName, exerciseIds) {
   return {
     dayNumber,
-    weekNumber: 1,
+    weekNumber,
     workoutName,
     isRestDay: false,
     workoutId: null,
@@ -102,20 +103,59 @@ function programWorkout(dayNumber, workoutName, exerciseIds) {
   };
 }
 
+// A phase as the builder stores it: durationWeeks × 7 days, empty days included (useProgramEditor.ts).
+function phaseWorkouts(durationWeeks, workouts) {
+  return Array.from({ length: durationWeeks * 7 }, (_, i) => {
+    const weekNumber = Math.floor(i / 7) + 1;
+    const dayNumber = (i % 7) + 1;
+    return (
+      workouts.find((w) => w.weekNumber === weekNumber && w.dayNumber === dayNumber) ?? {
+        dayNumber, weekNumber, isRestDay: false, workoutId: null, workoutName: null, exercises: [],
+      }
+    );
+  });
+}
+
 const programs = [
   {
     id: "prog-strength",
     name: "Strength Foundations",
     accessType: "assigned",
-    workouts: [programWorkout(1, "Lower", ["ex-squat"]), programWorkout(2, "Upper", ["ex-bench", "ex-row"])],
+    durationWeeks: 2,
+    workouts: [
+      programWorkout(1, 1, "Lower", ["ex-squat"]),
+      programWorkout(1, 2, "Upper", ["ex-bench", "ex-row"]),
+      programWorkout(2, 1, "Lower B", ["ex-squat"]),
+      programWorkout(2, 2, "Upper B", ["ex-bench", "ex-row"]),
+    ],
   },
   {
     id: "prog-free",
     name: "Free Starter Plan",
     accessType: "free",
-    workouts: [programWorkout(1, "Full Body", ["ex-squat", "ex-bench"])],
+    durationWeeks: 1,
+    workouts: [programWorkout(1, 1, "Full Body", ["ex-squat", "ex-bench"])],
   },
 ];
+
+// Same rule as lib/workoutLogSeed.ts (workoutLogId) and the app's lib/workout-logs.ts.
+const workoutLogId = (userId, programId, w) => `${userId}_${programId}_r1_p1w${w.weekNumber}d${w.dayNumber}`;
+
+const logExercises = (w, done) =>
+  w.exercises.map((ex) => ({
+    exerciseId: ex.exerciseId,
+    exerciseName: ex.exerciseName,
+    order: ex.order,
+    targetSets: ex.sets,
+    targetReps: ex.repsRange,
+    restPeriod: ex.restPeriod,
+    notes: null,
+    sets: [1, 2, 3].map((setNumber) =>
+      done
+        ? { setNumber, weight: 60, reps: 8, completed: true, timestamp: null, notes: null }
+        : { setNumber, weight: 0, reps: 0, completed: false, timestamp: null, notes: null }
+    ),
+  }));
 
 async function seed() {
   for (const s of staff) {
@@ -148,8 +188,8 @@ async function seed() {
       accessType: p.accessType,
       price: null,
       difficulty: "beginner",
-      totalDuration: 1,
-      daysPerWeek: p.workouts.length,
+      totalDuration: p.durationWeeks,
+      daysPerWeek: p.workouts.filter((w) => w.weekNumber === 1).length,
       isActive: true,
       createdBy: "admin",
       createdAt: now,
@@ -158,10 +198,10 @@ async function seed() {
           phaseId: `${p.id}-phase-1`,
           name: "Phase 1",
           description: "",
-          order: 1,
-          durationWeeks: 1,
+          order: 0,
+          durationWeeks: p.durationWeeks,
           focusAreas: [],
-          workouts: p.workouts,
+          workouts: phaseWorkouts(p.durationWeeks, p.workouts),
         },
       ],
     });
@@ -170,7 +210,8 @@ async function seed() {
   await db.doc("workouts/wo-push").set({
     name: "Push Day",
     description: null,
-    createdByRole: "admin",
+    createdBy: "coach-a",
+    createdByRole: "coach",
     exercises: [{ exerciseId: "ex-bench", exerciseName: "Bench Press", order: 0, targetSets: 3, targetReps: "8-10" }],
     tags: ["push"],
     estimatedDuration: 45,
@@ -205,8 +246,8 @@ async function seed() {
     await userRef.set(userDoc);
 
     await db.doc(`userPrograms/up-${c.uid}`).set({
-      userId: userRef,
-      programId: programRef,
+      userId: c.uid,
+      programId: program.id,
       programName: program.name,
       status: "active",
       currentPhase: 1,
@@ -217,51 +258,29 @@ async function seed() {
       createdAt: daysAgo(14),
     });
 
-    // One completed and one open workout log per client (userId string, programId reference).
-    const [first, second] = program.workouts;
-    await db.doc(`workoutLogs/wl-${c.uid}-1`).set({
-      userId: c.uid,
-      programId: programRef,
-      programName: program.name,
-      phaseNumber: 1,
-      weekNumber: 1,
-      dayNumber: first.dayNumber,
-      workoutName: first.workoutName,
-      status: "completed",
-      startedAt: daysAgo(2),
-      completedAt: daysAgo(2),
-      dateCompleted: daysAgo(2),
-      exercises: first.exercises.map((ex) => ({
-        exerciseId: ex.exerciseId,
-        exerciseName: ex.exerciseName,
-        order: ex.order,
-        targetSets: ex.sets,
-        targetReps: ex.repsRange,
-        notes: null,
-        sets: [1, 2, 3].map((setNumber) => ({ setNumber, weight: 60, reps: 8, completed: true, notes: null })),
-      })),
-      totalVolume: 1440 * first.exercises.length,
-      totalSets: 3 * first.exercises.length,
-      totalReps: 24 * first.exercises.length,
-      personalBests: [],
-      notes: null,
-    });
-    if (second) {
-      await db.doc(`workoutLogs/wl-${c.uid}-2`).set({
+    // As the portal seeds them: one log per program day, the first one completed, the rest scheduled.
+    for (const [k, w] of program.workouts.entries()) {
+      const done = k === 0;
+      const sets = done ? 3 * w.exercises.length : 0;
+      await db.doc(`workoutLogs/${workoutLogId(c.uid, program.id, w)}`).set({
         userId: c.uid,
-        programId: programRef,
+        sourceType: "program",
+        programId: program.id,
         programName: program.name,
+        round: 1,
         phaseNumber: 1,
-        weekNumber: 1,
-        dayNumber: second.dayNumber,
-        workoutName: second.workoutName,
-        status: "to-be-completed",
-        startedAt: now,
-        completedAt: null,
-        exercises: [],
-        totalVolume: 0,
-        totalSets: 0,
-        totalReps: 0,
+        weekNumber: w.weekNumber,
+        dayNumber: w.dayNumber,
+        workoutName: w.workoutName,
+        status: done ? "completed" : "to-be-completed",
+        timeStartedAt: done ? daysAgo(2) : null,
+        timeCompletedAt: done ? daysAgo(2) : null,
+        dateCompleted: done ? daysAgo(2) : null,
+        totalDuration: done ? 3600 : null,
+        exercises: logExercises(w, done),
+        totalVolume: done ? 480 * sets : 0,
+        totalSets: sets,
+        totalReps: done ? 8 * sets : 0,
         personalBests: [],
         notes: null,
       });
@@ -283,7 +302,7 @@ async function seed() {
     for (const [j, weight] of [80 + (i % 5), 79 + (i % 5)].entries()) {
       const taken = daysAgo(7 - j * 7);
       await db.doc(`bodyWeightLogs/bw-${c.uid}-${j}`).set({
-        userId: userRef,
+        userId: c.uid,
         weight,
         weightUnit: "kg",
         dateOfBodyWeightRecord: taken,

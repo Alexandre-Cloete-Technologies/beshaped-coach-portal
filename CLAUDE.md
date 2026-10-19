@@ -34,16 +34,23 @@ any Firestore/Storage work.
   for `in` queries. Until owner/coach security rules exist this is UI-only; don't read `users` unscoped.
 - Programs created here are consumed by the mobile app and the webapp store; changing their shape is a
   cross-repo change (use /schema-change).
-- Assigning a program writes `users.availablePrograms` (array of program refs) + `users.currentProgram` (ref),
-  creates one `userPrograms` doc on first assignment, and seeds `to-be-completed` `workoutLogs`
-  (`lib/workoutLogSeed.ts`). The seeded logs use `startedAt`/`completedAt` and a **reference** `programId`;
-  mobile writes `timeStartedAt`/`timeCompletedAt` and a **string** `programId`. Readers must handle both until unified.
+- Links between docs are id strings (beshaped-backend#29, #38): `userId` is the uid, `workoutLogs.programId` and
+  `userPrograms.programId` the program's doc id. Only `users.availablePrograms` / `users.currentProgram` stay
+  references. Never write a `DocumentReference` into a link field.
+- Assigning a program (`lib/programAssignment.ts`) writes `users.availablePrograms` + `users.currentProgram`,
+  creates that program's `userPrograms` doc if the client has none for it, and seeds a `to-be-completed`
+  workoutLog per program day (`lib/workoutLogSeed.ts`). A program log's doc id is
+  `workoutLogId()` = `{uid}_{programId}_r{round}_p{phase}w{week}d{day}`, the same rule as the mobile app, so the
+  app fills the seeded slot. Seeding and the program-edit sync (`workoutLogSync.ts`) only create missing days,
+  refresh scheduled ones, keep logged sets on started ones and never touch completed or skipped logs
+  (workoutLogs data contract). Logs use `timeStartedAt`/`timeCompletedAt`.
 - `AddClientModal` creates the Auth user via `createAccountForClient` (`lib/firebase/auth.ts`): a throwaway
   Firebase app with in-memory persistence, so the coach stays signed in; the `users` doc is written as the coach,
   and the Auth user is deleted again if that write fails. It creates clients only (`role: "client"`); staff
   accounts are made with `set-role-claims.ts` in beshaped-backend (#42). Interim only: BSF-72 (beshaped-backend#36) moves client creation to a
   Cloud Function (Admin SDK). Don't reuse this pattern elsewhere.
-- `createdBy` on programs/exercises/workouts is a literal (`"coach"` / `"admin"`), not a uid.
+- `createdBy` on programs/exercises is a literal (`"coach"` / `"admin"`), not a uid. On `workouts` it is the
+  signed-in coach's uid, with `createdByRole` from the claim.
 
 ## Don't
 - Don't deploy or change Netlify settings without asking.
