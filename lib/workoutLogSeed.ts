@@ -123,13 +123,20 @@ export const buildWorkoutLogExercises = (rawExercises: ProgramExerciseRaw[] = []
     })
     .sort((a, b) => a.order - b.order);
 
-const positiveInt = (v: unknown): number | null =>
-  typeof v === "number" && Number.isInteger(v) && v > 0 ? v : null;
+const positiveInt = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+const DAYS_PER_WEEK = 7;
 
 /**
- * The workout days of a program, numbered the way the builder stores them: phase = index + 1, week within the
- * phase, day 1–7 within the week (stored weekNumber/dayNumber, else from the position). Rest and empty days are
- * skipped. Used by both the seed and the program-edit sync, so both write the same doc ids.
+ * The workout days of a program, by the day convention in the programs data contract (beshaped-app#26):
+ * `phaseNumber` = position in `phases[]` + 1, `weekNumber` 1…durationWeeks restarting per phase, `dayNumber` 1–7
+ * restarting per week. Read the same way as the app's `lib/program-days.ts` (a `dayNumber` above 7 splits into week
+ * and day, a missing `weekNumber` means week 1), and a day counts only if the app would offer it as a workout: not a
+ * rest day and at least one exercise. Used by both the seed and the program-edit sync, so both apps write the same
+ * doc ids.
  */
 export const buildProgramWorkoutSlots = (programData: ProgramDataRaw | undefined): ProgramWorkoutSlot[] => {
   if (!programData?.phases || !Array.isArray(programData.phases)) return [];
@@ -140,26 +147,28 @@ export const buildProgramWorkoutSlots = (programData: ProgramDataRaw | undefined
     const phaseNumber = phaseIdx + 1;
     const workouts = phase.workouts || phase.days || [];
 
-    workouts.forEach((workout, workoutIdx) => {
+    workouts.forEach((workout) => {
       if (!workout) return;
       if (workout.isRestDay) return;
       if (workout.type === "rest" || workout.type === "empty") return;
+      // The app shows a day without exercises as a rest day, so it would never fill a log for it.
+      if (!Array.isArray(workout.exercises) || workout.exercises.length === 0) return;
 
-      const rawName = workout.workoutName || workout.dayName || workout.label || "";
-      if (!String(rawName).trim()) return;
-
-      const weekNumber = positiveInt(workout.weekNumber) ?? Math.floor(workoutIdx / 7) + 1;
-      const dayNumber = positiveInt(workout.dayNumber) ?? (workoutIdx % 7) + 1;
+      const rawDay = positiveInt(workout.dayNumber);
+      if (rawDay === null) return;
+      const weekNumber = rawDay > DAYS_PER_WEEK ? Math.ceil(rawDay / DAYS_PER_WEEK) : positiveInt(workout.weekNumber) ?? 1;
+      const dayNumber = rawDay > DAYS_PER_WEEK ? ((rawDay - 1) % DAYS_PER_WEEK) + 1 : rawDay;
       const key = `${phaseNumber}_${weekNumber}_${dayNumber}`;
       if (slots.has(key)) return;
 
+      const rawName = String(workout.workoutName || workout.dayName || workout.label || "").trim();
       slots.set(key, {
         key,
         phaseNumber,
         weekNumber,
         dayNumber,
-        workoutName: String(rawName).trim(),
-        exercises: buildWorkoutLogExercises(workout.exercises || []),
+        workoutName: rawName || `Day ${dayNumber}`,
+        exercises: buildWorkoutLogExercises(workout.exercises),
       });
     });
   });
