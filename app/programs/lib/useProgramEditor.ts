@@ -179,6 +179,14 @@ const emptyWorkout = (dayIdx: number): InternalWorkout => ({
   exercises: [],
 });
 
+/**
+ * A phaseId that can't collide with another phase of the program (the default "phase_1" or an earlier
+ * `phase_${Date.now()}_${index}`). Workout log doc ids contain it, so it must stay stable and never be
+ * reused (decided 2026-10-20, beshaped-backend#38): only [A-Za-z0-9_-], at most 40 characters.
+ */
+const newPhaseId = (): string =>
+  `phase_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+
 const makeEmptyPhase = (index: number, durationWeeks: number): InternalPhase => ({
   phaseId: `phase_${Date.now()}_${index}`,
   name: `Phase ${index + 1}`,
@@ -299,7 +307,8 @@ export const normalizeInitialProgram = (
         });
       }
       return {
-        phaseId: phase.phaseId || `phase_${phaseIdx}`,
+        // A missing id gets a new one here; the next save persists it (toFirestorePayload).
+        phaseId: phase.phaseId || newPhaseId(),
         name: phase.name || `Phase ${phaseIdx + 1}`,
         description: phase.description || "",
         order: phase.order ?? phaseIdx,

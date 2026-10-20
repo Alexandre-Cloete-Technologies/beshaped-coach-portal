@@ -26,8 +26,9 @@ import type { ProgramFormData } from "./useProgramEditor";
 const slotsByKey = (program: ProgramFormData): Map<string, ProgramWorkoutSlot> =>
   new Map(buildProgramWorkoutSlots(program).map((slot) => [slot.key, slot]));
 
+// phaseNumber is included: deleting an earlier phase moves a day's position but not its phaseId (or doc id).
 const slotContent = (slot: ProgramWorkoutSlot): string =>
-  JSON.stringify({ workoutName: slot.workoutName, exercises: slot.exercises });
+  JSON.stringify({ phaseNumber: slot.phaseNumber, workoutName: slot.workoutName, exercises: slot.exercises });
 
 const hasDoneSet = (exercise: DocumentData | undefined): boolean =>
   Array.isArray(exercise?.sets) && exercise.sets.some((s: DocumentData) => s?.completed === true);
@@ -80,12 +81,15 @@ const planLogWrite = (
 
   if (current.status === "to-be-completed") {
     if (!contentChanged && !nameChanged) return null;
-    return { op: "update", data: { programName, workoutName: slot.workoutName, exercises: slot.exercises } };
+    return {
+      op: "update",
+      data: { programName, phaseNumber: slot.phaseNumber, workoutName: slot.workoutName, exercises: slot.exercises },
+    };
   }
   if (current.status === "in-progress") {
     if (contentChanged) {
       const exercises = mergeLoggedSets(Array.isArray(current.exercises) ? current.exercises : [], slot.exercises);
-      return { op: "update", data: { programName, workoutName: slot.workoutName, exercises } };
+      return { op: "update", data: { programName, phaseNumber: slot.phaseNumber, workoutName: slot.workoutName, exercises } };
     }
     return nameChanged ? { op: "update", data: { programName } } : null;
   }

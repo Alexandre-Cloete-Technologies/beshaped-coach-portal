@@ -139,7 +139,8 @@ const programs = [
 ];
 
 // Same rule as lib/workoutLogSeed.ts (workoutLogId) and the app's lib/workout-logs.ts.
-const workoutLogId = (userId, programId, w) => `${userId}_${programId}_r1_p1w${w.weekNumber}d${w.dayNumber}`;
+const workoutLogId = (userId, programId, phaseId, w) =>
+  `${userId}_${programId}_r1_${phaseId}_w${w.weekNumber}d${w.dayNumber}`;
 
 const logExercises = (w, done) =>
   w.exercises.map((ex) => ({
@@ -262,12 +263,13 @@ async function seed() {
     for (const [k, w] of program.workouts.entries()) {
       const done = k === 0;
       const sets = done ? 3 * w.exercises.length : 0;
-      await db.doc(`workoutLogs/${workoutLogId(c.uid, program.id, w)}`).set({
+      await db.doc(`workoutLogs/${workoutLogId(c.uid, program.id, `${program.id}-phase-1`, w)}`).set({
         userId: c.uid,
         sourceType: "program",
         programId: program.id,
         programName: program.name,
         round: 1,
+        phaseId: `${program.id}-phase-1`,
         phaseNumber: 1,
         weekNumber: w.weekNumber,
         dayNumber: w.dayNumber,

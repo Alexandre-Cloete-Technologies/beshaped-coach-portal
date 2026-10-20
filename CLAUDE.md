@@ -40,7 +40,8 @@ any Firestore/Storage work.
 - Assigning a program (`lib/programAssignment.ts`) writes `users.availablePrograms` + `users.currentProgram`,
   creates that program's `userPrograms` doc if the client has none for it, and seeds a `to-be-completed`
   workoutLog per program day (`lib/workoutLogSeed.ts`). A program log's doc id is
-  `workoutLogId()` = `{uid}_{programId}_r{round}_p{phase}w{week}d{day}`, the same rule as the mobile app, so the
+  `workoutLogId()` = `{uid}_{programId}_r{round}_{phaseId}_w{week}d{day}` (the phase's `phaseId`, which must stay
+  stable and never be reused), the same rule as the mobile app, so the
   app fills the seeded slot. Seeding and the program-edit sync (`workoutLogSync.ts`) only create missing days,
   refresh scheduled ones, keep logged sets on started ones and never touch completed or skipped logs
   (workoutLogs data contract). Logs use `timeStartedAt`/`timeCompletedAt`.

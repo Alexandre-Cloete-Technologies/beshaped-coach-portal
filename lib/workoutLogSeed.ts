@@ -33,6 +33,7 @@ interface ProgramWorkoutRaw {
 }
 
 interface ProgramPhaseRaw {
+  phaseId?: string;
   workouts?: ProgramWorkoutRaw[];
   days?: ProgramWorkoutRaw[];
 }
@@ -66,8 +67,11 @@ export interface WorkoutLogExercise {
 }
 
 export interface ProgramWorkoutSlot {
-  /** `${phaseNumber}_${weekNumber}_${dayNumber}`, unique within a program. */
+  /** `${phaseKey}_${weekNumber}_${dayNumber}`, unique within a program. */
   key: string;
+  /** `programs.phases[].phaseId`, or null if the phase has none (or one that isn't id-safe). */
+  phaseId: string | null;
+  /** Position in `phases[]` + 1, for order and display. */
   phaseNumber: number;
   weekNumber: number;
   dayNumber: number;
@@ -78,18 +82,32 @@ export interface ProgramWorkoutSlot {
 /** Always 1 until a restart feature exists (workoutLogs data contract). */
 export const PROGRAM_LOG_ROUND = 1;
 
+const SAFE_PHASE_ID = /^[A-Za-z0-9_-]{1,40}$/;
+
+/** The phase's id when it can go in a doc id; the builder always writes one. */
+export const usablePhaseId = (phaseId: unknown): string | null =>
+  typeof phaseId === "string" && SAFE_PHASE_ID.test(phaseId) ? phaseId : null;
+
 /**
- * Doc id of a client's log for one program day: `{uid}_{programId}_r{round}_p{phase}w{week}d{day}`.
+ * The phase part of a log id: its `phaseId` (stable when other phases are added or deleted, decided 2026-10-20,
+ * beshaped-backend#38), else `p{phaseNumber}` for a phase without one.
+ */
+export const phaseKey = (phaseId: string | null, phaseNumber: number): string => phaseId ?? `p${phaseNumber}`;
+
+/**
+ * Doc id of a client's log for one program day: `{uid}_{programId}_r{round}_{phaseKey}_w{week}d{day}`.
  * The same rule as the mobile app's lib/workout-logs.ts, so both apps write to the same doc.
  */
 export const workoutLogId = (p: {
   userId: string;
   programId: string;
   round: number;
+  phaseId: string | null;
   phaseNumber: number;
   weekNumber: number;
   dayNumber: number;
-}): string => `${p.userId}_${p.programId}_r${p.round}_p${p.phaseNumber}w${p.weekNumber}d${p.dayNumber}`;
+}): string =>
+  `${p.userId}_${p.programId}_r${p.round}_${phaseKey(p.phaseId, p.phaseNumber)}_w${p.weekNumber}d${p.dayNumber}`;
 
 export const slotWorkoutLogId = (userId: string, programId: string, slot: ProgramWorkoutSlot): string =>
   workoutLogId({ userId, programId, round: PROGRAM_LOG_ROUND, ...slot });
@@ -133,10 +151,10 @@ const DAYS_PER_WEEK = 7;
 /**
  * The workout days of a program, by the day convention in the programs data contract (beshaped-app#26):
  * `phaseNumber` = position in `phases[]` + 1, `weekNumber` 1…durationWeeks restarting per phase, `dayNumber` 1–7
- * restarting per week. Read the same way as the app's `lib/program-days.ts` (a `dayNumber` above 7 splits into week
- * and day, a missing `weekNumber` means week 1), and a day counts only if the app would offer it as a workout: not a
- * rest day and at least one exercise. Used by both the seed and the program-edit sync, so both apps write the same
- * doc ids.
+ * restarting per week; the phase is keyed by its `phaseId` (beshaped-backend#38, 2026-10-20). Read the same way as
+ * the app's `lib/program-days.ts` (a `dayNumber` above 7 splits into week and day, a missing `weekNumber` means
+ * week 1), and a day counts only if the app would offer it as a workout: not a rest day and at least one exercise.
+ * Used by both the seed and the program-edit sync, so both apps write the same doc ids.
  */
 export const buildProgramWorkoutSlots = (programData: ProgramDataRaw | undefined): ProgramWorkoutSlot[] => {
   if (!programData?.phases || !Array.isArray(programData.phases)) return [];
@@ -145,6 +163,7 @@ export const buildProgramWorkoutSlots = (programData: ProgramDataRaw | undefined
 
   programData.phases.forEach((phase, phaseIdx) => {
     const phaseNumber = phaseIdx + 1;
+    const phaseId = usablePhaseId(phase?.phaseId);
     const workouts = phase.workouts || phase.days || [];
 
     workouts.forEach((workout) => {
@@ -158,12 +177,13 @@ export const buildProgramWorkoutSlots = (programData: ProgramDataRaw | undefined
       if (rawDay === null) return;
       const weekNumber = rawDay > DAYS_PER_WEEK ? Math.ceil(rawDay / DAYS_PER_WEEK) : positiveInt(workout.weekNumber) ?? 1;
       const dayNumber = rawDay > DAYS_PER_WEEK ? ((rawDay - 1) % DAYS_PER_WEEK) + 1 : rawDay;
-      const key = `${phaseNumber}_${weekNumber}_${dayNumber}`;
+      const key = `${phaseKey(phaseId, phaseNumber)}_${weekNumber}_${dayNumber}`;
       if (slots.has(key)) return;
 
       const rawName = String(workout.workoutName || workout.dayName || workout.label || "").trim();
       slots.set(key, {
         key,
+        phaseId,
         phaseNumber,
         weekNumber,
         dayNumber,
@@ -183,6 +203,7 @@ export const newProgramWorkoutLog = (userId: string, programId: string, programN
   programId,
   programName,
   round: PROGRAM_LOG_ROUND,
+  phaseId: slot.phaseId,
   phaseNumber: slot.phaseNumber,
   weekNumber: slot.weekNumber,
   dayNumber: slot.dayNumber,
