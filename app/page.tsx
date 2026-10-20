@@ -16,7 +16,6 @@ import {
   where,
   Timestamp,
   type DocumentData,
-  type DocumentReference,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
@@ -51,17 +50,10 @@ function parseLogWeight(d: DocumentData): number | null {
 }
 
 /** Latest body weight from `bodyWeightLogs` (by `photoTakenDate`), with change vs previous log. */
-async function fetchLatestBodyweight(userRef: DocumentReference) {
-  const bodyWeightLogsRef = collection(db, "bodyWeightLogs");
-  const userIdStr = userRef.id;
-  let snapshot = await getDocs(
-    query(bodyWeightLogsRef, where("userId", "==", userRef))
+async function fetchLatestBodyweight(userId: string) {
+  const snapshot = await getDocs(
+    query(collection(db, "bodyWeightLogs"), where("userId", "==", userId))
   );
-  if (snapshot.empty) {
-    snapshot = await getDocs(
-      query(bodyWeightLogsRef, where("userId", "==", userIdStr))
-    );
-  }
   if (snapshot.empty) {
     return { weight: null as number | null, weightUnit: "kg", weightChange: null as number | null };
   }
@@ -114,14 +106,8 @@ export default function Home() {
         const userProgramsMap = new Map();
         for (const upDoc of userProgramDocs) {
           const upData = upDoc.data();
-          // Get the userId from the reference
-          let userId = null;
-          if (upData.userId?.id) {
-            userId = upData.userId.id;
-          } else if (typeof upData.userId === 'string') {
-            userId = upData.userId;
-          }
-          
+          const userId = typeof upData.userId === "string" ? upData.userId : null;
+
           if (userId) {
             userProgramsMap.set(userId, {
               currentWeek: upData.currentWeek || 0,
@@ -141,7 +127,7 @@ export default function Home() {
             let weightChange: number | null = null;
             let weightUnit = "kg";
             try {
-              const bw = await fetchLatestBodyweight(doc.ref);
+              const bw = await fetchLatestBodyweight(doc.id);
               weight = bw.weight;
               weightUnit = bw.weightUnit;
               weightChange = bw.weightChange;

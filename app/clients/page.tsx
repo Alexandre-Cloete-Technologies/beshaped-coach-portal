@@ -206,7 +206,7 @@ export default function ClientsPage() {
       // Delete userPrograms entries for this user
       const userProgramsQuery = query(
         collection(db, "userPrograms"),
-        where("userId", "==", userRef)
+        where("userId", "==", clientToDelete.id)
       );
       const userProgramsSnapshot = await getDocs(userProgramsQuery);
       await Promise.all(userProgramsSnapshot.docs.map((d) => deleteDoc(d.ref)));

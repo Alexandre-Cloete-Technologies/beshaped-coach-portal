@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import ConfirmModal from "./ConfirmModal";
 
 export interface ModalExercise {
@@ -49,6 +50,7 @@ export default function WorkoutEditorModal({
   onTemplateSaved,
   onDelete,
 }: WorkoutEditorModalProps) {
+  const { uid, role } = useSignedInCoach();
   const [localWorkoutName, setLocalWorkoutName] = useState(
     workoutName || ""
   );
@@ -252,8 +254,9 @@ export default function WorkoutEditorModal({
         await addDoc(collection(db, "workouts"), {
           name,
           description: "",
-          createdBy: "admin",
-          createdByRole: "admin",
+          // The signed-in coach's uid and claim role: user links are uids (beshaped-backend#29).
+          createdBy: uid,
+          createdByRole: role,
           exercises: mappedExercises,
           tags: [],
           estimatedDuration,

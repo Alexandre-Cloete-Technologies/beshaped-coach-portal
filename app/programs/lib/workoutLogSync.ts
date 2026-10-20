@@ -1,120 +1,105 @@
 import {
-  addDoc,
-  collection,
-  deleteDoc,
   doc,
   DocumentReference,
-  Timestamp,
-  updateDoc,
+  runTransaction,
   where,
+  type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
+  chunk,
   type CoachScope,
   fetchScopedClients,
   fetchUserProgramsForClients,
   getDocsWhereIn,
 } from "@/lib/coachScope";
-import type {
-  InternalExercise,
-  InternalWorkout,
-  ProgramFormData,
-} from "./useProgramEditor";
+import {
+  buildProgramWorkoutSlots,
+  newProgramWorkoutLog,
+  type ProgramWorkoutSlot,
+  slotWorkoutLogId,
+  TRANSACTION_CHUNK,
+  type WorkoutLogExercise,
+} from "@/lib/workoutLogSeed";
+import type { ProgramFormData } from "./useProgramEditor";
 
-export interface WorkoutSlot {
-  key: string;
-  phaseNumber: number;
-  weekNumber: number;
-  dayNumber: number;
-  workoutName: string;
-  exercises: InternalExercise[];
-}
+const slotsByKey = (program: ProgramFormData): Map<string, ProgramWorkoutSlot> =>
+  new Map(buildProgramWorkoutSlots(program).map((slot) => [slot.key, slot]));
 
-export const hasWorkoutAssigned = (workout: InternalWorkout): boolean =>
-  Boolean(workout.workoutName?.trim()) && !workout.isRestDay;
+// phaseNumber is included: deleting an earlier phase moves a day's position but not its phaseId (or doc id).
+const slotContent = (slot: ProgramWorkoutSlot): string =>
+  JSON.stringify({ phaseNumber: slot.phaseNumber, workoutName: slot.workoutName, exercises: slot.exercises });
 
-export const buildWorkoutSlotMap = (
-  programData: ProgramFormData
-): Map<string, WorkoutSlot> => {
-  const slots = new Map<string, WorkoutSlot>();
-
-  programData.phases.forEach((phase, phaseIdx) => {
-    const phaseNumber = phaseIdx + 1;
-
-    phase.workouts.forEach((workout, workoutIdx) => {
-      if (!hasWorkoutAssigned(workout)) return;
-
-      const weekNumber =
-        typeof workout.weekNumber === "number" && workout.weekNumber > 0
-          ? workout.weekNumber
-          : Math.floor(workoutIdx / 7) + 1;
-      const fallbackDayNumber = (workoutIdx % 7) + 1;
-      const dayNumber =
-        typeof workout.dayNumber === "number" && workout.dayNumber > 0
-          ? workout.dayNumber
-          : fallbackDayNumber;
-      const key = `${phaseNumber}_${weekNumber}_${dayNumber}`;
-
-      slots.set(key, {
-        key,
-        phaseNumber,
-        weekNumber,
-        dayNumber,
-        workoutName: workout.workoutName?.trim() || `Workout ${dayNumber}`,
-        exercises: workout.exercises || [],
-      });
-    });
-  });
-
-  return slots;
-};
-
-export const serializeWorkoutForComparison = (slot: WorkoutSlot): string =>
-  JSON.stringify({
-    workoutName: slot.workoutName,
-    exercises: (slot.exercises || [])
-      .slice()
-      .sort((a, b) => a.order - b.order)
-      .map((ex, idx) => ({
-        order: ex.order ?? idx + 1,
-        exerciseId: ex.exerciseId || "",
-        exerciseName: ex.exerciseName || "",
-        sets: ex.sets || 0,
-        repsRange: ex.repsRange || "",
-        restPeriod: ex.restPeriod || "",
-        notes: ex.notes || null,
-      })),
-  });
-
-export const buildWorkoutLogExercises = (exercises: InternalExercise[]) =>
-  (exercises || [])
-    .slice()
-    .sort((a, b) => a.order - b.order)
-    .map((ex, idx) => ({
-      exerciseId: ex.exerciseId || "",
-      exerciseName: ex.exerciseName || "Unknown Exercise",
-      order: ex.order ?? idx + 1,
-      targetSets: ex.sets || 0,
-      targetReps: ex.repsRange || "",
-      restPeriod: ex.restPeriod || "",
-      personalBest: false,
-      notes: ex.notes || null,
-      sets: Array.from({ length: ex.sets || 0 }, (_, setIdx) => ({
-        setNumber: setIdx + 1,
-        weight: 0,
-        weightUnit: "kg",
-        reps: 0,
-        completed: false,
-        rpe: null,
-        timestamp: null,
-        notes: null,
-      })),
-    }));
+const hasDoneSet = (exercise: DocumentData | undefined): boolean =>
+  Array.isArray(exercise?.sets) && exercise.sets.some((s: DocumentData) => s?.completed === true);
 
 /**
- * Rewrites the open workoutLogs of clients on this program. Only the signed-in coach's clients
- * (all clients for an admin) are read and synced; other coaches' clients on the same program
- * keep their current open logs until their coach (or an admin) saves the program.
+ * The program's exercises for a started log, keeping what the client already logged: an exercise that is still in
+ * the program keeps its sets if any is done, and a removed exercise stays only if it has a done set.
+ */
+const mergeLoggedSets = (current: DocumentData[], template: WorkoutLogExercise[]): DocumentData[] => {
+  const currentById = new Map(current.map((ex) => [ex?.exerciseId, ex]));
+  const templateIds = new Set(template.map((ex) => ex.exerciseId));
+  const merged: DocumentData[] = template.map((ex) => {
+    const logged = currentById.get(ex.exerciseId);
+    return hasDoneSet(logged) ? { ...ex, sets: logged!.sets } : ex;
+  });
+  return [...merged, ...current.filter((ex) => !templateIds.has(ex?.exerciseId) && hasDoneSet(ex))];
+};
+
+interface SlotChange {
+  /** The day as saved, or as it was before the save if it was removed (its numbers give the doc id). */
+  slot: ProgramWorkoutSlot;
+  /** False when the save removed the day. */
+  inProgram: boolean;
+  /** Its name or exercises differ from before the save. */
+  contentChanged: boolean;
+}
+
+type LogWrite =
+  | { op: "set"; data: DocumentData }
+  | { op: "update"; data: DocumentData }
+  | { op: "delete" };
+
+/**
+ * What a program save does to one client's log for one day (workoutLogs data contract, 2026-10-19):
+ * create a missing day; refresh a scheduled day; update a started day but keep its logged sets; never touch a
+ * completed or skipped log; on a removed day, delete only a scheduled log.
+ */
+const planLogWrite = (
+  current: DocumentData | undefined,
+  change: SlotChange,
+  userId: string,
+  programId: string,
+  programName: string,
+  nameChanged: boolean
+): LogWrite | null => {
+  const { slot, inProgram, contentChanged } = change;
+
+  if (!inProgram) return current?.status === "to-be-completed" ? { op: "delete" } : null;
+  if (!current) return { op: "set", data: newProgramWorkoutLog(userId, programId, programName, slot) };
+
+  if (current.status === "to-be-completed") {
+    if (!contentChanged && !nameChanged) return null;
+    return {
+      op: "update",
+      data: { programName, phaseNumber: slot.phaseNumber, workoutName: slot.workoutName, exercises: slot.exercises },
+    };
+  }
+  if (current.status === "in-progress") {
+    if (contentChanged) {
+      const exercises = mergeLoggedSets(Array.isArray(current.exercises) ? current.exercises : [], slot.exercises);
+      return { op: "update", data: { programName, phaseNumber: slot.phaseNumber, workoutName: slot.workoutName, exercises } };
+    }
+    return nameChanged ? { op: "update", data: { programName } } : null;
+  }
+  return null;
+};
+
+/**
+ * Brings the open workoutLogs of clients on this program in line with the saved program. Only the signed-in coach's
+ * clients (all clients for an admin) are read and synced; other coaches' clients on the same program keep their
+ * current logs until their coach (or an admin) saves the program.
  */
 export const syncWorkoutLogsForProgramChange = async (
   previousProgram: ProgramFormData,
@@ -122,170 +107,66 @@ export const syncWorkoutLogsForProgramChange = async (
   programRef: DocumentReference,
   scope: CoachScope
 ): Promise<void> => {
-  const previousSlots = buildWorkoutSlotMap(previousProgram);
-  const updatedSlots = buildWorkoutSlotMap(updatedProgram);
+  const programId = programRef.id;
+  const programName = updatedProgram.name || previousProgram.name || "Unknown Program";
+  const nameChanged = (updatedProgram.name || "") !== (previousProgram.name || "");
+  const previousSlots = slotsByKey(previousProgram);
+  const updatedSlots = slotsByKey(updatedProgram);
 
-  const addedKeys = Array.from(updatedSlots.keys()).filter(
-    (key) => !previousSlots.has(key)
-  );
-  const removedKeys = Array.from(previousSlots.keys()).filter(
-    (key) => !updatedSlots.has(key)
-  );
-  const commonKeys = Array.from(updatedSlots.keys()).filter((key) =>
-    previousSlots.has(key)
-  );
-  const currentSlotKeys = Array.from(updatedSlots.keys());
-
-  const changedKeys = commonKeys.filter((key) => {
-    const oldSlot = previousSlots.get(key);
-    const newSlot = updatedSlots.get(key);
-    if (!oldSlot || !newSlot) return false;
-    return (
-      serializeWorkoutForComparison(oldSlot) !==
-      serializeWorkoutForComparison(newSlot)
-    );
-  });
-
-  // `addedKeys` is referenced here to keep parity with the previous sync
-  // logic — added slots get backfilled below when an open log is missing.
-  void addedKeys;
+  const changes: SlotChange[] = [
+    ...Array.from(updatedSlots.values()).map((slot) => {
+      const before = previousSlots.get(slot.key);
+      return { slot, inProgram: true, contentChanged: !before || slotContent(before) !== slotContent(slot) };
+    }),
+    ...Array.from(previousSlots.values())
+      .filter((slot) => !updatedSlots.has(slot.key))
+      .map((slot) => ({ slot, inProgram: false, contentChanged: true })),
+  ];
 
   try {
     const clientDocs = await fetchScopedClients(scope);
     const clientIds = clientDocs.map((d) => d.id);
     if (clientIds.length === 0) return;
 
-    // workoutLogs.userId is the uid string; userPrograms.userId is a reference (or legacy string).
     const [userProgramDocs, workoutLogDocs] = await Promise.all([
-      fetchUserProgramsForClients(clientIds, [where("programId", "==", programRef)]),
-      getDocsWhereIn("workoutLogs", "userId", clientIds, [
-        where("programId", "==", programRef),
-      ]),
+      fetchUserProgramsForClients(clientIds, [where("programId", "==", programId)]),
+      getDocsWhereIn("workoutLogs", "userId", clientIds, [where("programId", "==", programId)]),
     ]);
 
+    // Assigned: the program is their current one (users.currentProgram stays a reference), or they have a
+    // userPrograms doc for it.
     const assignedUserIds = new Set<string>();
-
     clientDocs.forEach((clientDoc) => {
-      const currentProgram = clientDoc.data().currentProgram;
-      if (currentProgram?.path === programRef.path) {
-        assignedUserIds.add(clientDoc.id);
-      }
+      if (clientDoc.data().currentProgram?.path === programRef.path) assignedUserIds.add(clientDoc.id);
     });
-
     userProgramDocs.forEach((userProgramDoc) => {
-      const userIdField = userProgramDoc.data().userId;
-      if (typeof userIdField === "string" && userIdField) {
-        assignedUserIds.add(userIdField);
-        return;
-      }
-      if (userIdField?.id) {
-        assignedUserIds.add(userIdField.id);
-      }
+      const userId = userProgramDoc.data().userId;
+      if (typeof userId === "string" && userId) assignedUserIds.add(userId);
     });
 
-    if (assignedUserIds.size === 0) return;
+    const existingLogs = new Map(workoutLogDocs.map((d) => [d.id, d.data()]));
 
-    const existingLogsByUserAndSlot = new Map<
-      string,
-      { openLogId: string | null; openLogIds: string[] }
-    >();
+    for (const userId of assignedUserIds) {
+      // Plan from the query, then re-read each doc in a transaction so a log the app wrote meanwhile wins.
+      const targets = changes
+        .map((change) => ({ change, id: slotWorkoutLogId(userId, programId, change.slot) }))
+        .filter(({ change, id }) =>
+          planLogWrite(existingLogs.get(id), change, userId, programId, programName, nameChanged) !== null
+        );
 
-    workoutLogDocs.forEach((workoutLogDoc) => {
-      const data = workoutLogDoc.data();
-      const userId =
-        typeof data.userId === "string" ? data.userId : data.userId?.id;
-      if (!userId || !assignedUserIds.has(userId)) return;
-
-      const phaseNumber = Number(data.phaseNumber) || 1;
-      const weekNumber = Number(data.weekNumber) || 1;
-      const dayNumber = Number(data.dayNumber) || 1;
-      const key = `${phaseNumber}_${weekNumber}_${dayNumber}`;
-      const mapKey = `${userId}::${key}`;
-      const status = String(data.status || "in-progress");
-
-      const current = existingLogsByUserAndSlot.get(mapKey) || {
-        openLogId: null,
-        openLogIds: [],
-      };
-
-      if (status !== "completed") {
-        current.openLogIds.push(workoutLogDoc.id);
-        if (!current.openLogId) {
-          current.openLogId = workoutLogDoc.id;
-        }
-      }
-
-      existingLogsByUserAndSlot.set(mapKey, current);
-    });
-
-    const now = Timestamp.now();
-    const userIds = Array.from(assignedUserIds);
-
-    for (const userId of userIds) {
-      // Backfill open workout logs for every current workout slot.
-      for (const slotKey of currentSlotKeys) {
-        const slot = updatedSlots.get(slotKey);
-        if (!slot) continue;
-
-        const mapKey = `${userId}::${slotKey}`;
-        const existing = existingLogsByUserAndSlot.get(mapKey);
-        if (existing?.openLogId) continue;
-
-        const createdLogRef = await addDoc(collection(db, "workoutLogs"), {
-          dateCompleted: null,
-          userId,
-          programId: programRef,
-          programName:
-            updatedProgram.name || previousProgram.name || "Unknown Program",
-          phaseNumber: slot.phaseNumber,
-          workoutName: slot.workoutName,
-          dayNumber: slot.dayNumber,
-          weekNumber: slot.weekNumber,
-          startedAt: now,
-          completedAt: null,
-          totalDuration: null,
-          status: "in-progress",
-          exercises: buildWorkoutLogExercises(slot.exercises),
-          totalVolume: 0,
-          totalSets: 0,
-          totalReps: 0,
-          personalBests: [],
-          notes: null,
+      for (const part of chunk(targets, TRANSACTION_CHUNK)) {
+        await runTransaction(db, async (transaction) => {
+          const refs = part.map(({ id }) => doc(db, "workoutLogs", id));
+          const snapshots = await Promise.all(refs.map((ref) => transaction.get(ref)));
+          snapshots.forEach((snapshot, i) => {
+            const current = snapshot.exists() ? snapshot.data() : undefined;
+            const write = planLogWrite(current, part[i].change, userId, programId, programName, nameChanged);
+            if (!write) return;
+            if (write.op === "set") transaction.set(refs[i], write.data);
+            else if (write.op === "update") transaction.update(refs[i], write.data);
+            else transaction.delete(refs[i]);
+          });
         });
-
-        existingLogsByUserAndSlot.set(mapKey, {
-          openLogId: createdLogRef.id,
-          openLogIds: [...(existing?.openLogIds || []), createdLogRef.id],
-        });
-      }
-
-      for (const slotKey of changedKeys) {
-        const slot = updatedSlots.get(slotKey);
-        if (!slot) continue;
-
-        const mapKey = `${userId}::${slotKey}`;
-        const existing = existingLogsByUserAndSlot.get(mapKey);
-        if (!existing?.openLogId) continue;
-
-        await updateDoc(doc(db, "workoutLogs", existing.openLogId), {
-          programName:
-            updatedProgram.name || previousProgram.name || "Unknown Program",
-          phaseNumber: slot.phaseNumber,
-          workoutName: slot.workoutName,
-          dayNumber: slot.dayNumber,
-          weekNumber: slot.weekNumber,
-          exercises: buildWorkoutLogExercises(slot.exercises),
-        });
-      }
-
-      for (const slotKey of removedKeys) {
-        const mapKey = `${userId}::${slotKey}`;
-        const existing = existingLogsByUserAndSlot.get(mapKey);
-        if (!existing?.openLogIds?.length) continue;
-
-        for (const logId of existing.openLogIds) {
-          await deleteDoc(doc(db, "workoutLogs", logId));
-        }
       }
     }
   } catch (syncError) {

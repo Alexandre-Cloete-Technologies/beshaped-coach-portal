@@ -1,6 +1,5 @@
 import {
   collection,
-  doc,
   getDocs,
   query,
   where,
@@ -74,14 +73,10 @@ export async function getDocsWhereIn(
   return Array.from(byId.values());
 }
 
-/**
- * `userPrograms` for the given clients. `userId` is a reference there, but older docs may hold the
- * uid string, so match both forms.
- */
+/** `userPrograms` for the given clients (`userId` is the client's uid string). */
 export function fetchUserProgramsForClients(
   clientIds: string[],
   extraConstraints: QueryConstraint[] = []
 ): Promise<QueryDocumentSnapshot[]> {
-  const values = clientIds.flatMap((id) => [doc(db, "users", id), id]);
-  return getDocsWhereIn("userPrograms", "userId", values, extraConstraints);
+  return getDocsWhereIn("userPrograms", "userId", clientIds, extraConstraints);
 }
