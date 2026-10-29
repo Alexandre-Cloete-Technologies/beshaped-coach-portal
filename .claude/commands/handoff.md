@@ -14,8 +14,26 @@ Refs look like `beshaped-webapp#12`, `backend#45` or `BSF-86`. Add `--dry-run` t
    and diff against the default branch (`master` for the coach portal, `main` elsewhere). A branch named
    `<n>-slug` belongs to issue #n in that repo. Find PRs with `gh pr list --head <branch> --state all`. Don't rely
    on memory alone. If it's unclear which issue the work belongs to, ask. No issue at all: propose creating one
-   (step 4).
-2. **Per issue, prepare** (run `issue.mjs show <ref>` first):
+   (step 5).
+2. **Live on Netlify.** When the session merged or pushed to the coach portal's `master` (Netlify project
+   `beshaped-coach-portal`, site id `036be203-1ac6-4935-8cad-718d255d59d0`) or the website's `main` (project
+   `beshapedfitness`, site id `791c8acb-6730-45cd-a38f-89f59df5d849`), check that it's live:
+   - Expected: the newest commit on that branch without `[skip netlify]` in its message (Netlify doesn't build
+     those), usually the session's merge commit. A merge that changed no app code should carry `[skip netlify]`;
+     if one didn't, say it used a production deploy.
+   - Published: the Netlify connector or MCP (`get-projects` by project name, then `get-deploy-for-site` on its
+     current deploy: `commit_ref`, `published_at`), or the netlify CLI signed in to the team that owns the
+     projects (`netlify api getSite --data '{"site_id":"<site id>"}'`: `published_deploy.commit_ref`; newer
+     deploys' `state`, `error_message` and `skipped` from `netlify api listSiteDeploys --data
+     '{"site_id":"<site id>","per_page":5}'`). GitHub can't tell you: Netlify posts commit statuses for Deploy
+     Previews only.
+   - A build takes 1–2 minutes: if the published commit isn't the expected one, check again until about 5 minutes
+     after the merge.
+   - Still not live: the first line of what the handoff shows (the step 7 list and the step 8 summary) is
+     `NOT LIVE: <project> serves <sha>, not <sha>` plus why (the newer deploy's error or skip message, or no
+     deploy at all: credits used up, or the GitHub link). Neither the connector nor the CLI reaches the project:
+     the first line is `LIVE NOT CONFIRMED: <project>` with https://app.netlify.com/projects/<project>/deploys.
+3. **Per issue, prepare** (run `issue.mjs show <ref>` first):
    - Status: In progress; In review when a PR is open; Done when it's merged (the Project's workflows usually
      set this, so check); Blocked, with the reason in the comment.
    - "Latest update" = `YYYY-MM-DD: one line`.
@@ -25,19 +43,19 @@ Refs look like `beshaped-webapp#12`, `backend#45` or `BSF-86`. Add `--dry-run` t
    - An epic's sub-issues: a comment on each sub-issue, plus a one-line summary comment on the epic.
    - Drafts can't take comments: put the update in "Latest update", and propose converting the draft to an
      issue (`issue.mjs convert`) when the update is substantial.
-3. **Public repos.** Issues and comments in `beshaped-coach-portal` and `beshaped-webapp` are public. Security
+4. **Public repos.** Issues and comments in `beshaped-coach-portal` and `beshaped-webapp` are public. Security
    findings, secrets, clients' personal data and commercial terms never go there: put them in a
    `beshaped-backend` issue and link to it. `issue.mjs` refuses such text in a public repo unless you pass
    `--allow-public`; only do that when the match is harmless.
-4. **Follow-ups** become new issues with `issue.mjs create`: the right repo, the issue type (Feature,
+5. **Follow-ups** become new issues with `issue.mjs create`: the right repo, the issue type (Feature,
    Improvement, Bug, Chore, Question), labels (`data-model`, `security-rules`, `admin` as they apply), Priority,
    Scope and Requested by. Cross-repo work: an epic (`--type Epic --labels epic`) in `beshaped-backend` when the
    data model or rules change, otherwise in the leading repo, then one sub-issue per repo with `--parent`.
    Admin-only work: a draft (`--draft`).
-5. **Decisions** with a real trade-off: propose a Decision log entry in Notion
+6. **Decisions** with a real trade-off: propose a Decision log entry in Notion
    (https://app.notion.com/p/3e5587cfb07881ef9a6ac39d77d9c088), newest on top: date and title, context,
    decision, rejected options, what it affects. If Firestore shapes, rules or Storage paths changed, confirm the
    collection's data contract and the DB schema page were updated; if not, say so.
-6. **Approval.** Show every proposed change as one list: per issue the Status, Latest update and comment text;
+7. **Approval.** Show every proposed change as one list: per issue the Status, Latest update and comment text;
    the follow-ups; the Decision log entries. Check the writes with `--dry-run` first. Apply only after I approve.
-7. Finish with a **5-line summary** for the Hand-offs chat, with the issue refs (`repo#n`).
+8. Finish with a **5-line summary** for the Hand-offs chat, with the issue refs (`repo#n`).
