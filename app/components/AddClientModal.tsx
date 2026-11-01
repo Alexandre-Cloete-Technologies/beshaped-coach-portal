@@ -2,11 +2,11 @@
 
 import { X, Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, addDoc, setDoc, Timestamp, getDocs, doc, query, where, getDoc } from "firebase/firestore";
+import { collection, setDoc, Timestamp, getDocs, doc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createAccountForClient } from "@/lib/firebase/auth";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
-import { buildProgramWorkoutSlots, seedMissingWorkoutLogsForUserProgram } from "@/lib/workoutLogSeed";
+import { assignProgramToClient } from "@/lib/programAssignment";
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -148,65 +148,10 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
             : [],
         })
       );
-      const userDocRef = doc(db, "users", uid);
-
-      // If a program was selected, create a userPrograms entry (only if none exists)
+      // If a program was selected: its userPrograms doc and a scheduled workoutLog per program day
       if (formData.currentProgram) {
-        const newUserRef = userDocRef;
-        const programRef = doc(db, "programs", formData.currentProgram);
-
-        // Check if a userPrograms doc already exists for this user
-        const userProgramsQuery = query(
-          collection(db, "userPrograms"),
-          where("userId", "==", newUserRef)
-        );
-        const existingDocs = await getDocs(userProgramsQuery);
-
-        if (existingDocs.empty) {
-          // Fetch program doc to get extra details
-          const programSnap = await getDoc(programRef);
-          const programData = programSnap.data();
-          const selectedProgramObj = programs.find((p) => p.id === formData.currentProgram);
-          const totalDurationWeeks = programData?.totalDuration || programData?.phases?.length * 4 || 8;
-          const workoutSlots = buildProgramWorkoutSlots(programData);
-
-          const now = Timestamp.now();
-          const estimatedEnd = new Date();
-          estimatedEnd.setDate(estimatedEnd.getDate() + totalDurationWeeks * 7);
-
-          await addDoc(collection(db, "userPrograms"), {
-            userId: newUserRef,
-            programId: programRef,
-            programName: selectedProgramObj?.name || programData?.name || "Unknown Program",
-            status: "active",
-            currentPhase: 1,
-            currentWeek: 1,
-            currentDay: 1,
-            nextWorkoutId: null,
-            nextWorkoutName: null,
-            createdAt: now,
-            estimatedEndDate: Timestamp.fromDate(estimatedEnd),
-            completedDate: null,
-            lastWorkoutDate: null,
-            totalWorkoutsCompleted: 0,
-            totalWorkoutsMissed: 0,
-            adherenceRate: 0,
-            totalWorkoutsInProgram: workoutSlots.length,
-            phasesCompleted: [],
-
-            notes: null,
-            trainerNotes: null,
-          });
-
-          const programName = selectedProgramObj?.name || programData?.name || "Unknown Program";
-          await seedMissingWorkoutLogsForUserProgram({
-            userId: uid,
-            programRef,
-            programName,
-            slots: workoutSlots,
-            startedAt: now,
-          });
-        }
+        const selectedProgramObj = programs.find((p) => p.id === formData.currentProgram);
+        await assignProgramToClient(uid, formData.currentProgram, selectedProgramObj?.name);
       }
 
       // Reset form

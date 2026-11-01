@@ -11,6 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { Exercise, getCategoryFromMuscle } from "./exercise";
 import { ModalExercise } from "../../components/WorkoutEditorModal";
 
@@ -104,6 +105,7 @@ export function useWorkoutEditor({
   redirectTo = "/workouts",
 }: UseWorkoutEditorOptions = {}): WorkoutEditorState {
   const router = useRouter();
+  const { uid, role } = useSignedInCoach();
   const [workoutName, setWorkoutName] = useState(initialWorkoutName);
   const [workoutExercises, setWorkoutExercises] = useState<CreateWorkoutExercise[]>(
     initialExercises ?? []
@@ -309,8 +311,9 @@ export function useWorkoutEditor({
         await addDoc(collection(db, "workouts"), {
           name,
           description: "",
-          createdBy: "admin",
-          createdByRole: "admin",
+          // The signed-in coach's uid and claim role: user links are uids (beshaped-backend#29).
+          createdBy: uid,
+          createdByRole: role,
           exercises: mappedExercises,
           tags: [],
           estimatedDuration: mappedExercises.length * 5,

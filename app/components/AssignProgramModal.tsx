@@ -2,11 +2,11 @@
 
 import { X, Users, BookOpen, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, updateDoc, addDoc, query, where, Timestamp, getDoc, arrayUnion } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { fetchScopedClients } from "@/lib/coachScope";
-import { buildProgramWorkoutSlots, seedMissingWorkoutLogsForUserProgram } from "@/lib/workoutLogSeed";
+import { assignProgramToClient } from "@/lib/programAssignment";
 
 interface AssignProgramModalProps {
   isOpen: boolean;
@@ -112,56 +112,9 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
         availablePrograms: arrayUnion(programRef),
       });
 
-      // Check if a userPrograms doc already exists for this user
-      const userProgramsQuery = query(
-        collection(db, "userPrograms"),
-        where("userId", "==", userRef)
-      );
-      const existingDocs = await getDocs(userProgramsQuery);
-
-      // Only create a userPrograms entry on FIRST-TIME assignment
-      if (existingDocs.empty) {
-        // Fetch program doc to get extra details
-        const programSnap = await getDoc(programRef);
-        const programData = programSnap.data();
-        const totalDurationWeeks = programData?.totalDuration || programData?.phases?.length * 4 || 8;
-        const workoutSlots = buildProgramWorkoutSlots(programData);
-
-        const now = Timestamp.now();
-        const estimatedEnd = new Date();
-        estimatedEnd.setDate(estimatedEnd.getDate() + totalDurationWeeks * 7);
-
-        await addDoc(collection(db, "userPrograms"), {
-          userId: userRef,
-          programId: programRef,
-          programName: selectedProgram.name,
-          status: "active",
-          currentPhase: 1,
-          currentWeek: 1,
-          currentDay: 1,
-          nextWorkoutId: null,
-          nextWorkoutName: null,
-          createdAt: now,
-          estimatedEndDate: Timestamp.fromDate(estimatedEnd),
-          completedDate: null,
-          lastWorkoutDate: null,
-          totalWorkoutsCompleted: 0,
-          totalWorkoutsMissed: 0,
-          adherenceRate: 0,
-          totalWorkoutsInProgram: workoutSlots.length,
-          phasesCompleted: [],
-          notes: null,
-          trainerNotes: null,
-        });
-
-        await seedMissingWorkoutLogsForUserProgram({
-          userId: selectedUserId,
-          programRef,
-          programName: selectedProgram.name,
-          slots: workoutSlots,
-          startedAt: now,
-        });
-      }
+      // The program's userPrograms doc if missing, and a scheduled workoutLog per program day the client has no
+      // log for. Re-assigning the same program keeps the client's logs and only adds missing days.
+      await assignProgramToClient(selectedUserId, selectedProgramId, selectedProgram.name);
 
       // Reset selections
       setSelectedUserId("");

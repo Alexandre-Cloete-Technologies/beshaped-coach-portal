@@ -420,12 +420,9 @@ export default function WorkoutHistory() {
 
         const logs: WorkoutLog[] = snapshot.docs.map((docSnap) => {
           const data = docSnap.data() as Record<string, unknown>;
-          const startedAt =
-            toDateValue(data.timeStartedAt) ?? toDateValue(data.startedAt);
+          const startedAt = toDateValue(data.timeStartedAt);
           const completedAt =
-            toDateValue(data.timeCompletedAt) ??
-            toDateValue(data.completedAt) ??
-            toDateValue(data.dateCompleted);
+            toDateValue(data.timeCompletedAt) ?? toDateValue(data.dateCompleted);
           const dateCompleted = calendarDateFromValue(data.dateCompleted);
           const logDate = dateCompleted ?? calendarDateFromValue(completedAt) ?? calendarDateFromValue(startedAt) ?? new Date(0);
           const rawDuration = data.totalDuration;

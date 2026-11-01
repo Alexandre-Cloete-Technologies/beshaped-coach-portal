@@ -207,7 +207,7 @@ export default function ClientDetailPage() {
             const { collection, query, where, getDocs, limit } = await import("firebase/firestore");
             const q = query(
               collection(db, "userPrograms"), 
-              where("userId", "==", clientDoc.ref),
+              where("userId", "==", clientDoc.id),
               limit(1)
             );
             const querySnapshot = await getDocs(q);
