@@ -3,6 +3,7 @@
 import { LogOut } from "lucide-react";
 import { useState } from "react";
 import { useAuth, useSignedInCoach } from "@/lib/auth/AuthProvider";
+import { useMessages } from "@/lib/i18n/LocaleProvider";
 
 function initialsFor(nameOrEmail: string): string {
   const base = nameOrEmail.split("@")[0];
@@ -14,8 +15,9 @@ function initialsFor(nameOrEmail: string): string {
 export default function SignedInUser({ compact = false }: { compact?: boolean }) {
   const { signOutUser } = useAuth();
   const { user, role } = useSignedInCoach();
+  const t = useMessages();
   const [signingOut, setSigningOut] = useState(false);
-  const label = user.displayName || user.email || "Signed in";
+  const label = user.displayName || user.email || t.signedIn;
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -35,14 +37,14 @@ export default function SignedInUser({ compact = false }: { compact?: boolean })
         <p className="text-sm font-medium text-sidebar-foreground truncate" title={label}>
           {label}
         </p>
-        <p className="text-xs text-muted-foreground">{role === "admin" ? "Admin" : "Coach"}</p>
+        <p className="text-xs text-muted-foreground">{role === "admin" ? t.admin : t.coach}</p>
       </div>
       <button
         type="button"
         onClick={handleSignOut}
         disabled={signingOut}
-        title="Sign out"
-        aria-label="Sign out"
+        title={t.signOut}
+        aria-label={t.signOut}
         className="p-2 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50"
       >
         <LogOut size={16} />
