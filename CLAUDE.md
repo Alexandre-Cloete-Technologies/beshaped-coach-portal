@@ -5,7 +5,7 @@ Workspace context and cross-repo rules: ../CLAUDE.md. Read the DB schema page in
 any Firestore/Storage work.
 
 ## Stack
-- Framework: Next.js 16.1 (App Router, React 19.2); pages are client components that call Firestore
+- Framework: Next.js 16.4.5 (App Router, React 19.2); pages are client components that call Firestore
   directly · UI: Tailwind v4 + shadcn/ui config (`components.json`, new-york), lucide-react icons
 - Firebase: client SDK only (`lib/firebase/`); no Admin SDK, no server actions or API routes
 - Hosting: Netlify site `beshaped-coach-portal` (https://beshaped-coach-portal.netlify.app): builds from `master`,
