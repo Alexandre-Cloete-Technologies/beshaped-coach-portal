@@ -8,7 +8,7 @@ const eslintConfig = defineConfig([
   {
     // eslint-plugin-react-hooks 7.1 (pulled in by eslint-config-next 16.4) turned
     // these two React Compiler rules on as errors. The portal's fetch-in-effect
-    // pattern trips them in 13 files (16 findings). Kept as warnings so the Next
+    // pattern trips them in 12 files (16 findings). Kept as warnings so the Next
     // security bump stays dependency-only; fixing the effects is a separate change.
     rules: {
       "react-hooks/set-state-in-effect": "warn",
