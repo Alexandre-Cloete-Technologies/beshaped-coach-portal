@@ -7,14 +7,15 @@ any Firestore/Storage work.
 ## Stack
 - Framework: Next.js 16.4.5 (App Router, React 19.2); pages are client components that call Firestore
   directly · UI: Tailwind v4 + shadcn/ui config (`components.json`, new-york), lucide-react icons
-- Firebase: client SDK only (`lib/firebase/`); no Admin SDK, no server actions or API routes
+- Firebase: client SDK only (`lib/firebase/`); no Admin SDK, no server actions or API routes. Server-side work is a
+  callable in beshaped-backend, called through `lib/firebase/functions.ts`
 - Hosting: Netlify site `beshaped-coach-portal` (https://beshaped-coach-portal.netlify.app): builds from `master`,
   deploy previews on PRs. Production env vars (`NEXT_PUBLIC_FIREBASE_*`, prod project) are set in Netlify;
   `NEXT_PUBLIC_USE_EMULATORS` must never be set there (the build refuses it). No `netlify.toml`.
 - Default branch is `master` (the other three repos use `main`)
 
 ## Commands
-- Dev: `npm run dev` · Build: `npm run build` · Typecheck: `npx tsc --noEmit` · Lint: `npm run lint` · Test: none
+- Dev: `npm run dev` · Build: `npm run build` · Typecheck: `npx tsc --noEmit` · Lint: `npm run lint` · Test: `npm test` (Node test runner, `lib/*.test.ts`, pure helpers only)
 - Emulators: `npm run dev:emulators` + `npm run seed:emulator` (see README). `firebase-admin` is a devDependency
   for the seed script only; the app itself stays client-SDK-only.
 
@@ -45,11 +46,12 @@ any Firestore/Storage work.
   app fills the seeded slot. Seeding and the program-edit sync (`workoutLogSync.ts`) only create missing days,
   refresh scheduled ones, keep logged sets on started ones and never touch completed or skipped logs
   (workoutLogs data contract). Logs use `timeStartedAt`/`timeCompletedAt`.
-- `AddClientModal` creates the Auth user via `createAccountForClient` (`lib/firebase/auth.ts`): a throwaway
-  Firebase app with in-memory persistence, so the coach stays signed in; the `users` doc is written as the coach,
-  and the Auth user is deleted again if that write fails. It creates clients only (`role: "client"`); staff
-  accounts are made with `set-role-claims.ts` in beshaped-backend (#42). Interim only: BSF-72 (beshaped-backend#36) moves client creation to a
-  Cloud Function (Admin SDK). Don't reuse this pattern elsewhere.
+- `AddClientModal` creates clients through the `createClient` callable (`lib/createClient.ts`, region `africa-south1`,
+  beshaped-backend#37): the backend creates the Auth user and `users/{uid}` with the Admin SDK and rolls both back on
+  failure, so the coach stays signed in. The portal then calls `assignProgramToClient` for `userPrograms` and the
+  seeded logs. Backend error messages map to text in `lib/createClientErrors.ts`. Clients only (`role: "client"`);
+  staff accounts are made with `set-role-claims.ts` in beshaped-backend (#42). The client SDK no longer creates other
+  people's accounts: don't bring that back.
 - `createdBy` on programs/exercises is a literal (`"coach"` / `"admin"`), not a uid. On `workouts` it is the
   signed-in coach's uid, with `createdByRole` from the claim.
 

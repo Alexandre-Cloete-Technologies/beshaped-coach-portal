@@ -2,9 +2,10 @@
 
 import { X, Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
-import { collection, setDoc, Timestamp, getDocs, doc, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { createAccountForClient } from "@/lib/firebase/auth";
+import { createClientAccount } from "@/lib/createClient";
+import { createClientErrorMessage } from "@/lib/createClientErrors";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { assignProgramToClient } from "@/lib/programAssignment";
 
@@ -16,6 +17,7 @@ interface AddClientModalProps {
 
 export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddClientModalProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [programs, setPrograms] = useState<{id: string; name: string}[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
@@ -94,6 +96,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
 
 
   const resetForm = () => {
+    setError(null);
     setFormData({
       username: "",
       email: "",
@@ -105,78 +108,52 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
     });
   };
 
+  const handleClose = () => {
+    setError(null);
+    onClose();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+
+    let uid: string;
+    try {
+      // The backend creates the Auth account and the users doc (Admin SDK, rolled back together), so the coach
+      // stays signed in. An admin's coach choice is sent; for a coach the backend uses their own uid.
+      ({ uid } = await createClientAccount({
+        email: formData.email.trim(),
+        username: formData.username.trim(),
+        password: formData.password,
+        phoneNumber: formData.phoneNumber || undefined,
+        goals: formData.goals || undefined,
+        assignedCoachId: coachRole === "admin" && formData.assignedCoach ? formData.assignedCoach : undefined,
+        programId: formData.currentProgram || undefined,
+      }));
+    } catch (err) {
+      console.error("Error adding client:", err);
+      setError(createClientErrorMessage(err));
+      setLoading(false);
+      return;
+    }
 
     try {
-      // Create the Auth account without signing the coach out (interim until BSF-72), then write
-      // the users doc as the coach. If that write fails, the new Auth account is rolled back.
-      const uid = await createAccountForClient(
-        formData.email,
-        formData.password,
-        formData.username,
-        (newUid) => setDoc(doc(db, "users", newUid), {
-          displayName: formData.username,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber,
-          username: formData.username,
-          profilePhoto: "",
-          // Always a client. Staff accounts are made with set-role-claims.ts in beshaped-backend.
-          role: "client",
-          // BSF-71 scoping: the coach's uid (string). Defaults to whoever is adding the client.
-          assignedCoachId: formData.assignedCoach || coachUid,
-          goals: formData.goals,
-          onboardingCompleted: false,
-          createdAt: Timestamp.now(),
-          lastActive: Timestamp.now(),
-          settings: {
-            weightUnit: "kg",
-            notifications: true,
-            theme: "light",
-            restTimerEnabled: true,
-            soundEffects: true,
-          },
-          stats: {
-            totalWorkouts: 0,
-            currentStreak: 0,
-            longestStreak: 0,
-          },
-          currentProgram: formData.currentProgram ? doc(db, "programs", formData.currentProgram) : null,
-          availablePrograms: formData.currentProgram
-            ? [doc(db, "programs", formData.currentProgram)]
-            : [],
-        })
-      );
       // If a program was selected: its userPrograms doc and a scheduled workoutLog per program day
       if (formData.currentProgram) {
         const selectedProgramObj = programs.find((p) => p.id === formData.currentProgram);
         await assignProgramToClient(uid, formData.currentProgram, selectedProgramObj?.name);
       }
-
-      // Reset form
-      setFormData({
-        username: "",
-        email: "",
-        password: "",
-        phoneNumber: "",
-        currentProgram: "",
-        assignedCoach: "",
-        goals: "",
-      });
-
-      // Notify parent component
-      if (onClientAdded) {
-        onClientAdded();
-      }
-
-      onClose();
-    } catch (error) {
-      console.error("Error adding client:", error);
-      alert("Failed to add client. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      // The account exists now, so retrying here would only say the email is taken.
+      console.error("Client created, but assigning the program failed:", err);
+      alert("The client was created, but their program could not be set up. Open the client and assign the program again.");
     }
+
+    resetForm();
+    onClientAdded?.();
+    onClose();
+    setLoading(false);
   };
 
   if (!isOpen) return null;
@@ -191,7 +168,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
             <p className="text-xs text-muted-foreground mt-0.5">Create a new user&apos;s profile</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
           >
             <X className="w-4 h-4 text-muted-foreground" />
@@ -341,6 +318,11 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
               </select>
             </div>
           </div>
+          {error && (
+            <p role="alert" className="mt-4 text-sm text-destructive">
+              {error}
+            </p>
+          )}
         </form>
 
         {/* Footer */}
@@ -354,7 +336,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
           >
             Cancel
