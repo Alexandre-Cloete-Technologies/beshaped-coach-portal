@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Loader2, Plus, UtensilsCrossed } from "lucide-react";
+import { BookOpen, Check, Loader2, Plus, UtensilsCrossed } from "lucide-react";
 import { useLocale, useMessages } from "@/lib/i18n/LocaleProvider";
 import Breadcrumbs from "../components/Breadcrumbs";
 import MealCard from "./components/MealCard";
 import MacroSummary from "./components/MacroSummary";
 import MacroPie from "./components/MacroPie";
+import SavedMealPicker from "./components/SavedMealPicker";
 import Toast, { useToast } from "./components/Toast";
 import {
   MACRO_META,
@@ -24,6 +25,11 @@ import {
   sumMacros,
 } from "./lib/foods";
 import { getPlan, savePlan } from "./lib/planStore";
+import { useSaveShortcut, useUnsavedChangesWarning } from "./lib/useEditorGuards";
+import { SavedMeal, copyOfMeal, guessCategory, saveSavedMeal } from "./lib/savedMeals";
+
+const dashedButtonClass =
+  "flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-4 text-sm font-medium text-muted-foreground transition-colors hover:border-beshaped-dark-green hover:text-beshaped-dark-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const snapshotOf = (p: NutritionPlan) =>
   JSON.stringify({ name: p.name, meals: p.meals, notes: p.notes ?? "", goals: p.goals ?? {} });
@@ -52,6 +58,7 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
   const [saving, setSaving] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
+  const [savedPicker, setSavedPicker] = useState<"empty" | "footer" | null>(null);
   const copy = useMessages().nutrition;
   const mealSuggestions = [1, 2, 3, 4].map((n) => copy.mealNumber(n));
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
@@ -102,36 +109,8 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [notesOpen]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        save();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
-
-  useEffect(() => {
-    if (!isDirty) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
-    // Client-side <Link> navigation doesn't fire beforeunload, so intercept link clicks too.
-    const onLinkClick = (e: MouseEvent) => {
-      const anchor = (e.target as HTMLElement | null)?.closest("a[href]");
-      if (!anchor || anchor.getAttribute("target") === "_blank") return;
-      if (!window.confirm(copy.leaveWarning)) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    document.addEventListener("click", onLinkClick, true);
-    return () => {
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      document.removeEventListener("click", onLinkClick, true);
-    };
-  }, [isDirty, copy.leaveWarning]);
+  useSaveShortcut(save);
+  useUnsavedChangesWarning(isDirty, copy.leaveWarning);
 
   const nextMealName = () => {
     const used = new Set(plan.meals.map((m) => m.name));
@@ -163,6 +142,20 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
           }),
       },
     });
+  };
+
+  const addSavedMeal = (saved: SavedMeal) => {
+    setPlan((p) => ({ ...p, meals: [...p.meals, copyOfMeal(saved)] }));
+    setSavedPicker(null);
+    showToast({ message: copy.addedNamed(saved.name) });
+  };
+
+  const saveMealToLibrary = (meal: Meal) => {
+    const saved = saveSavedMeal(
+      { ...copyOfMeal(meal), category: guessCategory(meal.name) },
+      copy.untitledMeal
+    );
+    showToast({ message: copy.savedToLibrary(saved.name) });
   };
 
   if (initial.notFound) {
@@ -258,16 +251,31 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
                   meal={meal}
                   onChange={updateMeal}
                   onDelete={() => deleteMeal(meal.id)}
+                  onSaveToLibrary={() => saveMealToLibrary(meal)}
                 />
               ))}
-              <button
-                type="button"
-                onClick={() => addMeal()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-4 text-sm font-medium text-muted-foreground transition-colors hover:border-beshaped-dark-green hover:text-beshaped-dark-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Plus className="h-4 w-4" />
-                {copy.addMeal}
-              </button>
+              <div className="relative flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => addMeal()}
+                  className={`flex-1 ${dashedButtonClass}`}
+                >
+                  <Plus className="h-4 w-4" />
+                  {copy.addMeal}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSavedPicker(savedPicker === "footer" ? null : "footer")}
+                  aria-expanded={savedPicker === "footer"}
+                  className={`flex-1 ${dashedButtonClass}`}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  {copy.addSavedMeal}
+                </button>
+                {savedPicker === "footer" && (
+                  <SavedMealPicker placement="above" onSelect={addSavedMeal} onClose={() => setSavedPicker(null)} />
+                )}
+              </div>
             </div>
             <div className="space-y-4 lg:sticky lg:top-8">
               <MacroSummary totals={totals} mealCount={plan.meals.length} goals={plan.goals} />
@@ -293,6 +301,20 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
                   {name}
                 </button>
               ))}
+            </div>
+            <div className="relative mt-3 w-full max-w-md">
+              <button
+                type="button"
+                onClick={() => setSavedPicker(savedPicker === "empty" ? null : "empty")}
+                aria-expanded={savedPicker === "empty"}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-beshaped-dark-green transition-colors hover:bg-beshaped-green/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <BookOpen className="h-4 w-4" />
+                {copy.addSavedMeal}
+              </button>
+              {savedPicker === "empty" && (
+                <SavedMealPicker onSelect={addSavedMeal} onClose={() => setSavedPicker(null)} />
+              )}
             </div>
           </div>
         )}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Pencil, Plus, Search, Trash2, UtensilsCrossed } from "lucide-react";
 import { useLocale, useMessages } from "@/lib/i18n/LocaleProvider";
 import Breadcrumbs from "../components/Breadcrumbs";
+import NutritionTabs from "./components/NutritionTabs";
 import RowMenu from "./components/RowMenu";
 import Toast, { useToast } from "./components/Toast";
 import { MACRO_META, formatGrams, formatKcal, macrosForMeal, sumMacros } from "./lib/foods";
@@ -71,6 +72,8 @@ export default function NutritionLibrary() {
             </Link>
           )}
         </div>
+
+        <NutritionTabs />
 
         {plans.length === 0 ? (
           <div className="flex flex-col items-center rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
