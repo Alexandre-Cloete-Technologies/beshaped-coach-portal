@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { BookmarkPlus, Plus, Trash2, X } from "lucide-react";
 import { useLocale, useMessages } from "@/lib/i18n/LocaleProvider";
 import FoodPicker from "./FoodPicker";
 import {
@@ -27,12 +27,15 @@ import {
 interface MealCardProps {
   meal: Meal;
   onChange: (meal: Meal) => void;
-  onDelete: () => void;
+  /** Omit to hide the delete button, e.g. when the card is the whole saved meal. */
+  onDelete?: () => void;
+  /** Shows a button that copies this meal into the saved meals library. */
+  onSaveToLibrary?: () => void;
 }
 
 const DEFAULT_GRAMS = 100;
 
-export default function MealCard({ meal, onChange, onDelete }: MealCardProps) {
+export default function MealCard({ meal, onChange, onDelete, onSaveToLibrary }: MealCardProps) {
   const { locale } = useLocale();
   const copy = useMessages().nutrition;
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -69,15 +72,29 @@ export default function MealCard({ meal, onChange, onDelete }: MealCardProps) {
           <p className="text-sm tabular-nums text-muted-foreground">
             <span className="font-semibold text-card-foreground">{formatKcal(totals.calories, locale)}</span> {copy.kcal}
           </p>
-          <button
-            type="button"
-            onClick={onDelete}
-            aria-label={copy.deleteNamedMeal(meal.name || copy.mealFallback)}
-            title={copy.deleteMeal}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {onSaveToLibrary && (
+            <button
+              type="button"
+              onClick={onSaveToLibrary}
+              disabled={meal.items.length === 0}
+              title={copy.saveToLibrary}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-beshaped-green/10 hover:text-beshaped-dark-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+            >
+              <BookmarkPlus className="h-4 w-4" />
+              {copy.saveToLibrary}
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label={copy.deleteNamedMeal(meal.name || copy.mealFallback)}
+              title={copy.deleteMeal}
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </header>
 
