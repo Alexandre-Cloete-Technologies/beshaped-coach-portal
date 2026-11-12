@@ -4,20 +4,18 @@ import { getBackendFunctions, httpsCallable } from '@/lib/firebase/functions';
 export interface CreateClientRequest {
   email: string;
   username: string;
-  /** 6-128 characters. Left out, the backend sets a random one and `passwordSetLink: true` returns a link to choose one. */
-  password?: string;
   phoneNumber?: string;
   goals?: string;
   /** Admin only. A coach's own uid is the default, and a coach naming another coach is refused. */
   assignedCoachId?: string;
   /** A `programs` doc id: the backend sets `currentProgram` and `availablePrograms` on the new `users` doc. */
   programId?: string;
-  passwordSetLink?: boolean;
+  // No password: the backend refuses one (Decision log 2026-10-29, D2). The client sets their own from the
+  // set-password email the portal sends after this call (see lib/clientInvite.ts).
 }
 
 export interface CreateClientResult {
   uid: string;
-  passwordSetLink?: string;
 }
 
 /**

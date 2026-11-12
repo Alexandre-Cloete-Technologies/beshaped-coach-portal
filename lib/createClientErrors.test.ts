@@ -5,8 +5,8 @@ import { createClientErrorMessage } from './createClientErrors.ts';
 
 test('maps the callable messages the backend contract lists', () => {
   const err = { code: 'functions/already-exists', message: 'email-already-in-use' };
-  assert.match(createClientErrorMessage(err), /already exists/);
-  assert.match(createClientErrorMessage({ code: 'functions/invalid-argument', message: 'invalid-password' }), /6 to 128/);
+  assert.equal(createClientErrorMessage(err), 'This email already has an account');
+  assert.match(createClientErrorMessage({ code: 'functions/invalid-argument', message: 'password-not-supported' }), /invite email/);
   assert.match(createClientErrorMessage({ code: 'functions/permission-denied', message: 'coach-assigns-to-self' }), /own list/);
   assert.match(createClientErrorMessage({ code: 'functions/internal', message: 'create-failed' }), /nothing was saved/);
 });

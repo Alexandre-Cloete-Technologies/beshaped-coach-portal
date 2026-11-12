@@ -8,15 +8,14 @@ const MESSAGES: Record<string, string> = {
   'coach-assigns-to-self': 'Coaches can only add clients to their own list.',
   'invalid-email': 'That email address is not valid.',
   'invalid-username': 'Enter a username (up to 100 characters).',
-  'invalid-password': 'The password must be 6 to 128 characters.',
+  'password-not-supported': 'Coaches no longer choose a password. The client sets their own from the invite email.',
   'invalid-phone-number': 'That phone number is too long.',
   'invalid-goals': 'The goals text is too long.',
   'invalid-program-id': 'The selected program is not valid. Pick it again.',
   'invalid-coach-id': 'The selected coach is not valid. Pick them again.',
   'unknown-coach': 'The selected coach is not a coach or admin account.',
   'program-not-found': 'The selected program no longer exists. Pick another one.',
-  'email-already-in-use':
-    'An account with this email already exists. If you just tried to add this client, reload the client list.',
+  'email-already-in-use': 'This email already has an account',
   'create-failed': 'The account could not be created and nothing was saved. Please try again.',
 };
 

@@ -48,10 +48,14 @@ any Firestore/Storage work.
   (workoutLogs data contract). Logs use `timeStartedAt`/`timeCompletedAt`.
 - `AddClientModal` creates clients through the `createClient` callable (`lib/createClient.ts`, region `africa-south1`,
   beshaped-backend#37): the backend creates the Auth user and `users/{uid}` with the Admin SDK and rolls both back on
-  failure, so the coach stays signed in. The portal then calls `assignProgramToClient` for `userPrograms` and the
-  seeded logs. Backend error messages map to text in `lib/createClientErrors.ts`. Clients only (`role: "client"`);
-  staff accounts are made with `set-role-claims.ts` in beshaped-backend (#42). The client SDK no longer creates other
-  people's accounts: don't bring that back.
+  failure, so the coach stays signed in. Nobody types a client's password (Decision log 2026-10-29, D2; the backend
+  refuses one): the form asks for the email twice, and after the call the portal sends the set-password email with
+  `sendPasswordResetEmail` (`resetPassword` in `lib/firebase/auth.ts`) and shows "Invite sent to <email>". The client page
+  has a "Send set-password email" button for a lost invite (a coach's own clients, any client for an admin: the page's
+  scope). The portal then calls `assignProgramToClient` for `userPrograms` and the seeded logs. Backend error messages
+  map to text in `lib/createClientErrors.ts`, invite-email errors in `lib/clientInvite.ts`. Clients only
+  (`role: "client"`); staff accounts are made with `set-role-claims.ts` in beshaped-backend (#42). The client SDK no
+  longer creates other people's accounts: don't bring that back.
 - `createdBy` on programs/exercises is a literal (`"coach"` / `"admin"`), not a uid. On `workouts` it is the
   signed-in coach's uid, with `createdByRole` from the claim.
 
