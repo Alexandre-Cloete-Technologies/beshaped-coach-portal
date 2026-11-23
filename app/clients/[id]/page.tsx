@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
-import { isClientInScope } from "@/lib/coachScope";
+import { isArchivedClient, isClientInScope } from "@/lib/coachScope";
 import { useParams, useSearchParams } from "next/navigation";
 import { profilePhotoUrl } from "@/lib/profilePhoto";
 import {
@@ -70,6 +70,8 @@ interface ClientView {
   currentDay: number;
   currentWeek: number;
   currentPhase: number;
+  /** Archived by `setClientArchived`: sign-in is off and the client is hidden from lists. */
+  archived: boolean;
 }
 
 const DETAIL_AVATAR_PX = 96;
@@ -243,6 +245,7 @@ export default function ClientDetailPage() {
             currentProgram: programName,
             stats: stats,
             goals,
+            archived: isArchivedClient(data),
             ...programProgress,
           });
           setError(null);
@@ -360,7 +363,17 @@ export default function ClientDetailPage() {
 
                 {/* Client Info */}
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground mb-2">{String(client.name)}</h1>
+                  <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+                    {String(client.name)}
+                    {client.archived && (
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                        title="This client can't sign in. Restore them from the Clients page."
+                      >
+                        Archived
+                      </span>
+                    )}
+                  </h1>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Mail className="w-4 h-4" />

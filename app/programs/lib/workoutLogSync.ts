@@ -124,7 +124,8 @@ export const syncWorkoutLogsForProgramChange = async (
   ];
 
   try {
-    const clientDocs = await fetchScopedClients(scope);
+    // Archived clients too: their logs should match the program if they're restored.
+    const clientDocs = await fetchScopedClients(scope, { includeArchived: true });
     const clientIds = clientDocs.map((d) => d.id);
     if (clientIds.length === 0) return;
 

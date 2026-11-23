@@ -50,6 +50,10 @@ any Firestore/Storage work.
   and the Auth user is deleted again if that write fails. It creates clients only (`role: "client"`); staff
   accounts are made with `set-role-claims.ts` in beshaped-backend (#42). Interim only: BSF-72 (beshaped-backend#36) moves client creation to a
   Cloud Function (Admin SDK). Don't reuse this pattern elsewhere.
+- Removing a client goes through backend callables (`lib/clientRemoval.ts`), never browser deletes: Archive / Restore
+  (`setClientArchived`, coach for own clients or admin) disables their Auth account and sets `users.archived`;
+  Delete permanently (`deleteClient`, admin only, type-the-name confirm) erases the account, every doc with their
+  `userId` and their Storage files. `fetchScopedClients` leaves archived clients out unless `includeArchived`.
 - `createdBy` on programs/exercises is a literal (`"coach"` / `"admin"`), not a uid. On `workouts` it is the
   signed-in coach's uid, with `createdByRole` from the claim.
 

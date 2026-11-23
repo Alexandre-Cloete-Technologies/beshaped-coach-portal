@@ -38,16 +38,28 @@ export function isClientInScope(scope: CoachScope, data: DocumentData): boolean 
   return data.assignedCoachId === scope.uid;
 }
 
-/** The `users` docs of this coach's clients (all clients for an admin). */
-export async function fetchScopedClients(scope: CoachScope): Promise<QueryDocumentSnapshot[]> {
+/** Archived clients (`setClientArchived` in beshaped-backend) can't sign in and are hidden from client lists. */
+export function isArchivedClient(data: DocumentData): boolean {
+  return data.archived === true;
+}
+
+/**
+ * The `users` docs of this coach's clients (all clients for an admin). Archived clients are left out unless
+ * `includeArchived` is set (the Clients page's "Show archived", and the program-edit log sync).
+ */
+export async function fetchScopedClients(
+  scope: CoachScope,
+  { includeArchived = false }: { includeArchived?: boolean } = {}
+): Promise<QueryDocumentSnapshot[]> {
+  const keep = (d: QueryDocumentSnapshot) => includeArchived || !isArchivedClient(d.data());
   if (scope.role === "admin") {
     const snapshot = await getDocs(collection(db, "users"));
-    return snapshot.docs.filter((d) => !isStaffDoc(d.data()));
+    return snapshot.docs.filter((d) => !isStaffDoc(d.data()) && keep(d));
   }
   const snapshot = await getDocs(
     query(collection(db, "users"), where("assignedCoachId", "==", scope.uid))
   );
-  return snapshot.docs;
+  return snapshot.docs.filter(keep);
 }
 
 /**
