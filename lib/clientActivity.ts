@@ -2,14 +2,11 @@ import type { DocumentData } from 'firebase/firestore';
 
 /**
  * What a coach needs at a glance about a client, worked out from their real workoutLogs (never placeholders):
- * when they last trained, what's next in their current program, how far through it they are, and a status.
+ * when they last trained, what's next in their current program, and how far through it they are.
  */
 
-export type ActivityStatus = 'active' | 'slipping' | 'inactive' | 'not-started' | 'no-program';
-
-/** Days since the last completed workout at which the status changes. */
-export const SLIPPING_AFTER_DAYS = 7;
-export const INACTIVE_AFTER_DAYS = 14;
+/** Up to this many days, the last workout reads "N days ago"; older ones show a date. */
+const RELATIVE_DAYS_LIMIT = 14;
 
 export type NextWorkout = {
   name: string;
@@ -27,7 +24,6 @@ export type ClientActivity = {
   completedInProgram: number;
   /** Workout days in the current program (0 when unknown or no program). */
   totalInProgram: number;
-  status: ActivityStatus;
 };
 
 function toDate(value: unknown): Date | null {
@@ -60,8 +56,7 @@ export function daysBetween(earlier: Date, later: Date): number {
 export function summarizeClientActivity(
   logs: DocumentData[],
   currentProgramId: string | null,
-  totalWorkoutsInProgram: number,
-  now: Date = new Date()
+  totalWorkoutsInProgram: number
 ): ClientActivity {
   let lastWorkoutAt: Date | null = null;
   for (const log of logs) {
@@ -94,15 +89,7 @@ export function summarizeClientActivity(
       }
     : null;
 
-  let status: ActivityStatus;
-  if (!currentProgramId) status = 'no-program';
-  else if (!lastWorkoutAt) status = 'not-started';
-  else {
-    const days = daysBetween(lastWorkoutAt, now);
-    status = days > INACTIVE_AFTER_DAYS ? 'inactive' : days > SLIPPING_AFTER_DAYS ? 'slipping' : 'active';
-  }
-
-  return { lastWorkoutAt, nextWorkout, completedInProgram, totalInProgram, status };
+  return { lastWorkoutAt, nextWorkout, completedInProgram, totalInProgram };
 }
 
 /** "Today", "Yesterday", "3 days ago", or a date for anything older than two weeks. */
@@ -111,6 +98,6 @@ export function formatLastWorkout(at: Date | null, now: Date = new Date()): stri
   const days = daysBetween(at, now);
   if (days <= 0) return 'Today';
   if (days === 1) return 'Yesterday';
-  if (days <= INACTIVE_AFTER_DAYS) return `${days} days ago`;
+  if (days <= RELATIVE_DAYS_LIMIT) return `${days} days ago`;
   return at.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: at.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
 }

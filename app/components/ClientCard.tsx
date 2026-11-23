@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { formatLastWorkout, type ActivityStatus, type ClientActivity } from "@/lib/clientActivity";
+import { formatLastWorkout, type ClientActivity } from "@/lib/clientActivity";
 
 export interface ClientData {
   id: string;
@@ -20,14 +20,6 @@ export interface ClientData {
   weightChange: number | null;
   goals?: string;
 }
-
-const STATUS_META: Record<ActivityStatus, { label: string; dot: string; text: string; hint: string }> = {
-  active: { label: "Active", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", hint: "Trained in the last 7 days" },
-  slipping: { label: "Slipping", dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", hint: "Last trained 8–14 days ago" },
-  inactive: { label: "Inactive", dot: "bg-red-500", text: "text-red-600 dark:text-red-400", hint: "No workout in over 14 days" },
-  "not-started": { label: "Not started", dot: "bg-gray-400", text: "text-muted-foreground", hint: "Has a program but no completed workouts yet" },
-  "no-program": { label: "No program", dot: "bg-gray-300 dark:bg-gray-600", text: "text-muted-foreground", hint: "No program assigned" },
-};
 
 interface ProgressBarProps {
   current: number;
@@ -60,7 +52,6 @@ export default function ClientCard({ client }: { client: ClientData }) {
   const showProfileImage = photoUrl.length > 0 && failedPhotoUrl !== photoUrl;
 
   const { activity } = client;
-  const statusMeta = STATUS_META[activity.status];
 
   // Program name, and where the client is in it (from their next open workout day)
   const formatProgramInfo = () => {
@@ -68,12 +59,11 @@ export default function ClientCard({ client }: { client: ClientData }) {
     if (!next) return client.currentProgram;
     return `${client.currentProgram} • Phase ${next.phaseNumber} · Week ${next.weekNumber} · Day ${next.dayNumber}`;
   };
-  const isAlert = activity.status === "inactive";
 
   return (
     <div 
       onClick={() => router.push(`/clients/${client.id}`)}
-      className={`bg-card rounded-2xl border ${isAlert ? 'border-red-300 dark:border-red-800 shadow-red-100 dark:shadow-red-900/20' : 'border-border'} p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4 cursor-pointer`}
+      className="bg-card rounded-2xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4 cursor-pointer"
     >
       {/* Header: Photo, Name, Status */}
       <div className="flex items-start justify-between">
@@ -111,13 +101,6 @@ export default function ClientCard({ client }: { client: ClientData }) {
             </p>
           </div>
         </div>
-        <span
-          className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ${statusMeta.text}`}
-          title={statusMeta.hint}
-        >
-          <span className={`w-2 h-2 rounded-full ${statusMeta.dot}`} />
-          {statusMeta.label}
-        </span>
       </div>
 
       {/* Main Content: Program progress + Stats */}
@@ -152,9 +135,9 @@ export default function ClientCard({ client }: { client: ClientData }) {
               <span className="font-medium text-card-foreground text-right">
                 {activity.nextWorkout
                   ? `${activity.nextWorkout.inProgress ? "In progress: " : ""}${activity.nextWorkout.name}`
-                  : activity.status === "no-program"
-                    ? "—"
-                    : "Program complete"}
+                  : activity.totalInProgram > 0
+                    ? "Program complete"
+                    : "—"}
               </span>
             </div>
             <div className="flex justify-between items-center gap-2">
