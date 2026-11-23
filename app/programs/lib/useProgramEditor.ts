@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { requireServerResult } from "@/lib/firebase/serverResult";
 import type { ModalExercise } from "../../components/WorkoutEditorModal";
 
 // === Types ===
@@ -138,33 +139,36 @@ export const getCategoryFromMuscle = (muscle: string): string => {
   return "Other";
 };
 
-// === Mock data (fallbacks) ===
+// === Save check ===
 
-export const mockExercises: EditExercise[] = [
-  { id: "1", name: "Barbell Bench Press", muscleGroup: "Chest", equipment: "Barbell", difficulty: "intermediate" },
-  { id: "2", name: "Incline Dumbbell Press", muscleGroup: "Chest", equipment: "Dumbbells", difficulty: "intermediate" },
-  { id: "3", name: "Cable Flyes", muscleGroup: "Chest", equipment: "Cable Machine", difficulty: "beginner" },
-  { id: "4", name: "Push-ups", muscleGroup: "Chest", equipment: "Bodyweight", difficulty: "beginner" },
-  { id: "5", name: "Pull-ups", muscleGroup: "Back", equipment: "Pull-up Bar", difficulty: "intermediate" },
-  { id: "6", name: "Barbell Rows", muscleGroup: "Back", equipment: "Barbell", difficulty: "intermediate" },
-  { id: "7", name: "Lat Pulldowns", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner" },
-  { id: "8", name: "Seated Cable Rows", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner" },
-  { id: "9", name: "Deadlift", muscleGroup: "Back", equipment: "Barbell", difficulty: "advanced" },
-  { id: "10", name: "Overhead Press", muscleGroup: "Shoulders", equipment: "Barbell", difficulty: "intermediate" },
-  { id: "11", name: "Lateral Raises", muscleGroup: "Shoulders", equipment: "Dumbbells", difficulty: "beginner" },
-  { id: "12", name: "Face Pulls", muscleGroup: "Shoulders", equipment: "Cable Machine", difficulty: "beginner" },
-  { id: "13", name: "Barbell Curl", muscleGroup: "Arms", equipment: "Barbell", difficulty: "beginner" },
-  { id: "14", name: "Tricep Pushdowns", muscleGroup: "Arms", equipment: "Cable Machine", difficulty: "beginner" },
-  { id: "15", name: "Hammer Curls", muscleGroup: "Arms", equipment: "Dumbbells", difficulty: "beginner" },
-  { id: "16", name: "Barbell Back Squat", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate" },
-  { id: "17", name: "Romanian Deadlift", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate" },
-  { id: "18", name: "Leg Press", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner" },
-  { id: "19", name: "Leg Curls", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner" },
-  { id: "20", name: "Calf Raises", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner" },
-  { id: "21", name: "Plank", muscleGroup: "Core", equipment: "Bodyweight", difficulty: "beginner" },
-  { id: "22", name: "Cable Crunches", muscleGroup: "Core", equipment: "Cable Machine", difficulty: "beginner" },
-  { id: "23", name: "Hanging Leg Raises", muscleGroup: "Core", equipment: "Pull-up Bar", difficulty: "intermediate" },
-];
+/** An exercise in the program that isn't in the exercise library (its id is missing or unknown). */
+export type UnknownProgramExercise = { phaseName: string; workoutName: string; exerciseName: string };
+
+/**
+ * Exercises the program points at that aren't in the library. The mobile app loads each exercise by its id, so a
+ * program must never be saved with one of these (beshaped-coach-portal: no mock or invented exercise ids).
+ */
+export const findUnknownExercises = (
+  data: ProgramFormData,
+  libraryIds: ReadonlySet<string>
+): UnknownProgramExercise[] => {
+  const unknown: UnknownProgramExercise[] = [];
+  data.phases.forEach((phase, phaseIdx) => {
+    phase.workouts.forEach((workout) => {
+      if (workout.isRestDay) return;
+      for (const ex of workout.exercises || []) {
+        if (!ex.exerciseId || !libraryIds.has(ex.exerciseId)) {
+          unknown.push({
+            phaseName: phase.name || `Phase ${phaseIdx + 1}`,
+            workoutName: workout.workoutName || "Untitled workout",
+            exerciseName: ex.exerciseName || "Unnamed exercise",
+          });
+        }
+      }
+    });
+  });
+  return unknown;
+};
 
 // === Defaults / factories ===
 
@@ -358,18 +362,18 @@ export function useProgramEditor({
   // Exercise library
   const [exercises, setExercises] = useState<EditExercise[]>([]);
   const [loadingExercises, setLoadingExercises] = useState(true);
+  // A failed load blocks adding exercises and saving; it never falls back to placeholder exercises.
+  const [exercisesError, setExercisesError] = useState<string | null>(null);
+  const [exercisesReloadKey, setExercisesReloadKey] = useState(0);
+  const reloadExercises = useCallback(() => setExercisesReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
     const fetchExercises = async () => {
       try {
         setLoadingExercises(true);
-        const exercisesSnapshot = await getDocs(collection(db, "exercises"));
-
-        if (exercisesSnapshot.empty) {
-          if (!cancelled) setExercises(mockExercises);
-          return;
-        }
+        setExercisesError(null);
+        const exercisesSnapshot = requireServerResult(await getDocs(collection(db, "exercises")));
 
         const fetched: EditExercise[] = exercisesSnapshot.docs.map((docSnap) => {
           const data = docSnap.data() as Record<string, unknown>;
@@ -415,12 +419,13 @@ export function useProgramEditor({
           };
         });
 
-        if (!cancelled) {
-          setExercises(fetched.length > 0 ? fetched : mockExercises);
-        }
+        if (!cancelled) setExercises(fetched);
       } catch (error) {
         console.error("Error fetching exercises:", error);
-        if (!cancelled) setExercises(mockExercises);
+        if (!cancelled) {
+          setExercises([]);
+          setExercisesError("Couldn't load the exercise library.");
+        }
       } finally {
         if (!cancelled) setLoadingExercises(false);
       }
@@ -430,7 +435,7 @@ export function useProgramEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [exercisesReloadKey]);
 
   // Saved workout templates (consumed by the sidebar "Saved Workouts" list)
   const [savedTemplates, setSavedTemplates] = useState<WorkoutTemplate[]>([]);
@@ -771,9 +776,10 @@ export function useProgramEditor({
           template.templateExercises
         )
           ? template.templateExercises.map((exercise, index) => {
-              const exerciseId =
-                exercise.exerciseId || `${template.id}-exercise-${index + 1}`;
-              const fromLibrary = exercises.find((e) => e.id === exerciseId);
+              const exerciseId = exercise.exerciseId || "";
+              const fromLibrary = exerciseId
+                ? exercises.find((e) => e.id === exerciseId)
+                : undefined;
               return {
                 exerciseId,
                 exerciseName: exercise.exerciseName,
@@ -945,6 +951,8 @@ export function useProgramEditor({
     // exercise library
     exercises,
     loadingExercises,
+    exercisesError,
+    reloadExercises,
     groupedExercises,
 
     // workout templates

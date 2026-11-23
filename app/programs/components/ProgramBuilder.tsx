@@ -25,6 +25,7 @@ import PhaseDescriptionModal from "../../components/PhaseDescriptionModal";
 import ConfirmModal from "../../components/ConfirmModal";
 import { ProgramBuilderFooterBar } from "./ProgramBuilderFooterBar";
 import {
+  findUnknownExercises,
   muscleGroupOrder,
   useProgramEditor,
   type ProgramFormData,
@@ -80,7 +81,10 @@ export default function ProgramBuilder({
     applyWorkoutEdit,
     resetProgram,
     resetToLastLoaded,
+    exercises,
     loadingExercises,
+    exercisesError,
+    reloadExercises,
     groupedExercises,
     savedTemplates,
     loadingTemplates,
@@ -199,6 +203,27 @@ export default function ProgramBuilder({
       (program.price == null || program.price < 0)
     ) {
       alert("Please enter a valid price for paid programs.");
+      return;
+    }
+    // Every exercise must be a real library exercise: the mobile app loads them by id.
+    if (loadingExercises) {
+      alert("The exercise library is still loading. Try saving again in a moment.");
+      return;
+    }
+    if (exercisesError) {
+      alert("The exercise library didn't load, so the program's exercises can't be checked. Reload it, then save.");
+      return;
+    }
+    const unknown = findUnknownExercises(program, new Set(exercises.map((e) => e.id)));
+    if (unknown.length > 0) {
+      const list = unknown
+        .slice(0, 8)
+        .map((u) => `• ${u.exerciseName} (${u.phaseName}, ${u.workoutName})`)
+        .join("\n");
+      const more = unknown.length > 8 ? `\n…and ${unknown.length - 8} more.` : "";
+      alert(
+        `These exercises aren't in the exercise library, so the app couldn't load them:\n\n${list}${more}\n\nReplace them with exercises from the library, then save.`
+      );
       return;
     }
     try {
@@ -724,6 +749,21 @@ export default function ProgramBuilder({
               <ArrowLeft className="w-4 h-4" />
               Back to Programs
             </Link>
+            {exercisesError && (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+              >
+                <span>{exercisesError} You can&apos;t add exercises or save until it loads.</span>
+                <button
+                  type="button"
+                  onClick={reloadExercises}
+                  className="h-8 px-3 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
             <div className="flex flex-col xl:flex-row xl:items-start gap-8">
               <div className="flex-1 min-w-0 flex flex-col gap-8">
                 {program.phases.map((phase, phaseIdx) =>
