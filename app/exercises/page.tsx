@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { requireServerResult } from "@/lib/firebase/serverResult";
 import ExerciseEditModal, { ExerciseEditValues } from "../components/ExerciseEditModal";
 import AnatomyGifPicker from "../components/AnatomyGifPicker";
 
@@ -265,36 +266,12 @@ const getRawMuscleFromExerciseData = (data: Record<string, unknown>): string => 
   return "";
 };
 
-// Mock exercises for fallback
-const mockExercises: Exercise[] = [
-  { id: "1", name: "Barbell Bench Press", muscleGroup: "Chest", equipment: "Barbell", difficulty: "intermediate", description: "Compound chest exercise" },
-  { id: "2", name: "Incline Dumbbell Press", muscleGroup: "Chest", equipment: "Dumbbells", difficulty: "intermediate", description: "Upper chest focus" },
-  { id: "3", name: "Cable Flyes", muscleGroup: "Chest", equipment: "Cable Machine", difficulty: "beginner", description: "Chest isolation movement" },
-  { id: "4", name: "Push-ups", muscleGroup: "Chest", equipment: "Bodyweight", difficulty: "beginner", description: "Classic bodyweight exercise" },
-  { id: "5", name: "Pull-ups", muscleGroup: "Back", equipment: "Pull-up Bar", difficulty: "intermediate", description: "Lat-focused compound movement" },
-  { id: "6", name: "Barbell Rows", muscleGroup: "Back", equipment: "Barbell", difficulty: "intermediate", description: "Horizontal pulling movement" },
-  { id: "7", name: "Lat Pulldowns", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner", description: "Machine lat exercise" },
-  { id: "8", name: "Seated Cable Rows", muscleGroup: "Back", equipment: "Cable Machine", difficulty: "beginner", description: "Back thickness builder" },
-  { id: "9", name: "Deadlift", muscleGroup: "Back", equipment: "Barbell", difficulty: "advanced", description: "Full posterior chain" },
-  { id: "10", name: "Overhead Press", muscleGroup: "Shoulders", equipment: "Barbell", difficulty: "intermediate", description: "Compound shoulder press" },
-  { id: "11", name: "Lateral Raises", muscleGroup: "Shoulders", equipment: "Dumbbells", difficulty: "beginner", description: "Side delt isolation" },
-  { id: "12", name: "Face Pulls", muscleGroup: "Shoulders", equipment: "Cable Machine", difficulty: "beginner", description: "Rear delt and rotator cuff" },
-  { id: "13", name: "Barbell Curl", muscleGroup: "Arms", equipment: "Barbell", difficulty: "beginner", description: "Bicep builder" },
-  { id: "14", name: "Tricep Pushdowns", muscleGroup: "Arms", equipment: "Cable Machine", difficulty: "beginner", description: "Tricep isolation" },
-  { id: "15", name: "Hammer Curls", muscleGroup: "Arms", equipment: "Dumbbells", difficulty: "beginner", description: "Brachialis focus" },
-  { id: "16", name: "Barbell Back Squat", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate", description: "King of leg exercises" },
-  { id: "17", name: "Romanian Deadlift", muscleGroup: "Legs", equipment: "Barbell", difficulty: "intermediate", description: "Hamstring focus" },
-  { id: "18", name: "Leg Press", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Quad-focused machine" },
-  { id: "19", name: "Leg Curls", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Hamstring isolation" },
-  { id: "20", name: "Calf Raises", muscleGroup: "Legs", equipment: "Machine", difficulty: "beginner", description: "Calf development" },
-  { id: "21", name: "Plank", muscleGroup: "Core", equipment: "Bodyweight", difficulty: "beginner", description: "Core stability" },
-  { id: "22", name: "Cable Crunches", muscleGroup: "Core", equipment: "Cable Machine", difficulty: "beginner", description: "Weighted ab exercise" },
-  { id: "23", name: "Hanging Leg Raises", muscleGroup: "Core", equipment: "Pull-up Bar", difficulty: "intermediate", description: "Lower ab focus" },
-];
-
 export default function ExercisesPage() {
-  const [exercises, setExercises] = useState<Exercise[]>(mockExercises);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load shows an error with Retry, never placeholder exercises.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -319,48 +296,48 @@ export default function ExercisesPage() {
     const fetchExercises = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
         const exercisesCollection = collection(db, "exercises");
-        const exercisesSnapshot = await getDocs(exercisesCollection);
+        const exercisesSnapshot = requireServerResult(await getDocs(exercisesCollection));
         
-        if (!exercisesSnapshot.empty) {
-          const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            const rawMuscle = getRawMuscleFromExerciseData(data as Record<string, unknown>);
-            
-            // Use helper to categorize specific muscles (e.g. "Biceps" -> "Arms")
-            const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
-            
-            // Log for debugging (helpful to see what fields are available)
-            // console.log("Exercise:", data.name, "Raw Muscle:", rawMuscle, "Category:", muscleCategory);
-            
-            return {
-              id: doc.id,
-              name: data.name || "Unnamed Exercise",
-              muscleGroup: muscleCategory, // Normalized category
-              musclesInvolved: Array.isArray(data.musclesInvolved) ? data.musclesInvolved : (Array.isArray(data.primaryMuscles) ? data.primaryMuscles : []),
-              secondaryMuscles: Array.isArray(data.secondaryMuscles) ? data.secondaryMuscles : [],
-              equipment: data.equipment || "None",
-              difficulty: data.difficulty || "intermediate",
-              description: data.description,
-              instructions: data.instructions,
-              videoUrl: data.videoUrl,
-              anatomyExerciseWalkthrough: data.anatomyExerciseWalkthrough || data.anatomyVideoUrl,
-              createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-            };
-          });
+        const fetchedExercises: Exercise[] = exercisesSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          const rawMuscle = getRawMuscleFromExerciseData(data as Record<string, unknown>);
           
-          setExercises(fetchedExercises.length > 0 ? fetchedExercises : mockExercises);
-        }
+          // Use helper to categorize specific muscles (e.g. "Biceps" -> "Arms")
+          const muscleCategory = getCategoryFromMuscle(String(rawMuscle));
+          
+          // Log for debugging (helpful to see what fields are available)
+          // console.log("Exercise:", data.name, "Raw Muscle:", rawMuscle, "Category:", muscleCategory);
+          
+          return {
+            id: doc.id,
+            name: data.name || "Unnamed Exercise",
+            muscleGroup: muscleCategory, // Normalized category
+            musclesInvolved: Array.isArray(data.musclesInvolved) ? data.musclesInvolved : (Array.isArray(data.primaryMuscles) ? data.primaryMuscles : []),
+            secondaryMuscles: Array.isArray(data.secondaryMuscles) ? data.secondaryMuscles : [],
+            equipment: data.equipment || "None",
+            difficulty: data.difficulty || "intermediate",
+            description: data.description,
+            instructions: data.instructions,
+            videoUrl: data.videoUrl,
+            anatomyExerciseWalkthrough: data.anatomyExerciseWalkthrough || data.anatomyVideoUrl,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+          };
+        });
+        
+        setExercises(fetchedExercises);
       } catch (error) {
         console.error("Error fetching exercises:", error);
-        setExercises(mockExercises);
+        setExercises([]);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     };
 
     fetchExercises();
-  }, []);
+  }, [reloadKey]);
 
   const exerciseCategoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -745,6 +722,32 @@ export default function ExercisesPage() {
             <div className="text-center py-12 text-muted-foreground">
               Loading exercises...
             </div>
+          ) : loadError ? (
+            <div role="alert" className="rounded-xl border border-border bg-card p-8 text-center">
+              <p className="text-sm font-medium text-card-foreground">Couldn&apos;t load the exercise library.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
+              <button
+                type="button"
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+              >
+                Try again
+              </button>
+            </div>
+          ) : exercises.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center">
+              <p className="text-sm font-medium text-card-foreground">No exercises yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add your first exercise to start building workouts and programs.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+              >
+                Add exercise
+              </button>
+            </div>
           ) : (
             <div className="space-y-3">
               {muscleGroupOrder.map((group) => {
@@ -855,7 +858,7 @@ export default function ExercisesPage() {
           )}
 
           {/* Empty State */}
-          {!loading && filteredTotal === 0 && hasActiveFilters && (
+          {!loading && !loadError && exercises.length > 0 && filteredTotal === 0 && hasActiveFilters && (
             <div className="text-center py-12">
               <p className="text-muted-foreground mb-2">
                 {searchQuery.trim() && selectedCategories.size > 0

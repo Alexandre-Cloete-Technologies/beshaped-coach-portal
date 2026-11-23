@@ -3,31 +3,9 @@
 import { ChevronLeft, ChevronRight, Search, } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-
-interface WorkoutSet {
-  setNumber: number;
-  weight: string;
-  reps: number;
-  rpe: number;
-}
-
-interface ProgramExercise {
-  exerciseId: string;
-  exerciseName: string;
-  order: number;
-  sets: number;
-  repsRange: string;
-  tempo?: string;
-  restPeriod: string;
-  notes: string | null;
-}
-
-interface Exercise {
-  name: string;
-  sets: WorkoutSet[];
-}
+import { requireServerResult } from "@/lib/firebase/serverResult";
 
 // WorkoutLog exercise structure from Firebase
 interface WorkoutLogExerciseSet {
@@ -75,9 +53,6 @@ interface Workout {
   status: "completed" | "partial" | "skipped";
   duration?: string;
   volume?: string;
-  avgRpe?: number;
-  exercises?: Exercise[];
-  programExercises?: ProgramExercise[];
   workoutLogExercises?: WorkoutLogExercise[];
   phase?: string;
   workoutLogId?: string;
@@ -86,20 +61,6 @@ interface Workout {
   weekNumber?: number;
   dayNumber?: number;
 }
-
-const mockWorkouts: Workout[] = [
-  {
-    date: "N/A",
-    dayOfWeek: "N/A",
-    time: "--:--",
-    startedTime: "--",
-    completedTime: "--",
-    duration: "--",
-    name: "No workouts found",
-    status: "skipped",
-    phase: "No program assigned",
-  },
-];
 
 function isValidDate(date: unknown): date is Date {
   return date instanceof Date && !isNaN(date.getTime());
@@ -198,37 +159,6 @@ function calendarDateFromValue(val: unknown): Date | null {
   return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
-/** Program `programs` doc shape (phases → workouts) used when building client program list */
-interface ProgramTemplateExercise {
-  exerciseId?: string;
-  exerciseName?: string;
-  order?: number;
-  sets?: number;
-  repsRange?: string;
-  tempo?: string;
-  restPeriod?: string;
-  notes?: string | null;
-}
-
-interface ProgramTemplateWorkout {
-  workoutName?: string;
-  dayName?: string;
-  isRestDay?: boolean;
-  dayNumber?: number;
-  description?: string;
-  exercises?: ProgramTemplateExercise[];
-}
-
-interface ProgramTemplatePhase {
-  name?: string;
-  order?: number;
-  workouts?: ProgramTemplateWorkout[];
-}
-
-interface ProgramDocumentData {
-  phases?: ProgramTemplatePhase[];
-}
-
 type CalendarDayCell = {
   day: number;
   isCurrentMonth: boolean;
@@ -278,29 +208,12 @@ export default function WorkoutHistory() {
   
   // const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
 
-  // Program and workout data from Firestore
-  const [programWorkouts, setProgramWorkouts] = useState<Array<{ 
-    workoutName: string;
-    phase: string;
-    phaseOrder: number;
-    dayNumber: number;
-    isRestDay: boolean;
-    description?: string;
-    exercises: Array<{
-      exerciseId: string;
-      exerciseName: string;
-      order: number;
-      sets: number;
-      repsRange: string;
-      tempo?: string;
-      restPeriod: string;
-      notes: string | null;
-    }>;
-  }>>([]);
-  const [loadingProgram, setLoadingProgram] = useState(true);
   
   // WorkoutLogs from Firebase
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
+  // Never fall back to made-up workouts: show loading, an error with Retry, or an honest empty state.
+  const [logsStatus, setLogsStatus] = useState<"loading" | "error" | "ready">("loading");
+  const [reloadKey, setReloadKey] = useState(0);
   
   // Calendar state — stable "today" for the session (avoids exhaustive-deps on `new Date()` each render)
   const today = useMemo(() => new Date(), []);
@@ -309,113 +222,15 @@ export default function WorkoutHistory() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(today);
   const [timePeriod, setTimePeriod] = useState<"day" | "week" | "month">("month");
 
-  // Fetch client's program and extract workout names from phase maps
-  useEffect(() => {
-    const fetchProgramWorkouts = async () => {
-      if (!clientId) return;
-      
-      try {
-        setLoadingProgram(true);
-        
-        // Fetch the client/user document
-        const userDoc = await getDoc(doc(db, "users", clientId));
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          
-          // Check if user has a currentProgram reference
-          if (userData.currentProgram) {
-            let programDoc;
-            
-            // Handle DocumentReference
-            if (userData.currentProgram.path) {
-              programDoc = await getDoc(userData.currentProgram);
-            } else if (typeof userData.currentProgram === 'string') {
-              // If it's a string ID, fetch it from programs collection
-              programDoc = await getDoc(doc(db, "programs", userData.currentProgram));
-            }
-            
-            if (programDoc && programDoc.exists()) {
-              const programData = programDoc.data() as ProgramDocumentData;
-              
-              // Extract workouts with exercises from phase maps
-              const workouts: Array<{ 
-                workoutName: string;
-                phase: string;
-                phaseOrder: number;
-                dayNumber: number;
-                isRestDay: boolean;
-                description?: string;
-                exercises: Array<{
-                  exerciseId: string;
-                  exerciseName: string;
-                  order: number;
-                  sets: number;
-                  repsRange: string;
-                  tempo?: string;
-                  restPeriod: string;
-                  notes: string | null;
-                }>;
-              }> = [];
-              
-              if (programData.phases && Array.isArray(programData.phases)) {
-                // Iterate through phases
-                programData.phases.forEach((phase, phaseIndex) => {
-                  const phaseName = phase.name || `Phase ${phaseIndex + 1}`;
-                  const phaseOrder = phase.order || phaseIndex + 1;
-                  
-                  // Each phase has workouts array
-                  if (phase.workouts && Array.isArray(phase.workouts)) {
-                    phase.workouts.forEach((workout) => {
-                      // Skip rest days or workouts without names
-                      if (workout.workoutName && !workout.isRestDay) {
-                        const exercises: ProgramTemplateExercise[] = workout.exercises || [];
-                        workouts.push({ 
-                          workoutName: workout.workoutName || workout.dayName || '',
-                          phase: phaseName,
-                          phaseOrder: phaseOrder,
-                          dayNumber: workout.dayNumber || 0,
-                          isRestDay: workout.isRestDay || false,
-                          description: workout.description,
-                          exercises: exercises.map((ex) => ({
-                            exerciseId: ex.exerciseId || '',
-                            exerciseName: ex.exerciseName || '',
-                            order: ex.order || 0,
-                            sets: ex.sets || 0,
-                            repsRange: ex.repsRange || '',
-                            tempo: ex.tempo,
-                            restPeriod: ex.restPeriod || '',
-                            notes: ex.notes ?? null,
-                          })),
-                        });
-                      }
-                    });
-                  }
-                });
-              }
-              
-              setProgramWorkouts(workouts);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching program workouts:", error);
-      } finally {
-        setLoadingProgram(false);
-      }
-    };
-
-    fetchProgramWorkouts();
-  }, [clientId]);
-
   // Fetch completed workoutLogs for this client (userId is the Auth UID string)
   useEffect(() => {
     const fetchWorkoutLogs = async () => {
       if (!clientId) return;
       
       try {
-        const snapshot = await getDocs(
-          query(collection(db, "workoutLogs"), where("userId", "==", clientId))
+        setLogsStatus("loading");
+        const snapshot = requireServerResult(
+          await getDocs(query(collection(db, "workoutLogs"), where("userId", "==", clientId)))
         );
 
         const logs: WorkoutLog[] = snapshot.docs.map((docSnap) => {
@@ -472,13 +287,15 @@ export default function WorkoutHistory() {
         completedLogs.sort((a, b) => b.logDate.getTime() - a.logDate.getTime());
 
         setWorkoutLogs(completedLogs);
+        setLogsStatus("ready");
       } catch (error) {
         console.error("Error fetching workout logs:", error);
+        setLogsStatus("error");
       }
     };
 
     fetchWorkoutLogs();
-  }, [clientId]);
+  }, [clientId, reloadKey]);
 
   // Navigate to previous month
   const goToPreviousMonth = () => {
@@ -586,36 +403,9 @@ export default function WorkoutHistory() {
       return workoutsFromLogs;
     }
     
-    // Fall back to program workouts if no workout logs
-    const generatedWorkouts: Workout[] = programWorkouts.map((programWorkout, index) => {
-      // Generate mock date for display (you can replace with actual dates from Firebase)
-      const date = new Date();
-      date.setDate(date.getDate() - index);
-      
-      return {
-        date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
-        dayOfWeek: programWorkout.workoutName || dayNames[date.getDay()],
-        time: "--",
-        startedTime: "--",
-        completedTime: "--",
-        name: programWorkout.workoutName,
-        status: (index === 0 ? "completed" : "completed") as "completed" | "partial" | "skipped",
-        phase: `Day ${programWorkout.dayNumber} - Phase ${programWorkout.phaseOrder}`, // Fallback mock
-        programExercises: programWorkout.exercises,
-        duration: "--",
-        volume: index === 0 ? "15,240 lb" : undefined,
-        avgRpe: index === 0 ? 8.5 : undefined,
-        // Mock values for fallback
-        programName: "Hypertrophy Program",
-        phaseNumber: programWorkout.phaseOrder,
-        weekNumber: 1,
-        dayNumber: programWorkout.dayNumber,
-      };
-    });
-
-    // If no program workouts, fall back to mock data
-    return generatedWorkouts.length > 0 ? generatedWorkouts : mockWorkouts;
-  }, [timePeriod, selectedDate, programWorkouts, workoutLogs, currentMonth, currentYear]);
+    // No logs: show nothing rather than inventing workouts.
+    return [];
+  }, [timePeriod, selectedDate, workoutLogs, currentMonth, currentYear]);
 
   // Get display title based on time period
   const getWorkoutListTitle = () => {
@@ -752,18 +542,8 @@ export default function WorkoutHistory() {
   ];
   const currentMonthName = monthNames[currentMonth];
 
-  const getRpeColor = (rpe: number) => {
-    if (rpe >= 9) return "text-orange-500";
-    return "text-green-600";
-  };
-
   return (
     <div className="flex flex-col gap-2">
-      {loadingProgram && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
-          Loading workout names from program...
-        </div>
-      )}
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="relative w-full sm:w-72">
@@ -968,7 +748,40 @@ export default function WorkoutHistory() {
             </div>
           </div>
 
-          {filteredWorkouts.map((workout, index) => (
+          {logsStatus === "loading" && (
+            <p className="py-10 text-center text-sm text-muted-foreground" role="status">
+              Loading workouts…
+            </p>
+          )}
+          {logsStatus === "error" && (
+            <div role="alert" className="rounded-xl border border-border bg-card p-6 text-center">
+              <p className="text-sm font-medium text-card-foreground">Couldn&apos;t load this client&apos;s workouts.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
+              <button
+                type="button"
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {logsStatus === "ready" && filteredWorkouts.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center">
+              <p className="text-sm font-medium text-card-foreground">
+                {workoutLogs.length === 0
+                  ? "No workouts logged yet"
+                  : `No workouts ${timePeriod === "day" ? "on this day" : timePeriod === "week" ? "this week" : "this month"}`}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {workoutLogs.length === 0
+                  ? "Workouts this client completes in the app will show here."
+                  : "Pick another day on the calendar, or switch to week or month."}
+              </p>
+            </div>
+          )}
+
+          {logsStatus === "ready" && filteredWorkouts.map((workout, index) => (
             <div key={workout.workoutLogId || index}>
               <details
                 className="group rounded-xl border border-muted-foreground/25 bg-muted shadow-sm overflow-hidden"
@@ -1050,84 +863,6 @@ export default function WorkoutHistory() {
                                 ) : (
                                   <span className="text-[10px] text-muted-foreground">Not done</span>
                                 )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : workout.programExercises && workout.programExercises.length > 0 ? (
-                  <div className="border-t border-border bg-muted/30 p-5">
-                    {/* Phase Info Header */}
-                    {workout.phase && (
-                      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                        <span className="text-sm font-medium text-card-foreground">{workout.phase}</span>
-                      </div>
-                    )}
-                    <div className="grid gap-3">
-                      {workout.programExercises.map((exercise, exIdx) => (
-                        <div key={exIdx} className="bg-card rounded-lg p-4 border border-border">
-                          <div className="flex justify-between items-start mb-2">
-                            <h5 className="font-bold text-card-foreground text-sm">
-                              {exercise.order}. {exercise.exerciseName}
-                            </h5>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                                {exercise.sets} Sets
-                              </span>
-                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
-                                {exercise.repsRange} Reps
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                            {exercise.restPeriod && (
-                              <span className="flex items-center gap-1">
-                                <span className="font-medium">Rest:</span> {exercise.restPeriod}
-                              </span>
-                            )}
-                            {exercise.tempo && (
-                              <span className="flex items-center gap-1">
-                                <span className="font-medium">Tempo:</span> {exercise.tempo}
-                              </span>
-                            )}
-                          </div>
-                          {exercise.notes && (
-                            <p className="mt-2 text-xs text-muted-foreground italic border-l-2 border-primary pl-2">
-                              {exercise.notes}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : workout.exercises ? (
-                  <div className="border-t border-border bg-muted/30 p-5">
-                    <div className="grid gap-4">
-                      {workout.exercises.map((exercise, exIdx) => (
-                        <div key={exIdx} className="bg-card rounded-lg p-4 border border-border">
-                          <div className="flex justify-between items-center mb-3">
-                            <h5 className="font-bold text-card-foreground text-sm">
-                              {exIdx + 1}. {exercise.name}
-                            </h5>
-                            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
-                              {exercise.sets.length} Sets
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-sm">
-                            {exercise.sets.map((set) => (
-                              <div
-                                key={set.setNumber}
-                                className="p-2 bg-muted rounded flex flex-col items-center justify-center text-center"
-                              >
-                                <span className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
-                                  Set {set.setNumber}
-                                </span>
-                                <span className="font-bold text-card-foreground">
-                                  {set.weight} x {set.reps}
-                                </span>
-                                <span className={`text-[10px] ${getRpeColor(set.rpe)}`}>@ {set.rpe} RPE</span>
                               </div>
                             ))}
                           </div>

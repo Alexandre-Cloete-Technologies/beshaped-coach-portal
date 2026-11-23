@@ -8,56 +8,9 @@ import AssignProgramModal from "../components/AssignProgramModal";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, doc, deleteDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { requireServerResult } from "@/lib/firebase/serverResult";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-// Mock programs for fallback
-const mockPrograms: ProgramData[] = [
-  {
-    id: "1",
-    name: "Hypertrophy Phase 1",
-    totalDuration: 12,
-    phasesCount: 3,
-    difficulty: "intermediate",
-    focusAreas: ["Muscle Gain", "Strength"],
-    isTemplate: true,
-    activeClients: 14,
-    updatedAt: "Updated 2 days ago",
-  },
-  {
-    id: "2",
-    name: "Mark's Marathon Prep",
-    totalDuration: 16,
-    phasesCount: 4,
-    difficulty: "advanced",
-    focusAreas: ["Endurance", "Cardio"],
-    isTemplate: false,
-    activeClients: 1,
-    createdBy: "You",
-  },
-  {
-    id: "3",
-    name: "Strength Fundamentals",
-    totalDuration: 8,
-    phasesCount: 2,
-    difficulty: "beginner",
-    focusAreas: ["Technique", "Base"],
-    isTemplate: true,
-    activeClients: 7,
-    updatedAt: "Updated 1 week ago",
-  },
-  {
-    id: "4",
-    name: "Advanced Cutting",
-    totalDuration: 10,
-    phasesCount: 3,
-    difficulty: "advanced",
-    focusAreas: ["Fat Loss", "Conditioning"],
-    isTemplate: true,
-    activeClients: 11,
-    updatedAt: "Updated yesterday",
-  },
-];
 
 function formatDate(date: Timestamp): string {
   const d = date.toDate();
@@ -72,8 +25,11 @@ function formatDate(date: Timestamp): string {
 }
 
 export default function ProgramsPage() {
-  const [programs, setPrograms] = useState<ProgramData[]>(mockPrograms);
+  const [programs, setPrograms] = useState<ProgramData[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load shows an error with Retry, never placeholder programs.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [programToDelete, setProgramToDelete] = useState<ProgramData | null>(null);
@@ -86,47 +42,47 @@ export default function ProgramsPage() {
     const fetchPrograms = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
         const programsCollection = collection(db, "programs");
         // No `users` read here: `createdBy` is a literal ("coach" / "admin"), not a uid, so the old
         // all-users lookup only exposed every client's name to every coach.
-        const programsSnapshot = await getDocs(programsCollection);
+        const programsSnapshot = requireServerResult(await getDocs(programsCollection));
         
-        if (!programsSnapshot.empty) {
-          const fetchedPrograms: ProgramData[] = programsSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              name: data.name || "Untitled Program",
-              description: data.description,
-              totalDuration: data.totalDuration || data.phases?.length * 4 || 8,
-              phasesCount: data.phases?.length || 0,
-              difficulty: data.difficulty || "intermediate",
-              focusAreas: data.focusAreas || data.focus || [],
-              isTemplate: data.isTemplate ?? true,
-              activeClients: data.activeClients || 0,
-              clientAvatars: data.clientAvatars || [],
-              updatedAt:
-                data.updatedAt instanceof Timestamp
-                  ? `Updated ${formatDate(data.updatedAt)}`
-                  : undefined,
-              createdBy: data.createdBy || undefined,
-              accessType: data.accessType || "free",
-              price: data.price ?? null,
-            };
-          });
-          
-          setPrograms(fetchedPrograms.length > 0 ? fetchedPrograms : mockPrograms);
-        }
+        const fetchedPrograms: ProgramData[] = programsSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || "Untitled Program",
+            description: data.description,
+            totalDuration: data.totalDuration || data.phases?.length * 4 || 8,
+            phasesCount: data.phases?.length || 0,
+            difficulty: data.difficulty || "intermediate",
+            focusAreas: data.focusAreas || data.focus || [],
+            isTemplate: data.isTemplate ?? true,
+            activeClients: data.activeClients || 0,
+            clientAvatars: data.clientAvatars || [],
+            updatedAt:
+              data.updatedAt instanceof Timestamp
+                ? `Updated ${formatDate(data.updatedAt)}`
+                : undefined,
+            createdBy: data.createdBy || undefined,
+            accessType: data.accessType || "free",
+            price: data.price ?? null,
+          };
+        });
+        
+        setPrograms(fetchedPrograms);
       } catch (error) {
         console.error("Error fetching programs:", error);
-        setPrograms(mockPrograms);
+        setPrograms([]);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     };
 
     fetchPrograms();
-  }, []);
+  }, [reloadKey]);
 
   // Filter programs based on search
   const filteredPrograms = useMemo(() => {
@@ -274,6 +230,18 @@ export default function ProgramsPage() {
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">Loading your programs…</p>
               <ProgramsListSkeleton />
+            </div>
+          ) : loadError ? (
+            <div role="alert" className="rounded-xl border border-border bg-card p-8 text-center">
+              <p className="text-sm font-medium text-card-foreground">Couldn&apos;t load your programs.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
+              <button
+                type="button"
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+              >
+                Try again
+              </button>
             </div>
           ) : filteredPrograms.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
