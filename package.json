@@ -8,7 +8,8 @@
     "seed:emulator": "node scripts/seed-emulator.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test lib/*.test.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

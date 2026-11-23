@@ -25,7 +25,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 Sign-in needs an account whose Firebase Auth custom claim `role` is `coach` or `admin`.
 To test without touching prod:
 
-1. Start the emulators from `../beshaped-backend` (`npm run emulators`; auth 9099, firestore 8080, storage 9199).
+1. Start the emulators from `../beshaped-backend` (`npm run emulators`; auth 9099, firestore 8080, storage 9199, functions 5001; Add New User needs the `createClient` function from beshaped-backend#37).
 2. Seed test accounts and data (refuses to run unless the emulator hosts are set):
 
    ```bash
@@ -36,6 +36,7 @@ To test without touching prod:
    `client-only@beshaped.test` (no role, must be refused). Password: `TEST_PASSWORD` in `scripts/seed-emulator.mjs`.
 3. `npm run dev:emulators` (sets `NEXT_PUBLIC_USE_EMULATORS=true`; the app then uses project `demo-beshaped`).
    Add `-- --webpack` if Turbopack dev crashes on your machine. `next build` refuses to run with the flag on.
+4. Add New User sends the client a set-password email. The Auth emulator sends no mail: read the link from the emulator log or `http://127.0.0.1:9099/emulator/v1/projects/demo-beshaped/oobCodes`.
 
 ## Learn More
 

@@ -26,6 +26,7 @@ import {
   getClientProfilePhotoUrl,
   setClientProfilePhotoUrl,
 } from "@/lib/clientProfilePhotoCache";
+import SendPasswordEmailButton from "./SendPasswordEmailButton";
 import WorkoutHistory from "./WorkoutHistory";
 import Progress from "./Progress";
 import ClientPrograms from "./ClientPrograms";
@@ -53,6 +54,8 @@ interface ClientView {
   id: string;
   name: string;
   email: string;
+  /** The stored address, or null when the doc has none (`email` then holds a display fallback). */
+  loginEmail: string | null;
   phone: string;
   /** Firestore `profilePhoto` download URL, or `""` for initials. */
   profilePhoto: string;
@@ -234,6 +237,7 @@ export default function ClientDetailPage() {
             id: clientDoc.id,
             name: serializedData.displayName || serializedData.username || "Unknown User",
             email: serializedData.email || "No email",
+            loginEmail: typeof serializedData.email === "string" && serializedData.email ? serializedData.email : null,
             phone: serializedData.phoneNumber || "No Phone Number Stored",
             profilePhoto: p,
             avatarGradient: `bg-gradient-to-br from-${['rose', 'purple', 'emerald', 'amber', 'blue'][clientId.charCodeAt(0) % 5]}-400 to-${['pink', 'purple', 'teal', 'orange', 'indigo'][clientId.charCodeAt(0) % 5]}-600`,
@@ -379,6 +383,7 @@ export default function ClientDetailPage() {
                 </div>
               </div>
 
+              <SendPasswordEmailButton email={client.loginEmail} />
             </div>
 
             {/* Tabs */}
