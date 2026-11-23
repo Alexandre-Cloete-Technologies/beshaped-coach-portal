@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { formatLastWorkout, type ActivityStatus, type ClientActivity } from "@/lib/clientActivity";
 
 export interface ClientData {
   id: string;
@@ -12,28 +12,22 @@ export interface ClientData {
   photo: string;
   avatarGradient?: string;
   currentProgram: string;
-  week: number;
-  totalWeeks: number;
-  currentDay?: number;
-  currentPhase?: number;
-  compliance: number;
-  totalWorkouts: number;
-  completedWorkouts: number;
-  totalWorkoutsInProgram?: number;
+  /** From the client's workoutLogs (lib/clientActivity.ts). */
+  activity: ClientActivity;
   weight: number | null;
   weightUnit?: string;
   /** `null` if fewer than two weigh-ins (no previous entry to compare). */
   weightChange: number | null;
-  lastWorkout: string;
-  status: "high" | "medium" | "low" | "critical" | "perfect";
-  todayWorkout?: {
-    name: string;
-    exercisesCompleted: number;
-    totalExercises: number;
-  };
-  nextWorkout: string;
   goals?: string;
 }
+
+const STATUS_META: Record<ActivityStatus, { label: string; dot: string; text: string; hint: string }> = {
+  active: { label: "Active", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", hint: "Trained in the last 7 days" },
+  slipping: { label: "Slipping", dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", hint: "Last trained 8–14 days ago" },
+  inactive: { label: "Inactive", dot: "bg-red-500", text: "text-red-600 dark:text-red-400", hint: "No workout in over 14 days" },
+  "not-started": { label: "Not started", dot: "bg-gray-400", text: "text-muted-foreground", hint: "Has a program but no completed workouts yet" },
+  "no-program": { label: "No program", dot: "bg-gray-300 dark:bg-gray-600", text: "text-muted-foreground", hint: "No program assigned" },
+};
 
 // const statusColors = {
 //   high: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "High", labelColor: "text-emerald-600" },
@@ -94,7 +88,7 @@ interface ProgressBarProps {
 }
 
 function ProgressBar({ current, total }: ProgressBarProps) {
-  const percentage = (current / total) * 100;
+  const percentage = total > 0 ? Math.min(100, (current / total) * 100) : 0;
   
   return (
     <div className="flex items-center gap-2 flex-1">
@@ -119,7 +113,8 @@ export default function ClientCard({ client }: { client: ClientData }) {
   const showProfileImage = photoUrl.length > 0 && failedPhotoUrl !== photoUrl;
 
   // const colors = statusColors[client.status];
-  const isAlert = client.status === "low" || client.status === "critical";
+  const { activity } = client;
+  const statusMeta = STATUS_META[activity.status];
   // const programProgress = Math.round((client.week / client.totalWeeks) * 100);
 
   // const formatLastWorkout = (lastWorkout: string) => {
@@ -128,14 +123,13 @@ export default function ClientCard({ client }: { client: ClientData }) {
   //   return <span className="text-red-500">{lastWorkout}</span>;
   // };
 
-  // Format program info with phase, day, and week
+  // Program name, and where the client is in it (from their next open workout day)
   const formatProgramInfo = () => {
-    const parts = [];
-    if (client.currentPhase) parts.push(`Phase ${client.currentPhase}`);
-    if (client.currentDay) parts.push(`Day ${client.currentDay}`);
-    parts.push(`Week ${client.week}`);
-    return `${client.currentProgram} • ${parts.join(' ')}`;
+    const next = activity.nextWorkout;
+    if (!next) return client.currentProgram;
+    return `${client.currentProgram} • Phase ${next.phaseNumber} · Week ${next.weekNumber} · Day ${next.dayNumber}`;
   };
+  const isAlert = activity.status === "inactive";
 
   return (
     <div 
@@ -178,7 +172,13 @@ export default function ClientCard({ client }: { client: ClientData }) {
             </p>
           </div>
         </div>
-        {/* <div className={`w-3 h-3 rounded-full ${colors.dot}`} /> */}
+        <span
+          className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ${statusMeta.text}`}
+          title={statusMeta.hint}
+        >
+          <span className={`w-2 h-2 rounded-full ${statusMeta.dot}`} />
+          {statusMeta.label}
+        </span>
       </div>
 
       {/* Main Content: Circular Progress + Stats */}
@@ -191,14 +191,34 @@ export default function ClientCard({ client }: { client: ClientData }) {
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-muted-foreground">Program Progress</span>
             </div>
-            <div className="text-xs text-muted-foreground mb-1">
-              Week {client.totalWorkouts} of {client.totalWorkoutsInProgram || 0}
-            </div>
-            <ProgressBar current={client.totalWorkouts} total={client.totalWorkoutsInProgram || 1} />
+            {activity.totalInProgram > 0 ? (
+              <>
+                <div className="text-xs text-muted-foreground mb-1">
+                  {activity.completedInProgram} of {activity.totalInProgram} workouts done
+                </div>
+                <ProgressBar current={activity.completedInProgram} total={activity.totalInProgram} />
+              </>
+            ) : (
+              <div className="text-xs text-muted-foreground mb-1">No program assigned</div>
+            )}
           </div>
 
           {/* Stats */}
           <div className="space-y-1 text-xs">
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-muted-foreground">Last workout</span>
+              <span className="font-medium text-card-foreground">{formatLastWorkout(activity.lastWorkoutAt)}</span>
+            </div>
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-muted-foreground whitespace-nowrap">Next workout</span>
+              <span className="font-medium text-card-foreground text-right">
+                {activity.nextWorkout
+                  ? `${activity.nextWorkout.inProgress ? "In progress: " : ""}${activity.nextWorkout.name}`
+                  : activity.status === "no-program"
+                    ? "—"
+                    : "Program complete"}
+              </span>
+            </div>
             <div className="flex justify-between items-center gap-2">
               <span className="text-muted-foreground">Current body weight</span>
               <span className="font-medium text-card-foreground tabular-nums">
@@ -262,29 +282,6 @@ export default function ClientCard({ client }: { client: ClientData }) {
           </div>
         </div>
       </div>
-
-      {/* Today's Workout Box */}
-      {client.todayWorkout && (
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-card-foreground">
-              TODAY: {client.todayWorkout.name}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Progress:</span>
-            <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-blue-500 rounded-full"
-                style={{ width: `${(client.todayWorkout.exercisesCompleted / client.todayWorkout.totalExercises) * 100}%` }}
-              />
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {client.todayWorkout.exercisesCompleted}/{client.todayWorkout.totalExercises} exercises
-            </span>
-          </div>
-        </div>
-      )}
 
       <div
         className="flex flex-wrap gap-2 border-t border-border pt-3 -mx-5 -mb-5 px-5 pb-5 mt-1"

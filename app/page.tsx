@@ -4,7 +4,6 @@ import {  UserPlus } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import ClientCard, { ClientData } from "./components/ClientCard";
-import Pagination from "./components/Pagination";
 import AddClientModal from "./components/AddClientModal";
 import AssignProgramModal from "./components/AssignProgramModal";
 import { useEffect, useState, useMemo } from "react";
@@ -19,7 +18,8 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
-import { fetchScopedClients, fetchUserProgramsForClients } from "@/lib/coachScope";
+import { fetchScopedClients, fetchUserProgramsForClients, getDocsWhereIn } from "@/lib/coachScope";
+import { summarizeClientActivity } from "@/lib/clientActivity";
 import { profilePhotoUrl } from "@/lib/profilePhoto";
 import {
   getClientProfilePhotoUrl,
@@ -100,23 +100,29 @@ export default function Home() {
         setLoading(true);
         // Only this coach's clients (all clients for an admin), and only their userPrograms
         const clientDocs = await fetchScopedClients({ uid, role });
-        const userProgramDocs = await fetchUserProgramsForClients(clientDocs.map((d) => d.id));
-        
-        // Create a map of userId -> userProgram data
-        const userProgramsMap = new Map();
+        const clientIds = clientDocs.map((d) => d.id);
+        // Real activity comes from the clients' workoutLogs (in chunks of 30 ids, scoped to this coach's clients).
+        const [userProgramDocs, workoutLogDocs] = await Promise.all([
+          fetchUserProgramsForClients(clientIds),
+          getDocsWhereIn("workoutLogs", "userId", clientIds),
+        ]);
+
+        // `${userId}:${programId}` -> workout days in that program, from the client's userPrograms doc
+        const workoutsInProgram = new Map<string, number>();
         for (const upDoc of userProgramDocs) {
           const upData = upDoc.data();
-          const userId = typeof upData.userId === "string" ? upData.userId : null;
-
-          if (userId) {
-            userProgramsMap.set(userId, {
-              currentWeek: upData.currentWeek || 0,
-              currentDay: upData.currentDay || 0,
-              currentPhase: upData.currentPhase || 0,
-              totalWorkoutsCompleted: upData.totalWorkoutsCompleted || 0,
-              totalWorkoutsInProgram: upData.totalWorkoutsInProgram || 0,
-            });
+          if (typeof upData.userId === "string" && typeof upData.programId === "string") {
+            workoutsInProgram.set(`${upData.userId}:${upData.programId}`, Number(upData.totalWorkoutsInProgram) || 0);
           }
+        }
+
+        const logsByClient = new Map<string, DocumentData[]>();
+        for (const logDoc of workoutLogDocs) {
+          const log = logDoc.data();
+          if (typeof log.userId !== "string") continue;
+          const list = logsByClient.get(log.userId) ?? [];
+          list.push(log);
+          logsByClient.set(log.userId, list);
         }
         
         const fetchedUsers: ClientData[] = await Promise.all(
@@ -168,8 +174,18 @@ export default function Home() {
               }
             }
             
-            // Get userProgram data for this user
-            const userProgramData = userProgramsMap.get(doc.id);
+            // users.currentProgram is a programs reference (an id string on old docs)
+            const currentProgramId: string | null =
+              data.currentProgram?.path && typeof data.currentProgram.id === "string"
+                ? data.currentProgram.id
+                : typeof data.currentProgram === "string"
+                  ? data.currentProgram
+                  : null;
+            const activity = summarizeClientActivity(
+              logsByClient.get(doc.id) ?? [],
+              currentProgramId,
+              currentProgramId ? workoutsInProgram.get(`${doc.id}:${currentProgramId}`) ?? 0 : 0
+            );
 
             const firestorePhoto = profilePhotoUrl(data.profilePhoto);
             const cachedPhoto = getClientProfilePhotoUrl(doc.id) ?? "";
@@ -182,20 +198,10 @@ export default function Home() {
               photo,
               avatarGradient: gradients[gradientIndex],
               currentProgram: programName,
-              week: userProgramData?.currentWeek || 0,
-              totalWeeks: userProgramData?.totalWorkoutsInProgram || 0,
-              currentDay: userProgramData?.currentDay,
-              currentPhase: userProgramData?.currentPhase,
-              compliance: 0,
-              totalWorkouts: userProgramData?.totalWorkoutsCompleted || 0,
-              completedWorkouts: userProgramData?.totalWorkoutsCompleted || 0,
-              totalWorkoutsInProgram: userProgramData?.totalWorkoutsInProgram || 0,
+              activity,
               weight: weight,
               weightUnit: weightUnit,
               weightChange: weightChange,
-              lastWorkout: "No activity",
-              status: "medium",
-              nextWorkout: "Not scheduled",
               goals: data.goals || "",
             };
           })
@@ -303,13 +309,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* Pagination */}
-          <Pagination
-            currentPage={1}
-            totalPages={4}
-            totalItems={24}
-            itemsPerPage={6}
-          />
         </div>
       </main>
 
