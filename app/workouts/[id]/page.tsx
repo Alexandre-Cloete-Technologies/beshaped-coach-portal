@@ -63,24 +63,22 @@ function parseWorkoutDoc(id: string, data: Record<string, unknown>): WorkoutDeta
 export default function WorkoutDetailPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
+  // A new id remounts the content, so it starts from "loading" instead of showing the previous workout.
+  return <WorkoutDetail key={id} id={id} />;
+}
 
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+function WorkoutDetail({ id }: { id: string }) {
+  const [loading, setLoading] = useState(Boolean(id));
+  const [notFound, setNotFound] = useState(!id);
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
 
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      setNotFound(true);
-      return;
-    }
+    if (!id) return;
 
     let cancelled = false;
 
     const load = async () => {
       try {
-        setLoading(true);
-        setNotFound(false);
         const snap = await getDoc(doc(db, "workouts", id));
         if (cancelled) return;
         if (!snap.exists()) {

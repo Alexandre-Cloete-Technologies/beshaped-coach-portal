@@ -390,8 +390,11 @@ export default function ExercisesPage() {
     });
   };
 
-  // Auto-expand groups when search or category filter is active
-  useEffect(() => {
+  // Auto-expand the groups with matches when the search or category filter changes (done during render,
+  // React's pattern for adjusting state when inputs change). Collapsing a group afterwards still works.
+  const [expandedFor, setExpandedFor] = useState(groupedExercises);
+  if (expandedFor !== groupedExercises) {
+    setExpandedFor(groupedExercises);
     if (searchQuery.trim() || selectedCategories.size > 0) {
       const groupsWithMatches = new Set<string>();
       Object.entries(groupedExercises).forEach(([group, exs]) => {
@@ -401,7 +404,7 @@ export default function ExercisesPage() {
       });
       setExpandedGroups(groupsWithMatches);
     }
-  }, [searchQuery, selectedCategories, groupedExercises]);
+  }
 
   const toggleGroup = (group: string) => {
     setExpandedGroups(prev => {

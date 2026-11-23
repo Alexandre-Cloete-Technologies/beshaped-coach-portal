@@ -116,60 +116,64 @@ function readAssessmentDraft(uid: string): Partial<AssessmentDraftV1> | null {
   }
 }
 
+/** The date (YYYY-MM-DD) of the client's newest assessment, or null if they have none. */
+async function loadLastAssessmentDate(userId: string): Promise<string | null> {
+  const snapshot = await getDocs(query(collection(db, "assessments"), where("userId", "==", userId)));
+  if (snapshot.empty) return null;
+  const newest = snapshot.docs.sort((a, b) => {
+    const aTime = a.data().createdAt?.toMillis?.() ?? 0;
+    const bTime = b.data().createdAt?.toMillis?.() ?? 0;
+    return bTime - aTime;
+  })[0];
+  const createdAt = newest.data().createdAt;
+  if (createdAt?.toDate) return createdAt.toDate().toISOString().split("T")[0];
+  if (createdAt) return new Date(createdAt).toISOString().split("T")[0];
+  return null;
+}
+
 export default function AssessmentPage() {
   const { uid, role } = useSignedInCoach();
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [assessmentDate, setAssessmentDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+  // The coach's saved draft, read once (protected pages only render in the browser, after sign-in).
+  const [draft] = useState(() => readAssessmentDraft(uid));
+  const draftText = (value: unknown, fallback: string) => (typeof value === "string" ? value : fallback);
+
+  const [searchQuery, setSearchQuery] = useState(() => draftText(draft?.searchQuery, ""));
+  const [selectedClientId, setSelectedClientId] = useState<string>(() => draftText(draft?.selectedClientId, ""));
+  const [assessmentDate, setAssessmentDate] = useState<string>(() =>
+    draftText(draft?.assessmentDate, new Date().toISOString().split("T")[0])
   );
-  const [lastAssessmentDate, setLastAssessmentDate] = useState<string | null>(null);
-  const [loadingLastAssessment, setLoadingLastAssessment] = useState(false);
+  // Last assessment date, tagged with the client it was looked up for; another client means still loading.
+  const [lastAssessment, setLastAssessment] = useState<{ clientId: string; date: string | null } | null>(null);
 
   // Basic stats
-  const [height, setHeight] = useState("");
-  const [weight, setWeight] = useState("");
-  const [age, setAge] = useState("");
+  const [height, setHeight] = useState(() => draftText(draft?.height, ""));
+  const [weight, setWeight] = useState(() => draftText(draft?.weight, ""));
+  const [age, setAge] = useState(() => draftText(draft?.age, ""));
 
   // Body circumferences (cm)
-  const [circumferences, setCircumferences] = useState(emptyCircumferences);
+  const [circumferences, setCircumferences] = useState(() => {
+    const next = emptyCircumferences();
+    const raw = (draft ?? {}) as Record<string, unknown>;
+    for (const { key } of CIRCUMFERENCE_FIELDS) {
+      const val = raw[key];
+      if (typeof val === "string") next[key] = val;
+    }
+    return next;
+  });
 
   // Skinfold measurements (mm)
-  const [skinfolds, setSkinfolds] = useState<Record<string, string>>(defaultSkinfolds);
+  const [skinfolds, setSkinfolds] = useState<Record<string, string>>(() =>
+    draft ? mergeSkinfolds(draft.skinfolds) : defaultSkinfolds()
+  );
 
   // Photos (not persisted — File objects cannot be stored in localStorage)
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoInputKey, setPhotoInputKey] = useState(0);
 
-  const [draftReady, setDraftReady] = useState(false);
-
   useEffect(() => {
-    const d = readAssessmentDraft(uid);
-    if (d) {
-      if (typeof d.searchQuery === "string") setSearchQuery(d.searchQuery);
-      if (typeof d.selectedClientId === "string") setSelectedClientId(d.selectedClientId);
-      if (typeof d.assessmentDate === "string") setAssessmentDate(d.assessmentDate);
-      if (typeof d.height === "string") setHeight(d.height);
-      if (typeof d.weight === "string") setWeight(d.weight);
-      if (typeof d.age === "string") setAge(d.age);
-      setCircumferences(() => {
-        const next = emptyCircumferences();
-        const raw = d as Record<string, unknown>;
-        for (const { key } of CIRCUMFERENCE_FIELDS) {
-          const val = raw[key];
-          if (typeof val === "string") next[key] = val;
-        }
-        return next;
-      });
-      setSkinfolds(mergeSkinfolds(d.skinfolds));
-    }
-    setDraftReady(true);
-  }, [uid]);
-
-  useEffect(() => {
-    if (!draftReady || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
     const payload: AssessmentDraftV1 = {
       v: 1,
       searchQuery,
@@ -188,7 +192,6 @@ export default function AssessmentPage() {
     }
   }, [
     uid,
-    draftReady,
     searchQuery,
     selectedClientId,
     assessmentDate,
@@ -199,76 +202,57 @@ export default function AssessmentPage() {
     skinfolds,
   ]);
 
-  const fetchClients = async () => {
-    try {
-      setLoadingClients(true);
-      // Only this coach's clients (all clients for an admin)
-      const clientDocs = await fetchScopedClients({ uid, role });
-      const fetched: Client[] = clientDocs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.displayName || data.username || "Unknown User",
-          email: data.email || "No email",
-        };
-      });
-      setClients(fetched);
-    } catch (err) {
-      console.error("Error fetching clients:", err);
-    } finally {
-      setLoadingClients(false);
-    }
-  };
-
-  const fetchLastAssessment = async (userId: string) => {
-    try {
-      setLoadingLastAssessment(true);
-      const assessmentsRef = collection(db, "assessments");
-      const q = query(
-        assessmentsRef,
-        where("userId", "==", userId)
-      );
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        const sorted = snapshot.docs.sort((a, b) => {
-          const aTime = a.data().createdAt?.toMillis?.() ?? 0;
-          const bTime = b.data().createdAt?.toMillis?.() ?? 0;
-          return bTime - aTime;
-        });
-        const last = sorted[0];
-        const createdAt = last.data().createdAt;
-        if (createdAt?.toDate) {
-          setLastAssessmentDate(createdAt.toDate().toISOString().split("T")[0]);
-        } else if (createdAt) {
-          setLastAssessmentDate(new Date(createdAt).toISOString().split("T")[0]);
-        } else {
-          setLastAssessmentDate(null);
-        }
-      } else {
-        setLastAssessmentDate(null);
-      }
-    } catch (err) {
-      console.error("Error fetching last assessment:", err);
-      setLastAssessmentDate(null);
-    } finally {
-      setLoadingLastAssessment(false);
-    }
-  };
-
+  // Loads this coach's clients (all for an admin).
   useEffect(() => {
-    fetchClients();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the signed-in coach changes
+    let cancelled = false;
+    const fetchClients = async () => {
+      try {
+        // Only this coach's clients (all clients for an admin)
+        const clientDocs = await fetchScopedClients({ uid, role });
+        const fetched: Client[] = clientDocs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.displayName || data.username || "Unknown User",
+            email: data.email || "No email",
+          };
+        });
+        if (!cancelled) setClients(fetched);
+      } catch (err) {
+        console.error("Error fetching clients:", err);
+      } finally {
+        if (!cancelled) setLoadingClients(false);
+      }
+    };
+    void fetchClients();
+    return () => {
+      cancelled = true;
+    };
   }, [uid, role]);
 
   // A draft may name a client from before scoping; only look up clients in this coach's set.
   const selectedInScope = clients.some((c) => c.id === selectedClientId);
 
+  const lookUpLastAssessment = Boolean(selectedClientId && selectedInScope);
+  const loadingLastAssessment = lookUpLastAssessment && lastAssessment?.clientId !== selectedClientId;
+  const lastAssessmentDate =
+    lookUpLastAssessment && lastAssessment?.clientId === selectedClientId ? lastAssessment.date : null;
+
   useEffect(() => {
-    if (selectedClientId && selectedInScope) {
-      fetchLastAssessment(selectedClientId);
-    } else {
-      setLastAssessmentDate(null);
-    }
+    if (!selectedClientId || !selectedInScope) return;
+    let cancelled = false;
+    const clientId = selectedClientId;
+    loadLastAssessmentDate(clientId)
+      .then((date) => {
+        if (!cancelled) setLastAssessment({ clientId, date });
+      })
+      .catch((err) => {
+        console.error("Error fetching last assessment:", err);
+        if (!cancelled) setLastAssessment({ clientId, date: null });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedClientId, selectedInScope]);
 
   const filteredClients = useMemo(() => {

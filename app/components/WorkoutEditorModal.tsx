@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { addDoc, collection, doc, Timestamp, updateDoc } from "firebase/firestore";
 import {
   Search,
@@ -69,15 +69,23 @@ export default function WorkoutEditorModal({
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen) return;
+  // Start from the workout passed in each time the modal opens (or gets a new one while open). Done during
+  // render, React's pattern for adjusting state when props change.
+  const [syncedFrom, setSyncedFrom] = useState<{ workoutName: string; exercises: ModalExercise[] } | null>(null);
+  if (!isOpen && syncedFrom !== null) {
+    setSyncedFrom(null);
+  } else if (
+    isOpen &&
+    (syncedFrom === null || syncedFrom.workoutName !== workoutName || syncedFrom.exercises !== exercises)
+  ) {
+    setSyncedFrom({ workoutName, exercises });
     setLocalWorkoutName(workoutName || "");
     setLocalExercises(exercises || []);
     setModalSearchQuery("");
     setSelectedCategories(new Set());
     setInputFocusRowIndex(null);
     setDraggedExerciseIndex(null);
-  }, [isOpen, workoutName, exercises]);
+  }
 
   const filteredLibrary = useMemo(() => {
     const q = modalSearchQuery.trim().toLowerCase();

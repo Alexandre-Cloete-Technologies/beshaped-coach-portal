@@ -338,6 +338,91 @@ export interface SelectedSlot {
   dayIdx: number;
 }
 
+/** The saved workouts for the builder sidebar (no state; the hook applies the result). */
+async function loadWorkoutTemplates(): Promise<WorkoutTemplate[]> {
+  const workoutsSnapshot = await getDocs(collection(db, "workouts"));
+  if (workoutsSnapshot.empty) return [];
+
+  const fetchedTemplates: WorkoutTemplate[] = [];
+
+  workoutsSnapshot.docs.forEach((workoutDoc) => {
+    const data = workoutDoc.data() as Record<string, unknown>;
+    const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
+
+    const templateExercises: WorkoutTemplateExercise[] = rawExercises.map(
+      (exercise) => {
+        const exerciseData = (exercise && typeof exercise === "object"
+          ? exercise
+          : {}) as Record<string, unknown>;
+        return {
+          exerciseId:
+            typeof exerciseData.exerciseId === "string"
+              ? exerciseData.exerciseId
+              : undefined,
+          exerciseName:
+            typeof exerciseData.exerciseName === "string" &&
+            exerciseData.exerciseName.trim()
+              ? exerciseData.exerciseName.trim()
+              : typeof exerciseData.name === "string" &&
+                  exerciseData.name.trim()
+                ? exerciseData.name.trim()
+                : "Unnamed Exercise",
+          targetSets:
+            typeof exerciseData.targetSets === "number"
+              ? exerciseData.targetSets
+              : typeof exerciseData.sets === "number"
+                ? exerciseData.sets
+                : undefined,
+          targetReps:
+            typeof exerciseData.targetReps === "string"
+              ? exerciseData.targetReps
+              : typeof exerciseData.repsRange === "string"
+                ? exerciseData.repsRange
+                : undefined,
+          restPeriod:
+            typeof exerciseData.restPeriod === "string"
+              ? exerciseData.restPeriod
+              : undefined,
+          notes:
+            typeof exerciseData.notes === "string" ||
+            exerciseData.notes === null
+              ? (exerciseData.notes as string | null)
+              : undefined,
+        };
+      }
+    );
+
+    const workoutName =
+      typeof data.name === "string" && data.name.trim()
+        ? data.name.trim()
+        : "Untitled Workout";
+    const exerciseCount = rawExercises.length;
+    const estimatedDuration =
+      typeof data.estimatedDuration === "number" &&
+      Number.isFinite(data.estimatedDuration)
+        ? data.estimatedDuration
+        : exerciseCount * 5;
+
+    fetchedTemplates.push({
+      id: workoutDoc.id,
+      name: workoutName,
+      exercises: exerciseCount,
+      duration: estimatedDuration,
+      category: "saved",
+      description:
+        typeof data.description === "string" ? data.description : "",
+      tags: Array.isArray(data.tags)
+        ? (data.tags as unknown[]).filter(
+            (tag): tag is string => typeof tag === "string"
+          )
+        : [],
+      templateExercises,
+    });
+  });
+
+  return fetchedTemplates;
+}
+
 // === Hook ===
 
 export function useProgramEditor({
@@ -346,18 +431,28 @@ export function useProgramEditor({
   defaultExpandAllPhases = false,
 }: UseProgramEditorOptions) {
   // Program state
-  const [program, setProgram] = useState<ProgramFormData>(() =>
-    normalizeInitialProgram(initialProgram)
-  );
+  // A saved browser draft (builder only, when draftKey is set) wins over the initial program. Read once here:
+  // protected pages only render in the browser, after sign-in, so localStorage is available.
+  const [program, setProgram] = useState<ProgramFormData>(() => {
+    if (draftKey && typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(draftKey);
+        if (stored) return normalizeInitialProgram(JSON.parse(stored) as Partial<ProgramFormData>);
+      } catch {
+        // ignore a corrupt draft
+      }
+    }
+    return normalizeInitialProgram(initialProgram);
+  });
 
-  // Keep editor state in sync when the parent passes a new program (e.g. detail
-  // page after fetch, or after save). Builder omits this prop: effect no-ops.
-  // We key off object identity, not JSON.stringify, so Firestore/undefined fields
-  // cannot break the sync the way stringify could.
-  useEffect(() => {
-    if (initialProgram == null) return;
-    setProgram(normalizeInitialProgram(initialProgram));
-  }, [initialProgram]);
+  // Keep editor state in sync when the parent passes a new program (e.g. detail page after fetch, or after
+  // save). Done during render, React's pattern for adjusting state when a prop changes. Keyed off object
+  // identity, not JSON.stringify, so Firestore/undefined fields can't break the sync.
+  const [syncedInitialProgram, setSyncedInitialProgram] = useState(initialProgram);
+  if (initialProgram !== syncedInitialProgram) {
+    setSyncedInitialProgram(initialProgram);
+    if (initialProgram != null) setProgram(normalizeInitialProgram(initialProgram));
+  }
 
   // Exercise library
   const [exercises, setExercises] = useState<EditExercise[]>([]);
@@ -444,95 +539,12 @@ export function useProgramEditor({
     null
   );
 
+  // Refresh (after a template is saved, renamed or deleted); awaitable.
   const fetchWorkoutTemplates = useCallback(async () => {
+    setLoadingTemplates(true);
+    setTemplateFetchError(null);
     try {
-      setLoadingTemplates(true);
-      setTemplateFetchError(null);
-
-      const workoutsSnapshot = await getDocs(collection(db, "workouts"));
-      if (workoutsSnapshot.empty) {
-        setSavedTemplates([]);
-        return;
-      }
-
-      const fetchedTemplates: WorkoutTemplate[] = [];
-
-      workoutsSnapshot.docs.forEach((workoutDoc) => {
-        const data = workoutDoc.data() as Record<string, unknown>;
-        const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
-
-        const templateExercises: WorkoutTemplateExercise[] = rawExercises.map(
-          (exercise) => {
-            const exerciseData = (exercise && typeof exercise === "object"
-              ? exercise
-              : {}) as Record<string, unknown>;
-            return {
-              exerciseId:
-                typeof exerciseData.exerciseId === "string"
-                  ? exerciseData.exerciseId
-                  : undefined,
-              exerciseName:
-                typeof exerciseData.exerciseName === "string" &&
-                exerciseData.exerciseName.trim()
-                  ? exerciseData.exerciseName.trim()
-                  : typeof exerciseData.name === "string" &&
-                      exerciseData.name.trim()
-                    ? exerciseData.name.trim()
-                    : "Unnamed Exercise",
-              targetSets:
-                typeof exerciseData.targetSets === "number"
-                  ? exerciseData.targetSets
-                  : typeof exerciseData.sets === "number"
-                    ? exerciseData.sets
-                    : undefined,
-              targetReps:
-                typeof exerciseData.targetReps === "string"
-                  ? exerciseData.targetReps
-                  : typeof exerciseData.repsRange === "string"
-                    ? exerciseData.repsRange
-                    : undefined,
-              restPeriod:
-                typeof exerciseData.restPeriod === "string"
-                  ? exerciseData.restPeriod
-                  : undefined,
-              notes:
-                typeof exerciseData.notes === "string" ||
-                exerciseData.notes === null
-                  ? (exerciseData.notes as string | null)
-                  : undefined,
-            };
-          }
-        );
-
-        const workoutName =
-          typeof data.name === "string" && data.name.trim()
-            ? data.name.trim()
-            : "Untitled Workout";
-        const exerciseCount = rawExercises.length;
-        const estimatedDuration =
-          typeof data.estimatedDuration === "number" &&
-          Number.isFinite(data.estimatedDuration)
-            ? data.estimatedDuration
-            : exerciseCount * 5;
-
-        fetchedTemplates.push({
-          id: workoutDoc.id,
-          name: workoutName,
-          exercises: exerciseCount,
-          duration: estimatedDuration,
-          category: "saved",
-          description:
-            typeof data.description === "string" ? data.description : "",
-          tags: Array.isArray(data.tags)
-            ? (data.tags as unknown[]).filter(
-                (tag): tag is string => typeof tag === "string"
-              )
-            : [],
-          templateExercises,
-        });
-      });
-
-      setSavedTemplates(fetchedTemplates);
+      setSavedTemplates(await loadWorkoutTemplates());
     } catch (error) {
       console.error("Error fetching workout templates:", error);
       setTemplateFetchError("Failed to load saved templates.");
@@ -542,9 +554,27 @@ export function useProgramEditor({
     }
   }, []);
 
+  // First load (loadingTemplates starts true).
   useEffect(() => {
-    fetchWorkoutTemplates();
-  }, [fetchWorkoutTemplates]);
+    let cancelled = false;
+    loadWorkoutTemplates()
+      .then((templates) => {
+        if (!cancelled) setSavedTemplates(templates);
+      })
+      .catch((error) => {
+        console.error("Error fetching workout templates:", error);
+        if (!cancelled) {
+          setTemplateFetchError("Failed to load saved templates.");
+          setSavedTemplates([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTemplates(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Grouped exercises by muscle group
   const [searchQuery, setSearchQuery] = useState("");
@@ -888,23 +918,6 @@ export function useProgramEditor({
     setPhaseMenuOpenId(null);
     setPhasePendingDeleteIdx(null);
   }, [initialProgram]);
-
-  // localStorage draft hydration (only when draftKey provided)
-  const draftHydratedRef = useRef(false);
-  useEffect(() => {
-    if (!draftKey || draftHydratedRef.current) return;
-    if (typeof window === "undefined") return;
-    draftHydratedRef.current = true;
-
-    try {
-      const stored = localStorage.getItem(draftKey);
-      if (!stored) return;
-      const draft = JSON.parse(stored) as Partial<ProgramFormData>;
-      setProgram(normalizeInitialProgram(draft));
-    } catch {
-      // ignore corrupt draft
-    }
-  }, [draftKey]);
 
   // Debounced save to localStorage
   useEffect(() => {
