@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpen, Plus, Trash2 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   doc,
   getDoc,
@@ -30,61 +30,65 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [selectedProgramId, setSelectedProgramId] = useState("");
 
-  const fetchData = useCallback(async () => {
-    if (!clientId) return;
+  // Loads the client's assigned programs and the program list for the Add dropdown.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchData = async () => {
+      if (!clientId) return;
 
-    try {
-      setLoading(true);
-      const userRef = doc(db, "users", clientId);
-      const userSnap = await getDoc(userRef);
+      try {
+        setLoading(true);
+        const userRef = doc(db, "users", clientId);
+        const userSnap = await getDoc(userRef);
 
-      if (!userSnap.exists()) {
-        setAvailablePrograms([]);
-        setAllPrograms([]);
-        return;
-      }
+        if (!userSnap.exists()) {
+          setAvailablePrograms([]);
+          setAllPrograms([]);
+          return;
+        }
 
-      const data = userSnap.data();
-      const availableRefs = data?.availablePrograms ?? [];
+        const data = userSnap.data();
+        const availableRefs = data?.availablePrograms ?? [];
 
-      // Resolve each ref to get program id and name
-      const resolved: ProgramItem[] = [];
-      for (const ref of availableRefs) {
-        if (ref?.path) {
-          try {
-            const programSnap = await getDoc(ref);
-            if (programSnap.exists()) {
-              const programData = programSnap.data() as { name?: string };
-              resolved.push({
-                id: programSnap.id,
-                name: programData?.name || "Unnamed Program",
-              });
+        // Resolve each ref to get program id and name
+        const resolved: ProgramItem[] = [];
+        for (const ref of availableRefs) {
+          if (ref?.path) {
+            try {
+              const programSnap = await getDoc(ref);
+              if (programSnap.exists()) {
+                const programData = programSnap.data() as { name?: string };
+                resolved.push({
+                  id: programSnap.id,
+                  name: programData?.name || "Unnamed Program",
+                });
+              }
+            } catch (err) {
+              console.error("Error resolving program ref:", err);
             }
-          } catch (err) {
-            console.error("Error resolving program ref:", err);
           }
         }
+
+        setAvailablePrograms(resolved);
+
+        // Fetch all programs for the Add dropdown
+        const programsSnapshot = await getDocs(collection(db, "programs"));
+        const all: ProgramItem[] = programsSnapshot.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name || "Unnamed Program",
+        }));
+        setAllPrograms(all);
+      } catch (err) {
+        console.error("Error fetching client programs:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      setAvailablePrograms(resolved);
-
-      // Fetch all programs for the Add dropdown
-      const programsSnapshot = await getDocs(collection(db, "programs"));
-      const all: ProgramItem[] = programsSnapshot.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name || "Unnamed Program",
-      }));
-      setAllPrograms(all);
-    } catch (err) {
-      console.error("Error fetching client programs:", err);
-    } finally {
-      setLoading(false);
-    }
+    };
+    void fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [clientId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const programsToAdd = allPrograms.filter(
     (p) => !availablePrograms.some((ap) => ap.id === p.id)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
 import { X, Upload, ImageIcon } from "lucide-react";
 import { listFilesWithUrls, uploadFile } from "@/lib/firebase";
@@ -29,15 +29,7 @@ export default function AnatomyGifPicker({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadGifs();
-    }
-  }, [isOpen]);
-
   const loadGifs = async () => {
-    setLoading(true);
-    setError(null);
     try {
       const items = await listFilesWithUrls(ANATOMY_STORAGE_PATH);
       setGifs(items.filter((item) => /\.(gif|mp4)$/i.test(item.name)));
@@ -101,7 +93,12 @@ export default function AnatomyGifPicker({
       )}
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setIsOpen(true);
+          setLoading(true);
+          setError(null);
+          void loadGifs();
+        }}
         className="w-full min-h-[88px] px-3 py-3 rounded-lg border border-border bg-background hover:bg-muted/50 transition-colors flex items-center justify-center gap-3 text-left"
       >
         {value ? (

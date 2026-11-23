@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle, AlertCircle, X } from "lucide-react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -18,9 +18,15 @@ import {
 import { syncWorkoutLogsForProgramChange } from "../lib/workoutLogSync";
 
 export default function ProgramDetailPage() {
-  const { uid, role } = useSignedInCoach();
   const params = useParams();
   const programId = (params?.id as string) || "";
+  // A new id remounts the content, so it never shows the previous program (or a mismatched id) while the
+  // next one loads.
+  return <ProgramDetail key={programId} programId={programId} />;
+}
+
+function ProgramDetail({ programId }: { programId: string }) {
+  const { uid, role } = useSignedInCoach();
 
   const [program, setProgram] = useState<ProgramFormData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,21 +37,11 @@ export default function ProgramDetailPage() {
     message: string;
   } | null>(null);
 
-  // When the route id changes, clear immediately so we never show ProgramBuilder
-  // with the previous program's data (or a mismatched id) while a new doc loads.
-  useLayoutEffect(() => {
-    if (!programId) return;
-    setProgram(null);
-    setError(null);
-    setLoading(true);
-  }, [programId]);
-
   useEffect(() => {
     const fetchProgram = async () => {
       if (!programId) return;
 
       try {
-        setLoading(true);
         const programDoc = await getDoc(doc(db, "programs", programId));
 
         if (programDoc.exists()) {

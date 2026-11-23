@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Dumbbell, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
-import Breadcrumbs from "../components/Breadcrumbs";
 import WorkoutEditorModal, { ModalExercise } from "../components/WorkoutEditorModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { collection, deleteDoc, doc, getDocs } from "firebase/firestore";
@@ -62,71 +61,78 @@ export default function WorkoutsPage() {
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<SavedWorkout | null>(null);
+  // Bumped to load again (after an add, save or delete); the load lives in the effect below.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const fetchWorkouts = useCallback(async () => {
-    try {
-      setLoadingWorkouts(true);
-      setFetchError(null);
-      const snapshot = await getDocs(collection(db, "workouts"));
-      if (snapshot.empty) {
-        setWorkouts([]);
-        return;
-      }
+  // Loads the saved-workout library; runs again when reloadKey changes.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchWorkouts = async () => {
+      try {
+        setLoadingWorkouts(true);
+        setFetchError(null);
+        const snapshot = await getDocs(collection(db, "workouts"));
+        if (snapshot.empty) {
+          setWorkouts([]);
+          return;
+        }
 
-      const list: SavedWorkout[] = snapshot.docs.map((workoutDoc) => {
-        const data = workoutDoc.data() as Record<string, unknown>;
-        const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
-        const exercisesCount = rawExercises.length;
-        const templateExercises: WorkoutTemplateExercise[] = rawExercises.map((exercise) => {
-          const exerciseData =
-            exercise && typeof exercise === "object" ? (exercise as Record<string, unknown>) : {};
+        const list: SavedWorkout[] = snapshot.docs.map((workoutDoc) => {
+          const data = workoutDoc.data() as Record<string, unknown>;
+          const rawExercises = Array.isArray(data.exercises) ? data.exercises : [];
+          const exercisesCount = rawExercises.length;
+          const templateExercises: WorkoutTemplateExercise[] = rawExercises.map((exercise) => {
+            const exerciseData =
+              exercise && typeof exercise === "object" ? (exercise as Record<string, unknown>) : {};
+            return {
+              exerciseId: typeof exerciseData.exerciseId === "string" ? exerciseData.exerciseId : undefined,
+              exerciseName:
+                typeof exerciseData.exerciseName === "string" && exerciseData.exerciseName.trim()
+                  ? exerciseData.exerciseName.trim()
+                  : typeof exerciseData.name === "string" && exerciseData.name.trim()
+                    ? exerciseData.name.trim()
+                    : "Unnamed Exercise",
+              targetSets:
+                typeof exerciseData.targetSets === "number"
+                  ? exerciseData.targetSets
+                  : typeof exerciseData.sets === "number"
+                    ? exerciseData.sets
+                    : undefined,
+              targetReps:
+                typeof exerciseData.targetReps === "string"
+                  ? exerciseData.targetReps
+                  : typeof exerciseData.repsRange === "string"
+                    ? exerciseData.repsRange
+                    : undefined,
+            };
+          });
           return {
-            exerciseId: typeof exerciseData.exerciseId === "string" ? exerciseData.exerciseId : undefined,
-            exerciseName:
-              typeof exerciseData.exerciseName === "string" && exerciseData.exerciseName.trim()
-                ? exerciseData.exerciseName.trim()
-                : typeof exerciseData.name === "string" && exerciseData.name.trim()
-                  ? exerciseData.name.trim()
-                  : "Unnamed Exercise",
-            targetSets:
-              typeof exerciseData.targetSets === "number"
-                ? exerciseData.targetSets
-                : typeof exerciseData.sets === "number"
-                  ? exerciseData.sets
-                  : undefined,
-            targetReps:
-              typeof exerciseData.targetReps === "string"
-                ? exerciseData.targetReps
-                : typeof exerciseData.repsRange === "string"
-                  ? exerciseData.repsRange
-                  : undefined,
+            id: workoutDoc.id,
+            name:
+              typeof data.name === "string" && data.name.trim()
+                ? data.name.trim()
+                : "Untitled Workout",
+            exercises: exercisesCount,
+            description: typeof data.description === "string" ? data.description : "",
+            templateExercises,
           };
         });
-        return {
-          id: workoutDoc.id,
-          name:
-            typeof data.name === "string" && data.name.trim()
-              ? data.name.trim()
-              : "Untitled Workout",
-          exercises: exercisesCount,
-          description: typeof data.description === "string" ? data.description : "",
-          templateExercises,
-        };
-      });
 
-      setWorkouts(list);
-    } catch (err) {
-      console.error("Error fetching workouts:", err);
-      setFetchError("Could not load workouts.");
-      setWorkouts([]);
-    } finally {
-      setLoadingWorkouts(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchWorkouts();
-  }, [fetchWorkouts]);
+        if (cancelled) return;
+        setWorkouts(list);
+      } catch (err) {
+        console.error("Error fetching workouts:", err);
+        setFetchError("Could not load workouts.");
+        setWorkouts([]);
+      } finally {
+        if (!cancelled) setLoadingWorkouts(false);
+      }
+    };
+    void fetchWorkouts();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   useEffect(() => {
     const fetchExercises = async () => {
@@ -223,7 +229,7 @@ export default function WorkoutsPage() {
     if (!deleteTarget) return;
     await deleteDoc(doc(db, "workouts", deleteTarget.id));
     setDeleteTarget(null);
-    await fetchWorkouts();
+    setReloadKey((k) => k + 1);
   };
 
   return (
@@ -373,14 +379,14 @@ export default function WorkoutsPage() {
           setEditorOpen(false);
           setEditingWorkoutId(null);
         }}
-        onTemplateSaved={fetchWorkouts}
+        onTemplateSaved={() => setReloadKey((k) => k + 1)}
         onDelete={
           editingWorkoutId
             ? async () => {
                 await deleteDoc(doc(db, "workouts", editingWorkoutId));
                 setEditorOpen(false);
                 setEditingWorkoutId(null);
-                await fetchWorkouts();
+                setReloadKey((k) => k + 1);
               }
             : undefined
         }

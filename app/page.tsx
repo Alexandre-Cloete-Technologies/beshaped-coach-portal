@@ -94,135 +94,140 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Bumped to load again (after an add, save or delete); the load lives in the effect below.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        // Only this coach's clients (all clients for an admin), and only their userPrograms
-        const clientDocs = await fetchScopedClients({ uid, role });
-        const clientIds = clientDocs.map((d) => d.id);
-        // Real activity comes from the clients' workoutLogs (in chunks of 30 ids, scoped to this coach's clients).
-        const [userProgramDocs, workoutLogDocs] = await Promise.all([
-          fetchUserProgramsForClients(clientIds),
-          getDocsWhereIn("workoutLogs", "userId", clientIds),
-        ]);
-
-        // `${userId}:${programId}` -> workout days in that program, from the client's userPrograms doc
-        const workoutsInProgram = new Map<string, number>();
-        for (const upDoc of userProgramDocs) {
-          const upData = upDoc.data();
-          if (typeof upData.userId === "string" && typeof upData.programId === "string") {
-            workoutsInProgram.set(`${upData.userId}:${upData.programId}`, Number(upData.totalWorkoutsInProgram) || 0);
-          }
-        }
-
-        const logsByClient = new Map<string, DocumentData[]>();
-        for (const logDoc of workoutLogDocs) {
-          const log = logDoc.data();
-          if (typeof log.userId !== "string") continue;
-          const list = logsByClient.get(log.userId) ?? [];
-          list.push(log);
-          logsByClient.set(log.userId, list);
-        }
-        
-        const fetchedUsers: ClientData[] = await Promise.all(
-          clientDocs.map(async (doc) => {
-            const data = doc.data();
-            
-            let weight: number | null = null;
-            let weightChange: number | null = null;
-            let weightUnit = "kg";
-            try {
-              const bw = await fetchLatestBodyweight(doc.id);
-              weight = bw.weight;
-              weightUnit = bw.weightUnit;
-              weightChange = bw.weightChange;
-            } catch (err) {
-              console.error("Error fetching weight logs for user", doc.id, err);
-            }
-
-            // Generate avatar gradient based on user ID
-            const gradients = [
-              "bg-gradient-to-br from-blue-500 to-indigo-600",
-              "bg-gradient-to-br from-rose-400 to-pink-600",
-              "bg-gradient-to-br from-amber-400 to-orange-600",
-              "bg-gradient-to-br from-emerald-400 to-teal-600",
-              "bg-gradient-to-br from-violet-400 to-purple-600",
-              "bg-gradient-to-br from-slate-400 to-slate-600",
-            ];
-            const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
-            
-            // Fetch program name if currentProgram is a reference
-            let programName = "No Program";
-            if (data.currentProgram) {
-              try {
-                // Check if it's a DocumentReference
-                if (data.currentProgram.path) {
-                  // It's a reference, fetch the document
-                  const programDoc = await getDoc(data.currentProgram);
-                  if (programDoc.exists()) {
-                    const programData = programDoc.data() as ProgramDoc;
-                    programName = programData.name || programData.programName || "Unknown Program";
-                  }
-                } else if (typeof data.currentProgram === 'string') {
-                  // It's already a string
-                  programName = data.currentProgram;
-                }
-              } catch (err) {
-                console.error("Error fetching program for user", doc.id, err);
-                programName = "Unknown Program";
-              }
-            }
-            
-            // users.currentProgram is a programs reference (an id string on old docs)
-            const currentProgramId: string | null =
-              data.currentProgram?.path && typeof data.currentProgram.id === "string"
-                ? data.currentProgram.id
-                : typeof data.currentProgram === "string"
-                  ? data.currentProgram
-                  : null;
-            const activity = summarizeClientActivity(
-              logsByClient.get(doc.id) ?? [],
-              currentProgramId,
-              currentProgramId ? workoutsInProgram.get(`${doc.id}:${currentProgramId}`) ?? 0 : 0
-            );
-
-            const firestorePhoto = profilePhotoUrl(data.profilePhoto);
-            const cachedPhoto = getClientProfilePhotoUrl(doc.id) ?? "";
-            const photo = firestorePhoto || cachedPhoto;
-            
-            // Transform Firebase user to ClientData format
-            return {
-              id: doc.id,
-              name: data.displayName || data.username || "Unknown User",
-              photo,
-              avatarGradient: gradients[gradientIndex],
-              currentProgram: programName,
-              activity,
-              weight: weight,
-              weightUnit: weightUnit,
-              weightChange: weightChange,
-              goals: data.goals || "",
-            };
-          })
-        );
-
-        for (const c of fetchedUsers) {
-          if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
-        }
-        setClients(fetchedUsers);
-      } catch (err) {
-        console.error("Error fetching users:", err);
-        setClients([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  // Loads this coach's clients (all for an admin). `loading` only gates the first-load placeholder; a reload keeps the cards visible.
   useEffect(() => {
-    fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the signed-in coach changes
-  }, [uid, role]);
+    let cancelled = false;
+    const fetchUsers = async () => {
+        try {
+          // Only this coach's clients (all clients for an admin), and only their userPrograms
+          const clientDocs = await fetchScopedClients({ uid, role });
+          const clientIds = clientDocs.map((d) => d.id);
+          // Real activity comes from the clients' workoutLogs (in chunks of 30 ids, scoped to this coach's clients).
+          const [userProgramDocs, workoutLogDocs] = await Promise.all([
+            fetchUserProgramsForClients(clientIds),
+            getDocsWhereIn("workoutLogs", "userId", clientIds),
+          ]);
+
+          // `${userId}:${programId}` -> workout days in that program, from the client's userPrograms doc
+          const workoutsInProgram = new Map<string, number>();
+          for (const upDoc of userProgramDocs) {
+            const upData = upDoc.data();
+            if (typeof upData.userId === "string" && typeof upData.programId === "string") {
+              workoutsInProgram.set(`${upData.userId}:${upData.programId}`, Number(upData.totalWorkoutsInProgram) || 0);
+            }
+          }
+
+          const logsByClient = new Map<string, DocumentData[]>();
+          for (const logDoc of workoutLogDocs) {
+            const log = logDoc.data();
+            if (typeof log.userId !== "string") continue;
+            const list = logsByClient.get(log.userId) ?? [];
+            list.push(log);
+            logsByClient.set(log.userId, list);
+          }
+        
+          const fetchedUsers: ClientData[] = await Promise.all(
+            clientDocs.map(async (doc) => {
+              const data = doc.data();
+            
+              let weight: number | null = null;
+              let weightChange: number | null = null;
+              let weightUnit = "kg";
+              try {
+                const bw = await fetchLatestBodyweight(doc.id);
+                weight = bw.weight;
+                weightUnit = bw.weightUnit;
+                weightChange = bw.weightChange;
+              } catch (err) {
+                console.error("Error fetching weight logs for user", doc.id, err);
+              }
+
+              // Generate avatar gradient based on user ID
+              const gradients = [
+                "bg-gradient-to-br from-blue-500 to-indigo-600",
+                "bg-gradient-to-br from-rose-400 to-pink-600",
+                "bg-gradient-to-br from-amber-400 to-orange-600",
+                "bg-gradient-to-br from-emerald-400 to-teal-600",
+                "bg-gradient-to-br from-violet-400 to-purple-600",
+                "bg-gradient-to-br from-slate-400 to-slate-600",
+              ];
+              const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
+            
+              // Fetch program name if currentProgram is a reference
+              let programName = "No Program";
+              if (data.currentProgram) {
+                try {
+                  // Check if it's a DocumentReference
+                  if (data.currentProgram.path) {
+                    // It's a reference, fetch the document
+                    const programDoc = await getDoc(data.currentProgram);
+                    if (programDoc.exists()) {
+                      const programData = programDoc.data() as ProgramDoc;
+                      programName = programData.name || programData.programName || "Unknown Program";
+                    }
+                  } else if (typeof data.currentProgram === 'string') {
+                    // It's already a string
+                    programName = data.currentProgram;
+                  }
+                } catch (err) {
+                  console.error("Error fetching program for user", doc.id, err);
+                  programName = "Unknown Program";
+                }
+              }
+            
+              // users.currentProgram is a programs reference (an id string on old docs)
+              const currentProgramId: string | null =
+                data.currentProgram?.path && typeof data.currentProgram.id === "string"
+                  ? data.currentProgram.id
+                  : typeof data.currentProgram === "string"
+                    ? data.currentProgram
+                    : null;
+              const activity = summarizeClientActivity(
+                logsByClient.get(doc.id) ?? [],
+                currentProgramId,
+                currentProgramId ? workoutsInProgram.get(`${doc.id}:${currentProgramId}`) ?? 0 : 0
+              );
+
+              const firestorePhoto = profilePhotoUrl(data.profilePhoto);
+              const cachedPhoto = getClientProfilePhotoUrl(doc.id) ?? "";
+              const photo = firestorePhoto || cachedPhoto;
+            
+              // Transform Firebase user to ClientData format
+              return {
+                id: doc.id,
+                name: data.displayName || data.username || "Unknown User",
+                photo,
+                avatarGradient: gradients[gradientIndex],
+                currentProgram: programName,
+                activity,
+                weight: weight,
+                weightUnit: weightUnit,
+                weightChange: weightChange,
+                goals: data.goals || "",
+              };
+            })
+          );
+
+          if (cancelled) return;
+          for (const c of fetchedUsers) {
+            if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
+          }
+          setClients(fetchedUsers);
+        } catch (err) {
+          console.error("Error fetching users:", err);
+          if (!cancelled) setClients([]);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      };
+    void fetchUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, role, reloadKey]);
 
   /** Only the first load shows a full grid skeleton; refetches keep existing cards (and browser-cached avatars) visible. */
   const showInitialLoadPlaceholder = loading && clients.length === 0;
@@ -317,7 +322,7 @@ export default function Home() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onClientAdded={() => {
-          fetchUsers(); // Refresh the client list
+          setReloadKey((k) => k + 1); // Refresh the client list
         }}
       />
 
@@ -325,7 +330,7 @@ export default function Home() {
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         onAssigned={() => {
-          fetchUsers(); // Refresh client program data after assignment
+          setReloadKey((k) => k + 1); // Refresh client program data after assignment
         }}
       />
     </div>

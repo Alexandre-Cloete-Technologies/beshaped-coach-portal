@@ -186,6 +186,9 @@ function buildSections(logs: NutritionLog[]): MealSection[] {
   return sections;
 }
 
+/** Stable empty list, so the memos below don't recompute on every render while loading. */
+const NO_LOGS: NutritionLog[] = [];
+
 export default function Nutrition({ clientId }: NutritionProps) {
   const today = useMemo(() => {
     const now = new Date();
@@ -205,7 +208,7 @@ export default function Nutrition({ clientId }: NutritionProps) {
   const isToday = dateKey === formatDateKey(today);
   const requestKey = `${clientId}|${dateKey}`;
   const loading = result?.key !== requestKey;
-  const logs = !loading && result ? result.logs : [];
+  const logs = !loading && result ? result.logs : NO_LOGS;
   const error = !loading && result ? result.error : null;
 
   useEffect(() => {

@@ -29,59 +29,6 @@ const STATUS_META: Record<ActivityStatus, { label: string; dot: string; text: st
   "no-program": { label: "No program", dot: "bg-gray-300 dark:bg-gray-600", text: "text-muted-foreground", hint: "No program assigned" },
 };
 
-// const statusColors = {
-//   high: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "High", labelColor: "text-emerald-600" },
-//   medium: { ring: "text-amber-500", dot: "bg-amber-500", label: "Medium", labelColor: "text-amber-600" },
-//   low: { ring: "text-red-400", dot: "bg-red-400", label: "Low", labelColor: "text-red-500" },
-//   critical: { ring: "text-red-500", dot: "bg-red-500", label: "Critical", labelColor: "text-red-600" },
-//   perfect: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "Perfect", labelColor: "text-emerald-600" },
-// };
-
-// interface CircularProgressProps {
-//   percentage: number;
-//   status: keyof typeof statusColors;
-// }
-
-// function CircularProgress({ percentage, status }: CircularProgressProps) {
-//   const radius = 36;
-//   const circumference = 2 * Math.PI * radius;
-//   const strokeDashoffset = circumference - (percentage / 100) * circumference;
-//   const colors = statusColors[status];
-
-//   return (
-//     <div className="relative w-20 h-20 flex-shrink-0">
-//       <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
-//         {/* Background circle */}
-//         <circle
-//           cx="40"
-//           cy="40"
-//           r={radius}
-//           fill="none"
-//           stroke="currentColor"
-//           strokeWidth="6"
-//           className="text-gray-200 dark:text-gray-700"
-//         />
-//         {/* Progress circle */}
-//         <circle
-//           cx="40"
-//           cy="40"
-//           r={radius}
-//           fill="none"
-//           stroke="currentColor"
-//           strokeWidth="6"
-//           strokeLinecap="round"
-//           strokeDasharray={circumference}
-//           strokeDashoffset={strokeDashoffset}
-//           className={colors.ring}
-//         />
-//       </svg>
-//       <div className="absolute inset-0 flex items-center justify-center">
-//         <span className="text-lg font-bold text-card-foreground">{percentage}%</span>
-//       </div>
-//     </div>
-//   );
-// }
-
 interface ProgressBarProps {
   current: number;
   total: number;
@@ -112,16 +59,8 @@ export default function ClientCard({ client }: { client: ClientData }) {
   const photoUrl = client.photo?.trim() ?? "";
   const showProfileImage = photoUrl.length > 0 && failedPhotoUrl !== photoUrl;
 
-  // const colors = statusColors[client.status];
   const { activity } = client;
   const statusMeta = STATUS_META[activity.status];
-  // const programProgress = Math.round((client.week / client.totalWeeks) * 100);
-
-  // const formatLastWorkout = (lastWorkout: string) => {
-  //   if (lastWorkout === "Today") return <span className="flex items-center gap-1">Today <Check className="w-3 h-3 text-emerald-500" /></span>;
-  //   if (lastWorkout === "Yesterday") return "Yesterday";
-  //   return <span className="text-red-500">{lastWorkout}</span>;
-  // };
 
   // Program name, and where the client is in it (from their next open workout day)
   const formatProgramInfo = () => {
@@ -181,9 +120,8 @@ export default function ClientCard({ client }: { client: ClientData }) {
         </span>
       </div>
 
-      {/* Main Content: Circular Progress + Stats */}
+      {/* Main Content: Program progress + Stats */}
       <div className="flex gap-4">
-        {/* <CircularProgress percentage={client.compliance} status={client.status} /> */}
         
         <div className="flex-1 space-y-2">
           {/* Program Progress */}
@@ -227,50 +165,6 @@ export default function ClientCard({ client }: { client: ClientData }) {
                   : "—"}
               </span>
             </div>
-            <div className="flex justify-between items-center gap-2">
-              {/* <span className="text-muted-foreground">Since last log</span>
-              <span
-                className={`font-medium tabular-nums inline-flex items-center gap-0.5 ${
-                  client.weightChange === null
-                    ? "text-muted-foreground"
-                    : client.weightChange < 0
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : client.weightChange > 0
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-card-foreground"
-                }`}
-              >
-                {client.weight === null || client.weightChange === null ? (
-                  "—"
-                ) : client.weightChange === 0 ? (
-                  <>
-                    <Minus className="w-3 h-3 opacity-70" />
-                    0 {client.weightUnit || "kg"}
-                  </>
-                ) : client.weightChange < 0 ? (
-                  <>
-                    <TrendingDown className="w-3 h-3" />
-                    {client.weightChange} {client.weightUnit || "kg"}
-                  </>
-                ) : (
-                  <>
-                    <TrendingUp className="w-3 h-3" />
-                    +{client.weightChange} {client.weightUnit || "kg"}
-                  </>
-                )}
-              </span> */}
-            </div>
-            {/* <div className="flex justify-between">
-              <span className="text-muted-foreground">Last Workout</span>
-              <span className="font-medium text-card-foreground">{formatLastWorkout(client.lastWorkout)}</span>
-            </div> */}
-            {/* Compliance */}
-            {/* <div className="flex justify-between">
-              <span className="text-muted-foreground">Compliance</span>
-              <span className={`font-medium ${colors.labelColor}`}>
-                {client.completedWorkouts}/{client.totalWorkouts} ({client.compliance}%)
-              </span>
-            </div> */}
             {client.goals && (
               <div className="flex items-start">
                 <div className="flex-1">
@@ -307,22 +201,6 @@ export default function ClientCard({ client }: { client: ClientData }) {
         </Link>
       </div>
 
-      {/* Footer: Next Workout or Alert */}
-      {/* <div className="flex items-center justify-between pt-1 border-t border-border">
-        {isAlert ? (
-          <button className="flex items-center gap-2 text-red-500 text-sm font-medium hover:text-red-600 transition-colors">
-            <AlertTriangle className="w-4 h-4" />
-            NUDGE CLIENT
-          </button>
-        ) : (
-          <span className="text-xs text-muted-foreground uppercase tracking-wide">
-            NEXT: {client.nextWorkout}
-          </span>
-        )}
-        <button className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div> */}
     </div>
   );
 }
