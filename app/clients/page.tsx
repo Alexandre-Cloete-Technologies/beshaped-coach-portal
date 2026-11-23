@@ -2,7 +2,6 @@
 
 import { Search, UserPlus, Edit, Trash2, AlertTriangle, Archive, ArchiveRestore } from "lucide-react";
 import Sidebar from "../components/Sidebar";
-import Pagination from "../components/Pagination";
 import AddClientModal from "../components/AddClientModal";
 import AssignProgramModal from "../components/AssignProgramModal";
 import Link from "next/link";
@@ -42,9 +41,6 @@ type ClientListItem = {
   avatarGradient: string;
   status: keyof typeof statusColors;
   currentProgram: string;
-  programProgress: number;
-  lastActive: string;
-  engagement: string;
   avatarInitials?: string;
 };
 
@@ -97,13 +93,6 @@ function ClientsTableRowAvatar({
   );
 }
 
-// const engagementConfig = {
-//   "Very High": { dots: 3, color: "bg-emerald-500" },
-//   High: { dots: 3, color: "bg-emerald-500" },
-//   Medium: { dots: 2, color: "bg-amber-500" },
-//   Low: { dots: 1, color: "bg-red-500" },
-// };
-
 export default function ClientsPage() {
   const { uid, role } = useSignedInCoach();
   const [clients, setClients] = useState<ClientListItem[]>([]);
@@ -112,6 +101,8 @@ export default function ClientsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Bumped to load again (after an add, save or delete); the load lives in the effect below.
+  const [reloadKey, setReloadKey] = useState(0);
   const [showArchived, setShowArchived] = useState(false);
   const [pending, setPending] = useState<{ action: RemovalAction; id: string; name: string } | null>(null);
   const [working, setWorking] = useState(false);
@@ -119,75 +110,76 @@ export default function ClientsPage() {
   // Permanent delete asks for the client's name to be typed, so a mis-click can't erase anyone.
   const [confirmText, setConfirmText] = useState("");
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      // Only this coach's clients (all clients for an admin)
-      const clientDocs = await fetchScopedClients({ uid, role }, { includeArchived: true });
+  // Loads this coach's clients (all for an admin), archived ones included for "Show archived".
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        // Only this coach's clients (all clients for an admin)
+        const clientDocs = await fetchScopedClients({ uid, role }, { includeArchived: true });
       
-      const fetchedUsers = await Promise.all(clientDocs.map(async (doc) => {
-        const data = doc.data();
+        const fetchedUsers = await Promise.all(clientDocs.map(async (doc) => {
+          const data = doc.data();
         
-        // Generate avatar gradient based on user ID
-        const gradients = [
-          "bg-gradient-to-br from-rose-400 to-pink-600",
-          "bg-gradient-to-br from-purple-400 to-purple-600",
-          "bg-gradient-to-br from-emerald-400 to-teal-600",
-          "bg-gradient-to-br from-amber-400 to-orange-600",
-          "bg-gradient-to-br from-blue-400 to-indigo-600",
-        ];
-        const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
+          // Generate avatar gradient based on user ID
+          const gradients = [
+            "bg-gradient-to-br from-rose-400 to-pink-600",
+            "bg-gradient-to-br from-purple-400 to-purple-600",
+            "bg-gradient-to-br from-emerald-400 to-teal-600",
+            "bg-gradient-to-br from-amber-400 to-orange-600",
+            "bg-gradient-to-br from-blue-400 to-indigo-600",
+          ];
+          const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
         
-        // Resolve current program name if it's a reference
-        let programName = "No Program";
-        if (data.currentProgram) {
-          if (typeof data.currentProgram === 'string') {
-            programName = data.currentProgram;
-          } else if (typeof data.currentProgram === 'object' && data.currentProgram.path) {
-            // It's a reference
-            try {
-              const programDoc = await getDoc(data.currentProgram);
-              if (programDoc.exists()) {
-                const programData = programDoc.data() as ProgramDoc;
-                programName = programData.name || programData.programName || "Unknown Program";
+          // Resolve current program name if it's a reference
+          let programName = "No Program";
+          if (data.currentProgram) {
+            if (typeof data.currentProgram === 'string') {
+              programName = data.currentProgram;
+            } else if (typeof data.currentProgram === 'object' && data.currentProgram.path) {
+              // It's a reference
+              try {
+                const programDoc = await getDoc(data.currentProgram);
+                if (programDoc.exists()) {
+                  const programData = programDoc.data() as ProgramDoc;
+                  programName = programData.name || programData.programName || "Unknown Program";
+                }
+              } catch (err) {
+                console.error("Error fetching program name:", err);
               }
-            } catch (err) {
-              console.error("Error fetching program name:", err);
             }
           }
+
+          return {
+            id: doc.id,
+            name: data.displayName || data.username || "Unknown User",
+            email: data.email || "No email",
+            photo: profilePhotoUrl(data.profilePhoto),
+            avatarGradient: gradients[gradientIndex],
+            status: isArchivedClient(data) ? ("Archived" as const) : ("Active" as const),
+            currentProgram: programName,
+          } satisfies ClientListItem;
+        }));
+
+        if (cancelled) return;
+        for (const c of fetchedUsers) {
+          if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
         }
-
-        return {
-          id: doc.id,
-          name: data.displayName || data.username || "Unknown User",
-          email: data.email || "No email",
-          photo: profilePhotoUrl(data.profilePhoto),
-          avatarGradient: gradients[gradientIndex],
-          status: isArchivedClient(data) ? ("Archived" as const) : ("Active" as const),
-          currentProgram: programName,
-          programProgress: 0,
-          lastActive: "Recently",
-          engagement: "Medium",
-        } satisfies ClientListItem;
-      }));
-
-      for (const c of fetchedUsers) {
-        if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
+        setClients(fetchedUsers);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        if (!cancelled) setError("Failed to load users from database");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setClients(fetchedUsers);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setError("Failed to load users from database");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the signed-in coach changes
-  }, [uid, role]);
+    };
+    void fetchUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, role, reloadKey]);
 
   const archivedCount = clients.filter((c) => c.status === "Archived").length;
 
@@ -399,26 +391,9 @@ export default function ClientsPage() {
                             <p className="text-xs font-medium text-card-foreground mb-1">
                               {client.currentProgram}
                             </p>
-                            <div className="flex items-center gap-2">
-                              {/* <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-blue-500 rounded-full transition-all"
-                                  style={{ width: `${client.programProgress}%` }}
-                                />
-                              </div> */}
-                            </div>
                           </div>
                         </Link>
                       </td>
-
-                      {/* Last Active */}
-                      {/* <td className="py-3 px-4">
-                        <Link href={`/clients/${client.id}`} className="block">
-                          <span className="text-xs text-muted-foreground">
-                            {client.lastActive}
-                          </span>
-                        </Link>
-                      </td> */}
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
@@ -472,15 +447,6 @@ export default function ClientsPage() {
             </table>
           </div>
 
-          {/* Pagination */}
-          <div className="mt-4">
-            <Pagination
-              currentPage={1}
-              totalPages={5}
-              totalItems={24}
-              itemsPerPage={5}
-            />
-          </div>
         </div>
       </main>
 
@@ -489,7 +455,7 @@ export default function ClientsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onClientAdded={() => {
-          fetchUsers(); // Refresh the client list
+          setReloadKey((k) => k + 1); // Refresh the client list
         }}
       />
 
@@ -497,7 +463,7 @@ export default function ClientsPage() {
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         onAssigned={() => {
-          fetchUsers(); // Refresh client program data after assignment
+          setReloadKey((k) => k + 1); // Refresh client program data after assignment
         }}
       />
 

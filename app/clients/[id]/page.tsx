@@ -41,7 +41,6 @@ const tabs = [
 ] as const;
 
 const TAB_IDS = new Set<string>(tabs.map((t) => t.id));
-type TabId = (typeof tabs)[number]["id"];
 
 /** Fields read from a `programs` document when resolving `currentProgram` */
 type ProgramDoc = {
@@ -132,8 +131,22 @@ export default function ClientDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const clientId = params?.id as string;
-  const [activeTab, setActiveTab] = useState("overview");
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["overview"]));
+  // A valid ?tab= opens that tab (e.g. the dashboard card's Workout History / Progress / Programs links).
+  const urlTabParam = searchParams.get("tab");
+  const urlTab = urlTabParam && TAB_IDS.has(urlTabParam) ? urlTabParam : null;
+  const [activeTab, setActiveTab] = useState(urlTab ?? "overview");
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
+    () => new Set(urlTab ? ["overview", urlTab] : ["overview"])
+  );
+  // Follow a later ?tab= change during render (React's pattern for adjusting state when inputs change).
+  const [syncedUrlTab, setSyncedUrlTab] = useState(urlTab);
+  if (urlTab !== syncedUrlTab) {
+    setSyncedUrlTab(urlTab);
+    if (urlTab) {
+      setActiveTab(urlTab);
+      setVisitedTabs((prev) => new Set(prev).add(urlTab));
+    }
+  }
 
   const [client, setClient] = useState<ClientView | null>(null);
 
@@ -145,13 +158,6 @@ export default function ClientDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const cachedHeaderPhoto = clientId ? getClientProfilePhotoUrl(clientId) : null;
-
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (!tab || !TAB_IDS.has(tab)) return;
-    setActiveTab(tab as TabId);
-    setVisitedTabs((prev) => new Set(prev).add(tab));
-  }, [searchParams]);
 
   useEffect(() => {
     const fetchClient = async () => {
