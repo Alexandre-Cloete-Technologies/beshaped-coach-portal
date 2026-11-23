@@ -25,7 +25,7 @@ interface WorkoutLog {
   id: string;
   startedAt: Date | null;
   completedAt: Date | null;
-  /** Calendar date of the session from dateCompleted, else timeCompletedAt. */
+  /** Local calendar day of the session: dateCompleted, else timeCompletedAt, else timeStartedAt. */
   logDate: Date;
   userId: string;
   programName: string;
@@ -152,11 +152,16 @@ function formatWorkoutDuration(
   return "--";
 }
 
-/** Build a local calendar Date from a date-only Firestore value (midnight UTC stays on that day). */
+/**
+ * The local calendar day of a stored moment (#50). The app saves `dateCompleted` as the moment the workout was
+ * finished (or the day the client picked), so its UTC date is the previous day for anything finished before 02:00
+ * in Namibia / South Africa. Local date parts give the day the client trained; an old midnight-UTC value is 02:00
+ * local, so it stays on the same day too.
+ */
 function calendarDateFromValue(val: unknown): Date | null {
   const d = toDateValue(val);
   if (!d || !isValidDate(d)) return null;
-  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 type CalendarDayCell = {
