@@ -1,17 +1,16 @@
 "use client";
 
-import {  Search, UserPlus, Edit, Trash2, AlertTriangle } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, AlertTriangle, Archive, ArchiveRestore } from "lucide-react";
 import Sidebar from "../components/Sidebar";
-import Pagination from "../components/Pagination";
 import AddClientModal from "../components/AddClientModal";
 import AssignProgramModal from "../components/AssignProgramModal";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { collection, getDocs, getDoc, doc, deleteDoc, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDoc } from "firebase/firestore";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
-import { fetchScopedClients } from "@/lib/coachScope";
+import { fetchScopedClients, isArchivedClient } from "@/lib/coachScope";
+import { clientRemovalErrorMessage, deleteClientPermanently, setClientArchived } from "@/lib/clientRemoval";
 import { profilePhotoUrl } from "@/lib/profilePhoto";
 import { setClientProfilePhotoUrl } from "@/lib/clientProfilePhotoCache";
 
@@ -21,7 +20,11 @@ const statusColors = {
   Active: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
   Onboarding: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400",
   Inactive: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  Archived: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
+
+/** What the confirm dialog is about to do to a client. */
+type RemovalAction = "archive" | "restore" | "delete";
 
 /** Fields read from a `programs` document when resolving `currentProgram` */
 type ProgramDoc = {
@@ -38,9 +41,6 @@ type ClientListItem = {
   avatarGradient: string;
   status: keyof typeof statusColors;
   currentProgram: string;
-  programProgress: number;
-  lastActive: string;
-  engagement: string;
   avatarInitials?: string;
 };
 
@@ -93,13 +93,6 @@ function ClientsTableRowAvatar({
   );
 }
 
-// const engagementConfig = {
-//   "Very High": { dots: 3, color: "bg-emerald-500" },
-//   High: { dots: 3, color: "bg-emerald-500" },
-//   Medium: { dots: 2, color: "bg-amber-500" },
-//   Low: { dots: 1, color: "bg-red-500" },
-// };
-
 export default function ClientsPage() {
   const { uid, role } = useSignedInCoach();
   const [clients, setClients] = useState<ClientListItem[]>([]);
@@ -108,81 +101,90 @@ export default function ClientsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [clientToDelete, setClientToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  // Bumped to load again (after an add, save or delete); the load lives in the effect below.
+  const [reloadKey, setReloadKey] = useState(0);
+  const [showArchived, setShowArchived] = useState(false);
+  const [pending, setPending] = useState<{ action: RemovalAction; id: string; name: string } | null>(null);
+  const [working, setWorking] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  // Permanent delete asks for the client's name to be typed, so a mis-click can't erase anyone.
+  const [confirmText, setConfirmText] = useState("");
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      // Only this coach's clients (all clients for an admin)
-      const clientDocs = await fetchScopedClients({ uid, role });
+  // Loads this coach's clients (all for an admin), archived ones included for "Show archived".
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        // Only this coach's clients (all clients for an admin)
+        const clientDocs = await fetchScopedClients({ uid, role }, { includeArchived: true });
       
-      const fetchedUsers = await Promise.all(clientDocs.map(async (doc) => {
-        const data = doc.data();
+        const fetchedUsers = await Promise.all(clientDocs.map(async (doc) => {
+          const data = doc.data();
         
-        // Generate avatar gradient based on user ID
-        const gradients = [
-          "bg-gradient-to-br from-rose-400 to-pink-600",
-          "bg-gradient-to-br from-purple-400 to-purple-600",
-          "bg-gradient-to-br from-emerald-400 to-teal-600",
-          "bg-gradient-to-br from-amber-400 to-orange-600",
-          "bg-gradient-to-br from-blue-400 to-indigo-600",
-        ];
-        const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
+          // Generate avatar gradient based on user ID
+          const gradients = [
+            "bg-gradient-to-br from-rose-400 to-pink-600",
+            "bg-gradient-to-br from-purple-400 to-purple-600",
+            "bg-gradient-to-br from-emerald-400 to-teal-600",
+            "bg-gradient-to-br from-amber-400 to-orange-600",
+            "bg-gradient-to-br from-blue-400 to-indigo-600",
+          ];
+          const gradientIndex = doc.id.charCodeAt(0) % gradients.length;
         
-        // Resolve current program name if it's a reference
-        let programName = "No Program";
-        if (data.currentProgram) {
-          if (typeof data.currentProgram === 'string') {
-            programName = data.currentProgram;
-          } else if (typeof data.currentProgram === 'object' && data.currentProgram.path) {
-            // It's a reference
-            try {
-              const programDoc = await getDoc(data.currentProgram);
-              if (programDoc.exists()) {
-                const programData = programDoc.data() as ProgramDoc;
-                programName = programData.name || programData.programName || "Unknown Program";
+          // Resolve current program name if it's a reference
+          let programName = "No Program";
+          if (data.currentProgram) {
+            if (typeof data.currentProgram === 'string') {
+              programName = data.currentProgram;
+            } else if (typeof data.currentProgram === 'object' && data.currentProgram.path) {
+              // It's a reference
+              try {
+                const programDoc = await getDoc(data.currentProgram);
+                if (programDoc.exists()) {
+                  const programData = programDoc.data() as ProgramDoc;
+                  programName = programData.name || programData.programName || "Unknown Program";
+                }
+              } catch (err) {
+                console.error("Error fetching program name:", err);
               }
-            } catch (err) {
-              console.error("Error fetching program name:", err);
             }
           }
+
+          return {
+            id: doc.id,
+            name: data.displayName || data.username || "Unknown User",
+            email: data.email || "No email",
+            photo: profilePhotoUrl(data.profilePhoto),
+            avatarGradient: gradients[gradientIndex],
+            status: isArchivedClient(data) ? ("Archived" as const) : ("Active" as const),
+            currentProgram: programName,
+          } satisfies ClientListItem;
+        }));
+
+        if (cancelled) return;
+        for (const c of fetchedUsers) {
+          if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
         }
-
-        return {
-          id: doc.id,
-          name: data.displayName || data.username || "Unknown User",
-          email: data.email || "No email",
-          photo: profilePhotoUrl(data.profilePhoto),
-          avatarGradient: gradients[gradientIndex],
-          status: "Active" as const, // Default for now
-          currentProgram: programName,
-          programProgress: 0,
-          lastActive: "Recently",
-          engagement: "Medium",
-        } satisfies ClientListItem;
-      }));
-
-      for (const c of fetchedUsers) {
-        if (c.photo) setClientProfilePhotoUrl(c.id, c.photo);
+        setClients(fetchedUsers);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        if (!cancelled) setError("Failed to load users from database");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setClients(fetchedUsers);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setError("Failed to load users from database");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    void fetchUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, role, reloadKey]);
 
-  useEffect(() => {
-    fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the signed-in coach changes
-  }, [uid, role]);
+  const archivedCount = clients.filter((c) => c.status === "Archived").length;
 
   const filteredClients = clients.filter(client => {
+    if (!showArchived && client.status === "Archived") return false;
     const query = searchQuery.toLowerCase();
     const name = client.name ? client.name.toString().toLowerCase() : "";
     const program = client.currentProgram ? client.currentProgram.toString().toLowerCase() : "";
@@ -190,38 +192,45 @@ export default function ClientsPage() {
     return name.includes(query) || program.includes(query);
   });
 
-  const handleDeleteClick = (e: React.MouseEvent, client: { id: string; name: string }) => {
+  const openAction = (e: React.MouseEvent, action: RemovalAction, client: { id: string; name: string }) => {
     e.preventDefault();
     e.stopPropagation();
-    setClientToDelete(client);
-    setDeleteModalOpen(true);
+    setPending({ action, id: client.id, name: client.name });
+    setActionError(null);
+    setConfirmText("");
   };
 
-  const confirmDelete = async () => {
-    if (!clientToDelete) return;
+  const closeAction = () => {
+    if (working) return;
+    setPending(null);
+    setActionError(null);
+  };
+
+  const confirmAction = async () => {
+    if (!pending) return;
     try {
-      setDeleting(true);
-      const userRef = doc(db, "users", clientToDelete.id);
-
-      // Delete userPrograms entries for this user
-      const userProgramsQuery = query(
-        collection(db, "userPrograms"),
-        where("userId", "==", clientToDelete.id)
-      );
-      const userProgramsSnapshot = await getDocs(userProgramsQuery);
-      await Promise.all(userProgramsSnapshot.docs.map((d) => deleteDoc(d.ref)));
-
-      // Delete the user document
-      await deleteDoc(userRef);
-      setClients((prev) => prev.filter((c) => c.id !== clientToDelete.id));
-      setDeleteModalOpen(false);
-      setClientToDelete(null);
+      setWorking(true);
+      setActionError(null);
+      if (pending.action === "delete") {
+        await deleteClientPermanently(pending.id);
+        setClients((prev) => prev.filter((c) => c.id !== pending.id));
+      } else {
+        const archived = pending.action === "archive";
+        await setClientArchived(pending.id, archived);
+        setClients((prev) =>
+          prev.map((c) => (c.id === pending.id ? { ...c, status: archived ? "Archived" : "Active" } : c))
+        );
+      }
+      setPending(null);
     } catch (err) {
-      console.error("Error deleting client:", err);
+      console.error(`Client ${pending.action} failed for ${pending.id}:`, err);
+      setActionError(clientRemovalErrorMessage(err));
     } finally {
-      setDeleting(false);
+      setWorking(false);
     }
   };
+
+  const nameConfirmed = pending != null && confirmText.trim() === pending.name.trim();
 
   return (
     <div className="min-h-screen bg-background">
@@ -255,6 +264,16 @@ export default function ClientsPage() {
                   className="w-full h-10 pl-10 pr-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                 />
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-muted-foreground whitespace-nowrap cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="h-4 w-4 rounded border-border accent-beshaped-dark-green"
+                />
+                Show archived{archivedCount > 0 ? ` (${archivedCount})` : ""}
+              </label>
 
               {/* Filter Button */}
               {/* <button className="h-10 px-4 rounded-lg border border-border bg-card flex items-center gap-2 text-sm font-medium text-card-foreground hover:bg-accent transition-colors">
@@ -371,26 +390,9 @@ export default function ClientsPage() {
                             <p className="text-xs font-medium text-card-foreground mb-1">
                               {client.currentProgram}
                             </p>
-                            <div className="flex items-center gap-2">
-                              {/* <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-blue-500 rounded-full transition-all"
-                                  style={{ width: `${client.programProgress}%` }}
-                                />
-                              </div> */}
-                            </div>
                           </div>
                         </Link>
                       </td>
-
-                      {/* Last Active */}
-                      {/* <td className="py-3 px-4">
-                        <Link href={`/clients/${client.id}`} className="block">
-                          <span className="text-xs text-muted-foreground">
-                            {client.lastActive}
-                          </span>
-                        </Link>
-                      </td> */}
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
@@ -405,13 +407,35 @@ export default function ClientsPage() {
                           >
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={(e) => handleDeleteClick(e, { id: client.id, name: client.name })}
-                            className="p-2 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {client.status === "Archived" ? (
+                            <button
+                              onClick={(e) => openAction(e, "restore", client)}
+                              className="p-2 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                              title="Restore client"
+                              aria-label={`Restore ${client.name}`}
+                            >
+                              <ArchiveRestore className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => openAction(e, "archive", client)}
+                              className="p-2 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                              title="Archive client"
+                              aria-label={`Archive ${client.name}`}
+                            >
+                              <Archive className="w-4 h-4" />
+                            </button>
+                          )}
+                          {role === "admin" && (
+                            <button
+                              onClick={(e) => openAction(e, "delete", client)}
+                              className="p-2 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
+                              title="Delete permanently"
+                              aria-label={`Delete ${client.name} permanently`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -422,15 +446,6 @@ export default function ClientsPage() {
             </table>
           </div>
 
-          {/* Pagination */}
-          <div className="mt-4">
-            <Pagination
-              currentPage={1}
-              totalPages={5}
-              totalItems={24}
-              itemsPerPage={5}
-            />
-          </div>
         </div>
       </main>
 
@@ -439,7 +454,7 @@ export default function ClientsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onClientAdded={() => {
-          fetchUsers(); // Refresh the client list
+          setReloadKey((k) => k + 1); // Refresh the client list
         }}
       />
 
@@ -447,44 +462,109 @@ export default function ClientsPage() {
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         onAssigned={() => {
-          fetchUsers(); // Refresh client program data after assignment
+          setReloadKey((k) => k + 1); // Refresh client program data after assignment
         }}
       />
 
-      {/* Delete Confirmation Modal */}
-      {deleteModalOpen && (
+      {/* Archive / restore / delete confirmation */}
+      {pending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeAction} />
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => { if (!deleting) { setDeleteModalOpen(false); setClientToDelete(null); } }}
-          />
-          <div className="relative bg-card rounded-2xl shadow-2xl border border-border p-6 w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-action-title"
+            className="relative bg-card rounded-2xl shadow-2xl border border-border p-6 w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200"
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30">
-                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <div
+                className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                  pending.action === "delete" ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"
+                }`}
+              >
+                {pending.action === "delete" ? (
+                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                ) : pending.action === "archive" ? (
+                  <Archive className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ArchiveRestore className="w-5 h-5 text-muted-foreground" />
+                )}
               </div>
-              <h2 className="text-lg font-bold text-card-foreground">Delete Client</h2>
+              <h2 id="client-action-title" className="text-lg font-bold text-card-foreground">
+                {pending.action === "delete"
+                  ? "Delete client permanently"
+                  : pending.action === "archive"
+                    ? "Archive client"
+                    : "Restore client"}
+              </h2>
             </div>
-            <p className="text-sm text-muted-foreground mb-1">
-              Are you sure you want to delete <span className="font-semibold text-card-foreground">{clientToDelete?.name}</span>?
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              This action cannot be undone.
-            </p>
+
+            {pending.action === "archive" && (
+              <div className="text-sm text-muted-foreground space-y-2 mb-6">
+                <p>
+                  <span className="font-semibold text-card-foreground">{pending.name}</span> won&apos;t be able to
+                  sign in to the app, and will be hidden from your client lists.
+                </p>
+                <p>Their workouts, logs and photos are kept. You can restore them at any time.</p>
+              </div>
+            )}
+            {pending.action === "restore" && (
+              <p className="text-sm text-muted-foreground mb-6">
+                <span className="font-semibold text-card-foreground">{pending.name}</span> will be able to sign in
+                again, and will show in your client lists.
+              </p>
+            )}
+            {pending.action === "delete" && (
+              <div className="text-sm text-muted-foreground space-y-3 mb-6">
+                <p>
+                  This erases <span className="font-semibold text-card-foreground">{pending.name}</span>&apos;s
+                  account and everything they have logged: workouts, nutrition, body weight, progress photos and
+                  programs. <span className="font-semibold text-card-foreground">It can&apos;t be undone.</span>
+                </p>
+                <p>To stop working with a client but keep their history, archive them instead.</p>
+                <label className="block">
+                  <span className="block mb-1">Type their name to confirm:</span>
+                  <input
+                    type="text"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder={pending.name}
+                    disabled={working}
+                    autoFocus
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+              </div>
+            )}
+
+            {actionError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400 mb-4">
+                {actionError}
+              </p>
+            )}
+
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => { setDeleteModalOpen(false); setClientToDelete(null); }}
-                disabled={deleting}
+                onClick={closeAction}
+                disabled={working}
                 className="px-4 py-2 rounded-lg text-sm font-semibold bg-muted text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={confirmDelete}
-                disabled={deleting}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                onClick={confirmAction}
+                disabled={working || (pending.action === "delete" && !nameConfirmed)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
+                  pending.action === "delete"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-beshaped-dark-green hover:bg-beshaped-green"
+                }`}
               >
-                {deleting ? "Deleting..." : "Delete"}
+                {pending.action === "delete"
+                  ? working ? "Deleting…" : "Delete permanently"
+                  : pending.action === "archive"
+                    ? working ? "Archiving…" : "Archive"
+                    : working ? "Restoring…" : "Restore"}
               </button>
             </div>
           </div>
