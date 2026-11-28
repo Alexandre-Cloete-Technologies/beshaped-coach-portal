@@ -32,10 +32,10 @@ export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="flex h-14 min-h-14 items-center justify-between gap-4 px-4 md:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-900">
             <Image
               src="/logotwo.png"
               alt="Company logo"
@@ -63,7 +63,7 @@ export default function Navbar() {
                     href={item.href}
                     className={`flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-3 sm:text-sm ${
                       isActive
-                        ? "bg-blue-50 text-beshaped-dark-green dark:bg-blue-950/50 dark:text-blue-400"
+                        ? "bg-beshaped-green/10 text-beshaped-dark-green dark:bg-beshaped-green/15 dark:text-beshaped-green"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     }`}
                   >

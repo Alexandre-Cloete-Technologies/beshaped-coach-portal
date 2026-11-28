@@ -58,7 +58,7 @@ export default function ConfirmModal({
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30">
             <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
           </div>
-          <h2 className="text-lg font-bold text-card-foreground">{title}</h2>
+          <h2 className="text-lg font-semibold text-card-foreground">{title}</h2>
         </div>
         <div className="text-sm text-muted-foreground mb-6">{message}</div>
         <div className="flex gap-3 justify-end">

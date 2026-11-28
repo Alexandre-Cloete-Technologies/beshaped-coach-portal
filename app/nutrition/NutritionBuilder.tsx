@@ -167,7 +167,7 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
           <p className="mt-1 text-sm text-muted-foreground">{copy.missingHint}</p>
           <Link
             href="/nutrition"
-            className="mt-6 inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="mt-6 inline-flex items-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             {copy.backToPlans}
           </Link>
@@ -234,7 +234,7 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
               onClick={save}
               disabled={!isDirty || saving}
               title={copy.saveShortcut}
-              className="inline-flex items-center gap-2 rounded-lg bg-beshaped-dark-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-beshaped-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-beshaped-dark-green"
+              className="inline-flex items-center gap-2 rounded-lg bg-action px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-action-hover"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isNew ? copy.createPlan : copy.saveChanges}
@@ -295,7 +295,7 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
                   key={name}
                   type="button"
                   onClick={() => addMeal(name)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-beshaped-dark-green hover:text-beshaped-dark-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-beshaped-dark-green hover:text-beshaped-dark-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Plus className="h-4 w-4" />
                   {name}
@@ -340,20 +340,20 @@ export default function NutritionBuilder({ planId: initialPlanId }: { planId?: s
               value={notesDraft}
               onChange={(e) => setNotesDraft(e.target.value)}
               placeholder={copy.notesPlaceholder}
-              className="mt-4 h-[min(28rem,60vh)] w-full resize-none overflow-y-auto rounded-md border border-border bg-background px-4 py-3 text-base leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="mt-4 h-[min(28rem,60vh)] w-full resize-none overflow-y-auto rounded-md border border-border bg-card px-4 py-3 text-base leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={closeNotes}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {copy.notesCancel}
               </button>
               <button
                 type="button"
                 onClick={saveNotes}
-                className="rounded-lg bg-beshaped-dark-green px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-beshaped-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-lg bg-action px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {copy.notesDone}
               </button>
@@ -437,7 +437,7 @@ function GoalFields({
                     onChange(field.key, raw.trim() === "" || !Number.isFinite(n) || n < 0 ? undefined : n);
                   }}
                   aria-label={field.label}
-                  className="h-9 w-full rounded-md border border-border bg-background pl-2 pr-8 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-9 w-full rounded-md border border-border bg-card pl-2 pr-8 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                   {field.unit}

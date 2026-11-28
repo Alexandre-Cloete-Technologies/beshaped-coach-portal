@@ -235,8 +235,8 @@ export default function ClientsPage() {
           <div className="mb-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Clients</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground">Clients</h1>
+                <p className="mt-1.5 text-muted-foreground">
                   View your active clients.
                 </p>
               </div>
@@ -266,14 +266,13 @@ export default function ClientsPage() {
                 onClick={() => setAssignModalOpen(true)}
                 className="h-10 px-4 rounded-lg border border-border bg-card text-card-foreground text-sm font-medium flex items-center gap-2 hover:bg-accent transition-colors shadow-sm"
               >
-                <UserPlus className="w-4 h-4" />
                 Assign Program
               </button>
 
               {/* Add New Client Button */}
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="h-10 px-4 rounded-lg bg-beshaped-dark-green text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-beshaped-green transition-colors shadow-sm"
+                className="h-10 px-4 rounded-lg bg-action text-white text-sm font-medium flex items-center gap-2 hover:bg-action-hover transition-colors shadow-sm"
               >
                 Add New Client
               </button>
@@ -337,7 +336,7 @@ export default function ClientsPage() {
                             avatarInitials={client.avatarInitials}
                           />
                           <div>
-                            <p className="text-sm font-semibold text-card-foreground">
+                            <p className="text-sm font-medium text-card-foreground">
                               {client.name}
                             </p>
                             <p className="text-xs text-muted-foreground">

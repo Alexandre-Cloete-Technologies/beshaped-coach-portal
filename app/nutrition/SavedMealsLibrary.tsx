@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Copy, Pencil, Plus, Search, Trash2, UtensilsCrossed } from "lucide-react";
 import { useLocale, useMessages } from "@/lib/i18n/LocaleProvider";
-import Breadcrumbs from "../components/Breadcrumbs";
+import PageHeader from "../components/PageHeader";
+import { buttonVariants } from "@/components/ui/button";
 import NutritionTabs from "./components/NutritionTabs";
 import RowMenu from "./components/RowMenu";
 import Toast, { useToast } from "./components/Toast";
@@ -22,7 +23,7 @@ import {
 } from "./lib/savedMeals";
 
 const primaryButtonClass =
-  "inline-flex shrink-0 items-center gap-2 rounded-lg bg-beshaped-dark-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-beshaped-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "inline-flex shrink-0 items-center gap-2 rounded-lg bg-action px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 /** Client-only (reads localStorage on first render); load via next/dynamic with ssr: false. */
 export default function SavedMealsLibrary() {
@@ -68,27 +69,24 @@ export default function SavedMealsLibrary() {
     `rounded-md border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
       selected
         ? "border-beshaped-dark-green bg-beshaped-dark-green text-white"
-        : "border-border bg-background text-foreground hover:bg-muted"
+        : "border-border bg-card text-foreground hover:bg-muted"
     }`;
 
   return (
     <>
-      <div className="mx-auto max-w-6xl p-8">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Breadcrumbs items={[{ label: copy.title, href: "/nutrition" }, { label: copy.mealsTab }]} />
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{copy.savedMealsTitle}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {meals.length === 0 ? copy.savedMealsEmptyHint : copy.savedMealsSummary(meals.length)}
-            </p>
-          </div>
-          {meals.length > 0 && (
-            <Link href="/nutrition/meals/new" className={`${primaryButtonClass} self-start md:self-auto`}>
-              <Plus className="h-4 w-4" />
-              {copy.newMeal}
-            </Link>
-          )}
-        </div>
+      <div className="p-8">
+        <PageHeader
+          title={copy.title}
+          description={meals.length === 0 ? copy.savedMealsEmptyHint : copy.savedMealsSummary(meals.length)}
+          actions={
+            meals.length > 0 && (
+              <Link href="/nutrition/meals/new" className={buttonVariants()}>
+                <Plus />
+                {copy.newMeal}
+              </Link>
+            )
+          }
+        />
 
         <NutritionTabs />
 
@@ -115,7 +113,7 @@ export default function SavedMealsLibrary() {
                   onChange={(e) => setQuery(e.target.value)}
                   aria-label={copy.searchMeals}
                   placeholder={copy.searchMeals}
-                  className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div className="flex flex-wrap gap-2" role="group" aria-label={copy.category}>

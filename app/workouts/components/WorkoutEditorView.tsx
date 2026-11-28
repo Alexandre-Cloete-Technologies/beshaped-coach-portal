@@ -73,7 +73,7 @@ export default function WorkoutEditorView({
           <Breadcrumbs items={breadcrumbs} />
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3 ">
-            <h1 className="text-3xl font-bold text-foreground tracking-tight">{heading}</h1>
+            <h1 className="text-3xl font-semibold text-foreground tracking-tight">{heading}</h1>
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/workouts"
@@ -86,7 +86,7 @@ export default function WorkoutEditorView({
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-beshaped-green text-white text-sm font-semibold hover:bg-beshaped-dark-green disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover disabled:opacity-50 transition-colors"
               >
                 {saving ? "Saving…" : submitLabel}
               </button>
@@ -110,7 +110,7 @@ export default function WorkoutEditorView({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search exercises…"
-                    className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+                    className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
                   />
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1" role="group" aria-label="Filter by muscle group">
@@ -125,7 +125,7 @@ export default function WorkoutEditorView({
                         className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                           allActive
                             ? "border-primary bg-beshaped-green text-primary-foreground"
-                            : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                            : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                         }`}
                       >
                         All
@@ -145,7 +145,7 @@ export default function WorkoutEditorView({
                         className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                           isActive
                             ? "border-primary bg-beshaped-green text-primary-foreground"
-                            : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                            : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                         }`}
                       >
                         {cat}
@@ -296,7 +296,7 @@ export default function WorkoutEditorView({
                       }`}
                     >
                       <div className="flex items-start gap-2">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-xs font-bold text-muted-foreground">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-xs font-semibold text-muted-foreground">
                           {index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -323,7 +323,7 @@ export default function WorkoutEditorView({
                                     className={` border px-2 py-1 text-xs font-medium transition-colors ${
                                       isActive
                                         ? "border-primary bg-beshaped-green text-primary-foreground"
-                                        : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                        : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                                     }`}
                                   >
                                     {num}
@@ -362,7 +362,7 @@ export default function WorkoutEditorView({
                                       className={` border px-2 py-1 text-xs font-medium transition-colors ${
                                         isActive
                                           ? "border-primary bg-beshaped-green text-primary-foreground"
-                                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                          : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                                       }`}
                                     >
                                       {repShortcut}

@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { AuthGuard } from "@/lib/auth/AuthGuard";
+import { ToastProvider } from "@/lib/toast";
 import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import type { Locale } from "@/lib/i18n/messages";
 
@@ -18,8 +19,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BeShape Coach Portal - Client Overview",
-  description: "Manage your clients, track progress, and monitor compliance",
+  // Each section sets its own name in its layout.tsx; the dashboard uses the default.
+  title: {
+    default: "Dashboard · BeShaped Coach Portal",
+    template: "%s · BeShaped Coach Portal",
+  },
+  description: "Manage your clients, review their training and nutrition, and build programs.",
 };
 
 export default async function RootLayout({
@@ -32,11 +37,13 @@ export default async function RootLayout({
   return (
     <html lang={locale}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <LocaleProvider initialLocale={locale}>
           <AuthProvider>
-            <AuthGuard>{children}</AuthGuard>
+            <ToastProvider>
+              <AuthGuard>{children}</AuthGuard>
+            </ToastProvider>
           </AuthProvider>
         </LocaleProvider>
       </body>

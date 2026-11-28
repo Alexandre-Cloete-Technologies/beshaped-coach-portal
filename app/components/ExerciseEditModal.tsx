@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import AnatomyGifPicker from "./AnatomyGifPicker";
 
+import { useToast } from "@/lib/toast";
 type Difficulty = "beginner" | "intermediate" | "advanced";
 
 export interface ExerciseEditValues {
@@ -121,6 +122,7 @@ function ExerciseEditModalContent({
   onClose: () => void;
   onSave: (values: ExerciseEditValues) => void;
 }) {
+  const toast = useToast();
   const resolveMuscleGroup = (
     musclesInvolved: string[],
     secondaryMuscles: string[],
@@ -154,7 +156,7 @@ function ExerciseEditModalContent({
 
   const handleSubmit = () => {
     if (!form.name.trim()) {
-      alert("Please enter an exercise name");
+      toast.error("Please enter an exercise name");
       return;
     }
     onSave({
@@ -211,7 +213,7 @@ function ExerciseEditModalContent({
                 type="text"
                 value={form.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="Exercise name"
               />
             </div>
@@ -224,7 +226,7 @@ function ExerciseEditModalContent({
                 type="url"
                 value={form.videoUrl}
                 onChange={(e) => handleChange("videoUrl", e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="https://..."
               />
             </div>
@@ -244,7 +246,7 @@ function ExerciseEditModalContent({
               <textarea
                 value={form.description}
                 onChange={(e) => handleChange("description", e.target.value)}
-                className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
                 placeholder="Brief description of the exercise..."
               />
             </div>
@@ -267,7 +269,7 @@ function ExerciseEditModalContent({
                           onClick={() => toggleMuscle(muscle, true)}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                             form.musclesInvolved.includes(muscle)
-                              ? "bg-blue-600 text-white"
+                              ? "bg-primary text-primary-foreground"
                               : "bg-muted text-muted-foreground hover:bg-muted/80"
                           }`}
                         >
@@ -319,7 +321,7 @@ function ExerciseEditModalContent({
                 type="text"
                 value={form.equipment}
                 onChange={(e) => handleChange("equipment", e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="e.g., Barbell, Dumbbells"
               />
             </div>
@@ -336,7 +338,7 @@ function ExerciseEditModalContent({
                     e.target.value as Difficulty
                   )
                 }
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
               >
                 <option value="beginner">Beginner</option>
                 <option value="intermediate">Intermediate</option>
@@ -351,7 +353,7 @@ function ExerciseEditModalContent({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
+            className="h-10 px-4 rounded-lg border border-border bg-card text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
           >
             Cancel
           </button>
@@ -359,7 +361,7 @@ function ExerciseEditModalContent({
             type="button"
             onClick={handleSubmit}
             disabled={saving || !form.name.trim()}
-            className="h-10 px-5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-5 rounded-lg bg-action text-white text-xs font-medium hover:bg-action-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>

@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Pencil, Plus, Search, Trash2, UtensilsCrossed } from "lucide-react";
+import { Copy, Pencil, Search, Trash2, UtensilsCrossed } from "lucide-react";
 import { useLocale, useMessages } from "@/lib/i18n/LocaleProvider";
-import Breadcrumbs from "../components/Breadcrumbs";
+import PageHeader from "../components/PageHeader";
+import { buttonVariants } from "@/components/ui/button";
 import NutritionTabs from "./components/NutritionTabs";
 import RowMenu from "./components/RowMenu";
 import Toast, { useToast } from "./components/Toast";
@@ -13,7 +14,7 @@ import { MACRO_META, formatGrams, formatKcal, macrosForMeal, sumMacros } from ".
 import { StoredPlan, deletePlan, duplicatePlan, formatUpdated, listPlans, restorePlan } from "./lib/planStore";
 
 const primaryButtonClass =
-  "inline-flex shrink-0 items-center gap-2 rounded-lg bg-beshaped-dark-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-beshaped-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "inline-flex shrink-0 items-center gap-2 rounded-lg bg-action px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 /** Client-only (reads localStorage on first render); load via next/dynamic with ssr: false. */
 export default function NutritionLibrary() {
@@ -56,22 +57,18 @@ export default function NutritionLibrary() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl p-8">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Breadcrumbs items={[{ label: copy.title }]} />
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{copy.plansTitle}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {plans.length === 0 ? copy.emptyLibraryHint : copy.planSummary(plans.length)}
-            </p>
-          </div>
-          {plans.length > 0 && (
-            <Link href="/nutrition/builder" className={`${primaryButtonClass} self-start md:self-auto`}>
-              <Plus className="h-4 w-4" />
-              {copy.newPlan}
-            </Link>
-          )}
-        </div>
+      <div className="p-8">
+        <PageHeader
+          title={copy.title}
+          description={plans.length === 0 ? copy.emptyLibraryHint : copy.planSummary(plans.length)}
+          actions={
+            plans.length > 0 && (
+              <Link href="/nutrition/builder" className={buttonVariants()}>
+                {copy.newPlan}
+              </Link>
+            )
+          }
+        />
 
         <NutritionTabs />
 
@@ -83,7 +80,6 @@ export default function NutritionLibrary() {
             <h2 className="mt-4 text-lg font-semibold text-card-foreground">{copy.noneYet}</h2>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">{copy.noneYetHint}</p>
             <Link href="/nutrition/builder" className={`${primaryButtonClass} mt-6`}>
-              <Plus className="h-4 w-4" />
               {copy.createFirst}
             </Link>
           </div>
@@ -97,7 +93,7 @@ export default function NutritionLibrary() {
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label={copy.searchPlans}
                 placeholder={copy.searchPlans}
-                className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
 

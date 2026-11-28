@@ -1,7 +1,8 @@
 "use client";
 
-import {  UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Sidebar from "./components/Sidebar";
+import PageHeader from "./components/PageHeader";
 import SearchBar from "./components/SearchBar";
 import ClientCard, { ClientData } from "./components/ClientCard";
 import AddClientModal from "./components/AddClientModal";
@@ -255,30 +256,18 @@ export default function Home() {
       {/* Main Content */}
       <main className="ml-[220px] min-h-screen">
         <div className="p-8">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-              <p className="text-muted-foreground mt-1">View clients progress</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setAssignModalOpen(true)}
-                className="h-11 px-5 rounded-xl bg-card border border-border text-card-foreground font-medium flex items-center gap-2 hover:bg-accent transition-colors shadow-sm"
-              >
-                <UserPlus className="w-4 h-4" />
-                Assign Program
-              </button>
-
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="h-10 px-4 rounded-lg bg-beshaped-dark-green text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-beshaped-green transition-colors shadow-sm"
-              >
-                Add a new user
-              </button>
-            </div>
-          </div>
-
+          <PageHeader
+            title="Dashboard"
+            description="Your clients' progress at a glance"
+            actions={
+              <>
+                <Button variant="outline" onClick={() => setAssignModalOpen(true)}>
+                  Assign program
+                </Button>
+                <Button onClick={() => setIsModalOpen(true)}>Add client</Button>
+              </>
+            }
+          />
 
           {/* Search Bar */}
           <div className="mb-8">

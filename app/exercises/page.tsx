@@ -1,8 +1,9 @@
 "use client";
 
-import { Search, ChevronDown, ChevronRight, Edit, Trash2, Dumbbell, ChevronsUpDown, X } from "lucide-react";
+import { Search, Edit, Trash2, Dumbbell, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
-import Breadcrumbs from "../components/Breadcrumbs";
+import PageHeader from "../components/PageHeader";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
@@ -11,6 +12,7 @@ import { requireServerResult } from "@/lib/firebase/serverResult";
 import ExerciseEditModal, { ExerciseEditValues } from "../components/ExerciseEditModal";
 import AnatomyGifPicker from "../components/AnatomyGifPicker";
 
+import { useToast } from "@/lib/toast";
 interface Exercise {
   id: string;
   name: string;
@@ -267,6 +269,7 @@ const getRawMuscleFromExerciseData = (data: Record<string, unknown>): string => 
 };
 
 export default function ExercisesPage() {
+  const toast = useToast();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   // A failed load shows an error with Retry, never placeholder exercises.
@@ -274,7 +277,6 @@ export default function ExercisesPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set());
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Add exercise modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -390,43 +392,6 @@ export default function ExercisesPage() {
     });
   };
 
-  // Auto-expand the groups with matches when the search or category filter changes (done during render,
-  // React's pattern for adjusting state when inputs change). Collapsing a group afterwards still works.
-  const [expandedFor, setExpandedFor] = useState(groupedExercises);
-  if (expandedFor !== groupedExercises) {
-    setExpandedFor(groupedExercises);
-    if (searchQuery.trim() || selectedCategories.size > 0) {
-      const groupsWithMatches = new Set<string>();
-      Object.entries(groupedExercises).forEach(([group, exs]) => {
-        if (exs.length > 0) {
-          groupsWithMatches.add(group);
-        }
-      });
-      setExpandedGroups(groupsWithMatches);
-    }
-  }
-
-  const toggleGroup = (group: string) => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-      }
-      return next;
-    });
-  };
-
-  const expandAll = () => {
-    setExpandedGroups(new Set(muscleGroupOrder));
-  };
-
-  const collapseAll = () => {
-    setExpandedGroups(new Set());
-  };
-
-  const allExpanded = expandedGroups.size === muscleGroupOrder.length;
 
   // Form handlers
   const handleInputChange = (field: keyof ExerciseFormData, value: string | string[]) => {
@@ -434,15 +399,20 @@ export default function ExercisesPage() {
   };
 
 
-  const toggleMuscle = (muscle: string, isPrimary: boolean) => {
-    const field = isPrimary ? "musclesInvolved" : "secondaryMuscles";
-    setFormData(prev => {
-      const current = prev[field];
-      if (current.includes(muscle)) {
-        return { ...prev, [field]: current.filter(m => m !== muscle) };
-      } else {
-        return { ...prev, [field]: [...current, muscle] };
+  /** One click cycles a muscle: not used → primary → secondary → not used. A muscle is never both. */
+  const cycleMuscle = (muscle: string) => {
+    setFormData((prev) => {
+      if (prev.musclesInvolved.includes(muscle)) {
+        return {
+          ...prev,
+          musclesInvolved: prev.musclesInvolved.filter((m) => m !== muscle),
+          secondaryMuscles: [...prev.secondaryMuscles, muscle],
+        };
       }
+      if (prev.secondaryMuscles.includes(muscle)) {
+        return { ...prev, secondaryMuscles: prev.secondaryMuscles.filter((m) => m !== muscle) };
+      }
+      return { ...prev, musclesInvolved: [...prev.musclesInvolved, muscle] };
     });
   };
 
@@ -483,7 +453,7 @@ export default function ExercisesPage() {
       closeDeleteModal();
     } catch (error) {
       console.error("Error deleting exercise:", error);
-      alert("Failed to delete exercise. Please try again.");
+      toast.error("Failed to delete exercise. Please try again.");
     } finally {
       setDeleting(false);
     }
@@ -530,14 +500,14 @@ export default function ExercisesPage() {
       closeEditModal();
     } catch (error) {
       console.error("Error updating exercise:", error);
-      alert("Failed to update exercise. Please try again.");
+      toast.error("Failed to update exercise. Please try again.");
       setUpdating(false);
     }
   };
 
   const handleSaveExercise = async () => {
     if (!formData.name.trim()) {
-      alert("Please enter an exercise name");
+      toast.error("Please enter an exercise name");
       return;
     }
     
@@ -574,7 +544,7 @@ export default function ExercisesPage() {
       closeModal();
     } catch (error) {
       console.error("Error saving exercise:", error);
-      alert("Failed to save exercise. Please try again.");
+      toast.error("Failed to save exercise. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -594,7 +564,11 @@ export default function ExercisesPage() {
   // };
 
   const totalExercises = exercises.length;
-  const filteredTotal = Object.values(groupedExercises).reduce((sum, exs) => sum + exs.length, 0);
+  // One table, ordered by muscle group (the chips' order) and then by name.
+  const visibleExercises = muscleGroupOrder.flatMap((group) =>
+    [...groupedExercises[group]].sort((a, b) => a.name.localeCompare(b.name))
+  );
+  const filteredTotal = visibleExercises.length;
   const hasActiveFilters = Boolean(searchQuery.trim() || selectedCategories.size > 0);
 
   return (
@@ -603,16 +577,7 @@ export default function ExercisesPage() {
 
       <main className="ml-[220px] min-h-screen">
         <div className="p-8">
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-            <div>
-              <Breadcrumbs items={[{ label: "Exercises" }]} />
-              <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">Exercise Library</h1>
-              <p className="text-muted-foreground">
-                {totalExercises} exercises organized by muscle group
-              </p>
-            </div>
-          </div>
+          <PageHeader title="Exercises" description={`${totalExercises} exercises in your library`} />
 
           {/* Toolbar */}
           <div className="bg-card p-4 rounded-xl shadow-sm border border-border mb-6 flex flex-col gap-0">
@@ -630,21 +595,11 @@ export default function ExercisesPage() {
               </div>
 
               <div className="flex items-center gap-3 shrink-0 w-full md:w-auto justify-end">
-                {/* Expand/Collapse All */}
-                <button
-                  type="button"
-                  onClick={allExpanded ? collapseAll : expandAll}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <ChevronsUpDown className="w-4 h-4" />
-                  {allExpanded ? "Collapse All" : "Expand All"}
-                </button>
-
                 {/* Add Button */}
                 <button
                   type="button"
                   onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+                  className="flex items-center gap-2 bg-action hover:bg-action-hover text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-colors"
                 >
                   Add Exercise
                 </button>
@@ -666,7 +621,7 @@ export default function ExercisesPage() {
                     className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                       allActive
                         ? "border-primary bg-beshaped-green text-primary-foreground"
-                        : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                        : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                     }`}
                   >
                     All
@@ -686,7 +641,7 @@ export default function ExercisesPage() {
                     className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                       isActive
                         ? "border-primary bg-beshaped-green text-primary-foreground"
-                        : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                        : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                     }`}
                   >
                     {cat}
@@ -732,7 +687,7 @@ export default function ExercisesPage() {
               <button
                 type="button"
                 onClick={() => setReloadKey((k) => k + 1)}
-                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+                className="mt-4 h-9 px-4 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors"
               >
                 Try again
               </button>
@@ -746,118 +701,95 @@ export default function ExercisesPage() {
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
-                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+                className="mt-4 h-9 px-4 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors"
               >
                 Add exercise
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              {muscleGroupOrder.map((group) => {
-                const groupExercises = groupedExercises[group];
-                const isExpanded = expandedGroups.has(group);
-                const hasExercises = groupExercises.length > 0;
-                
-                // Hide empty groups when a filter is active
-                if (hasActiveFilters && !hasExercises) return null;
-                
-                return (
-                  <div 
-                    key={group}
-                    className="bg-card rounded-xl border border-border overflow-hidden"
-                  >
-                    {/* Group Header */}
-                    <button
-                      onClick={() => toggleGroup(group)}
-                      className={`w-full flex items-center justify-between px-5 py-2 hover:bg-muted/50 transition-colors ${
-                        !hasExercises ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                      disabled={!hasExercises}
-                    >
-                      <div className="flex items-center gap-3">
-                        {isExpanded ? (
-                          <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                        )}
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                          <Dumbbell className="w-4 h-4" />
-                        </div>
-                        <span className="font-semibold text-card-foreground">{group}</span>
-                      </div>
-                      <span className={`text-sm font-medium px-2.5 py-1 rounded-full ${
-                        hasExercises 
-                          ? "bg-primary/10 text-primary" 
-                          : "bg-muted text-muted-foreground"
-                      }`}>
-                        {groupExercises.length} exercise{groupExercises.length !== 1 ? "s" : ""}
-                      </span>
-                    </button>
-                    
-                    {/* Expanded Content */}
-                    {isExpanded && hasExercises && (
-                      <div className="border-t border-border">
-                        {groupExercises.map((exercise, idx) => (
-                          <div 
-                            key={exercise.id}
-                            className={`flex items-center justify-between px-5 py-1.5 hover:bg-gray-200 dark:hover:bg-gray-800/50 transition-colors group ${
-                              idx !== groupExercises.length - 1 ? "border-b border-border/50" : ""
-                            }`}
-                          >
-                            <Link
-                              href={`/exercises/${exercise.id}`}
-                              className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer"
-                            >
-                              <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-sm font-medium flex-shrink-0">
-                                {idx + 1}
+            filteredTotal > 0 && (
+              <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Exercise
+                      </th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Muscle group
+                      </th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Equipment
+                      </th>
+                      <th className="text-right py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleExercises.map((exercise) => {
+                      // Specific muscles under the name, unless they only repeat the muscle-group column.
+                      const group = getDisplayGroup(exercise);
+                      const muscles = (exercise.musclesInvolved ?? [])
+                        .filter((m) => m.toLowerCase() !== group.toLowerCase())
+                        .join(", ");
+                      return (
+                        <tr
+                          key={exercise.id}
+                          className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors"
+                        >
+                          <td className="py-3 px-4">
+                            <Link href={`/exercises/${exercise.id}`} className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                <Dumbbell className="w-4 h-4" />
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-card-foreground truncate ">{exercise.name}</p>
-                                {/* For not the description is hidden */}
-{/*                                 {exercise.description && (
-                                  <p className="text-xs text-muted-foreground truncate">{exercise.description}</p>
-                                )} */}
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-card-foreground truncate">{exercise.name}</p>
+                                {muscles && <p className="text-xs text-muted-foreground truncate">{muscles}</p>}
                               </div>
                             </Link>
-                            
-                            <div className="flex items-center gap-4">
-                              {/* For now, the difficulty badge is hidden */}
-{/*                               <span className={`text-xs font-medium px-2 py-1 rounded ${getDifficultyBadge(exercise.difficulty)}`}>
-                                {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
-                              </span> */}
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded transition-colors"
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openEditModal(exercise);
-                                  }}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openDeleteModal(exercise);
-                                  }}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Link href={`/exercises/${exercise.id}`} className="block">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground">
+                                {group}
+                              </span>
+                            </Link>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Link href={`/exercises/${exercise.id}`} className="block text-sm text-card-foreground">
+                              {exercise.equipment}
+                            </Link>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(exercise)}
+                                className="p-2 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                                title="Edit"
+                                aria-label={`Edit ${exercise.name}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openDeleteModal(exercise)}
+                                className="p-2 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
+                                title="Delete"
+                                aria-label={`Delete ${exercise.name}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
 
           {/* Empty State */}
@@ -890,315 +822,157 @@ export default function ExercisesPage() {
       {/* Add Exercise Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-border max-h-[90vh] flex flex-col">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-border max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-start justify-between px-6 py-4 border-b border-border">
               <div>
-                <h2 className="text-lg font-semibold text-card-foreground">Add New Exercise</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Fill in the details below</p>
+                <h2 className="text-lg font-semibold text-card-foreground">Add exercise</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Only the name is required. You can add the rest later.</p>
               </div>
               <button
+                type="button"
                 onClick={closeModal}
+                aria-label="Close"
                 className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-accent transition-colors"
               >
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
 
-            {/* Form Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              <div className="grid grid-cols-2 gap-x-5 gap-y-5">
-                {/* Exercise Name */}
+            {/* Form Body: three sections, most important first */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+              {/* Basics */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold text-card-foreground">Basics</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-4">
+                  <div>
+                    <label htmlFor="new-exercise-name" className="block text-xs font-medium text-card-foreground mb-1.5">
+                      Name <span className="text-muted-foreground">(required)</span>
+                    </label>
+                    <input
+                      id="new-exercise-name"
+                      type="text"
+                      autoFocus
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                      placeholder="e.g. Barbell Bench Press"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="new-exercise-equipment" className="block text-xs font-medium text-card-foreground mb-1.5">
+                      Equipment
+                    </label>
+                    <select
+                      id="new-exercise-equipment"
+                      value={formData.equipment}
+                      onChange={(e) => handleInputChange("equipment", e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    >
+                      <option value="">Select equipment</option>
+                      {equipmentOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Exercise Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                    placeholder="e.g., Barbell Bench Press"
-                  />
-                </div>
-
-                {/* Equipment */}
-                <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Equipment
-                  </label>
-                  <select
-                    value={formData.equipment}
-                    onChange={(e) => handleInputChange("equipment", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
-                  >
-                    <option value="">Select Equipment</option>
-                    {equipmentOptions.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Category */}
-                {/* <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Category
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => handleInputChange("category", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
-                  >
-                    <option value="">Select Category</option>
-                    {categoryOptions.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div> */}
-
-                {/* Video URL */}
-                <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Video URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.videoUrl}
-                    onChange={(e) => handleInputChange("videoUrl", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                    placeholder="https://..."
-                  />
-                </div>
-
-                {/* Anatomy Walkthrough */}
-                <div className="col-span-2">
-                  <AnatomyGifPicker
-                    value={formData.anatomyExerciseWalkthrough}
-                    onChange={(url) => handleInputChange("anatomyExerciseWalkthrough", url)}
-                    label="Anatomy Walkthrough"
-                  />
-                </div>
-
-                {/* Description - full width */}
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
+                  <label htmlFor="new-exercise-description" className="block text-xs font-medium text-card-foreground mb-1.5">
                     Description
                   </label>
                   <textarea
+                    id="new-exercise-description"
                     value={formData.description}
                     onChange={(e) => handleInputChange("description", e.target.value)}
-                    className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-                    placeholder="Brief description of the exercise..."
+                    className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                    placeholder="Brief description of the exercise…"
                   />
                 </div>
+              </section>
 
-                {/* Primary Muscles */}
-                <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Primary Muscles
-                  </label>
-                  <div className="space-y-3">
-                    {muscleCategoryDetails.map(({ category, muscles }) => (
-                      <div key={category}>
-                        <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">{category}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {muscles.map((muscle) => (
+              {/* Muscles: one list; a click cycles not used → primary → secondary */}
+              <section className="space-y-3 border-t border-border pt-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-card-foreground">Muscles worked</h3>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-action" aria-hidden />
+                      Primary
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-[3px] border border-beshaped-dark-green bg-beshaped-green/15" aria-hidden />
+                      Secondary
+                    </span>
+                    <span>Click once for primary, twice for secondary.</span>
+                  </div>
+                </div>
+                <div className="divide-y divide-border rounded-lg border border-border">
+                  {muscleCategoryDetails.map(({ category, muscles }) => (
+                    <div key={category} className="flex items-start gap-3 px-3 py-2">
+                      <p className="w-20 shrink-0 pt-1 text-sm font-medium text-card-foreground">{category}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {muscles.map((muscle) => {
+                          const role = formData.musclesInvolved.includes(muscle)
+                            ? "primary"
+                            : formData.secondaryMuscles.includes(muscle)
+                              ? "secondary"
+                              : null;
+                          return (
                             <button
-                              key={`primary-${category}-${muscle}`}
+                              key={`${category}-${muscle}`}
                               type="button"
-                              onClick={() => toggleMuscle(muscle, true)}
-                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                                formData.musclesInvolved.includes(muscle)
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              onClick={() => cycleMuscle(muscle)}
+                              aria-label={`${muscle}: ${role ?? "not used"}`}
+                              className={`px-3 py-1 rounded-sm border text-xs transition-colors ${
+                                role === "primary"
+                                  ? "border-action bg-action text-white"
+                                  : role === "secondary"
+                                    ? "border-beshaped-dark-green bg-beshaped-green/15 text-beshaped-dark-green dark:text-beshaped-green"
+                                    : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
                               }`}
                             >
                               {muscle}
                             </button>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
+              </section>
 
-                {/* Secondary Muscles */}
+              {/* Media */}
+              <section className="space-y-4 border-t border-border pt-5">
+                <h3 className="text-sm font-semibold text-card-foreground">Media</h3>
                 <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Secondary Muscles
+                  <label htmlFor="new-exercise-video" className="block text-xs font-medium text-card-foreground mb-1.5">
+                    Video URL
                   </label>
-                  <div className="space-y-3">
-                    {muscleCategoryDetails.map(({ category, muscles }) => (
-                      <div key={category}>
-                        <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">{category}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {muscles.map((muscle) => (
-                            <button
-                              key={`secondary-${category}-${muscle}`}
-                              type="button"
-                              onClick={() => toggleMuscle(muscle, false)}
-                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                                formData.secondaryMuscles.includes(muscle)
-                                  ? "bg-indigo-600 text-white"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-                              }`}
-                            >
-                              {muscle}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <input
+                    id="new-exercise-video"
+                    type="url"
+                    value={formData.videoUrl}
+                    onChange={(e) => handleInputChange("videoUrl", e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    placeholder="https://…"
+                  />
                 </div>
-
-                {/* Instructions */}
-                {/* <div className="col-span-2">
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Instructions
-                  </label>
-                  <div className="grid grid-cols-2 gap-x-5 gap-y-4">
-                    <div>
-                      <label className="block text-[11px] text-muted-foreground mb-1">Setup</label>
-                      <textarea
-                        value={formData.instructions.setup}
-                        onChange={(e) => handleInstructionChange("setup", e.target.value)}
-                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-                        placeholder="How to set up..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-muted-foreground mb-1">Posture</label>
-                      <textarea
-                        value={formData.instructions.posture}
-                        onChange={(e) => handleInstructionChange("posture", e.target.value)}
-                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-                        placeholder="Correct posture..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-muted-foreground mb-1">Execution</label>
-                      <textarea
-                        value={formData.instructions.execution}
-                        onChange={(e) => handleInstructionChange("execution", e.target.value)}
-                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-                        placeholder="How to perform..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-muted-foreground mb-1">Breathing</label>
-                      <textarea
-                        value={formData.instructions.breathing}
-                        onChange={(e) => handleInstructionChange("breathing", e.target.value)}
-                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-                        placeholder="Breathing pattern..."
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[11px] text-muted-foreground mb-1">Control</label>
-                      <textarea
-                        value={formData.instructions.control}
-                        onChange={(e) => handleInstructionChange("control", e.target.value)}
-                        className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
-                        placeholder="Control and tempo..."
-                      />
-                    </div>
-                  </div>
-                </div> */}
-
-                {/* Thumbnail URL */}
-                {/* <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Thumbnail URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.thumbnailUrl}
-                    onChange={(e) => handleInputChange("thumbnailUrl", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                    placeholder="https://..."
-                  />
-                </div> */}
-
-                {/* Anatomical Illustration URL */}
-                {/* <div>
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Anatomical Illustration URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.anatomicalIllustration}
-                    onChange={(e) => handleInputChange("anatomicalIllustration", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                    placeholder="https://..."
-                  />
-                </div> */}
-
-                {/* Tips - full width */}
-                {/* <div className="col-span-2">
-                  <label className="block text-xs font-medium text-card-foreground mb-2">
-                    Tips & Notes
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newTip}
-                      onChange={(e) => setNewTip(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTip())}
-                      className="flex-1 h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                      placeholder="Add a tip..."
-                    />
-                    <button
-                      type="button"
-                      onClick={addTip}
-                      className="h-11 px-4 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {formData.tips.length > 0 && (
-                    <div className="space-y-2 mt-3">
-                      {formData.tips.map((tip, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-lg">
-                          <span className="flex-1 text-sm text-card-foreground">{tip}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeTip(index)}
-                            className="text-muted-foreground hover:text-red-500 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div> */}
-              </div>
+                <AnatomyGifPicker
+                  value={formData.anatomyExerciseWalkthrough}
+                  onChange={(url) => handleInputChange("anatomyExerciseWalkthrough", url)}
+                  label="Anatomy walkthrough"
+                />
+              </section>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-muted/20">
-              <button
-                type="button"
-                onClick={() => setFormData(emptyFormData)}
-                className="h-10 px-4 rounded-lg text-xs text-muted-foreground font-medium hover:text-card-foreground hover:bg-accent transition-colors"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
-              >
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+              <Button variant="outline" onClick={closeModal}>
                 Cancel
-              </button>
-              <button
-                onClick={handleSaveExercise}
-                disabled={saving || !formData.name.trim()}
-                className="h-10 px-5 rounded-lg bg-beshaped-dark-green text-white text-xs font-medium hover:bg-beshaped-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? "Saving..." : "Save Exercise"}
-              </button>
+              </Button>
+              <Button onClick={handleSaveExercise} disabled={saving || !formData.name.trim()}>
+                {saving ? "Saving…" : "Save exercise"}
+              </Button>
             </div>
           </div>
         </div>
@@ -1226,7 +1000,7 @@ export default function ExercisesPage() {
                 type="button"
                 onClick={closeDeleteModal}
                 disabled={deleting}
-                className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 px-4 rounded-lg border border-border bg-card text-xs text-card-foreground font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>

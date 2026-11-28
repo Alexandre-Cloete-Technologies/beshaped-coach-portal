@@ -78,7 +78,7 @@ export default function MealCard({ meal, onChange, onDelete, onSaveToLibrary }: 
               onClick={onSaveToLibrary}
               disabled={meal.items.length === 0}
               title={copy.saveToLibrary}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-beshaped-green/10 hover:text-beshaped-dark-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
             >
               <BookmarkPlus className="h-4 w-4" />
               {copy.saveToLibrary}
@@ -151,7 +151,7 @@ export default function MealCard({ meal, onChange, onDelete, onSaveToLibrary }: 
                           value={amount === 0 ? "" : amount}
                           onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
                           aria-label={`${copy.amountOf(food ? foodName(food, locale) : copy.foodFallback)} (${modeLabel(mode)})`}
-                          className="h-8 w-16 rounded-md border border-border bg-background px-2 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          className="h-8 w-16 rounded-md border border-border bg-card px-2 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                         <select
                           value={mode}
@@ -161,7 +161,7 @@ export default function MealCard({ meal, onChange, onDelete, onSaveToLibrary }: 
                             setAmount(nextAmount, nextMode);
                           }}
                           aria-label={copy.amount}
-                          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-card px-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         >
                           {modes.map((option) => (
                             <option key={option} value={option}>{modeLabel(option)}</option>

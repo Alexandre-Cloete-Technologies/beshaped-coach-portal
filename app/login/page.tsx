@@ -145,7 +145,7 @@ function LoginForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
               />
             </div>
             <div>
@@ -169,7 +169,7 @@ function LoginForm() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                  className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 />
                 <button
                   type="button"
@@ -184,7 +184,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full h-11 rounded-lg bg-beshaped-dark-green text-primary-foreground text-sm font-medium hover:bg-beshaped-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-11 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {busy ? "Signing in…" : "Sign in"}
             </button>

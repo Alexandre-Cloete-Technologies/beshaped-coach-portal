@@ -85,7 +85,7 @@ export default function SavedMealEditor({ mealId }: { mealId?: string }) {
           <p className="mt-1 text-sm text-muted-foreground">{copy.mealMissingHint}</p>
           <Link
             href="/nutrition/meals"
-            className="mt-6 inline-flex items-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="mt-6 inline-flex items-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             {copy.backToMeals}
           </Link>
@@ -109,7 +109,7 @@ export default function SavedMealEditor({ mealId }: { mealId?: string }) {
                 { label: title },
               ]}
             />
-            <h1 className="truncate text-3xl font-bold tracking-tight text-foreground">{title}</h1>
+            <h1 className="truncate text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">{copy.mealEditorHint}</p>
             <label className="mt-4 block w-48">
               <span className="text-xs font-medium text-muted-foreground">{copy.category}</span>
@@ -118,7 +118,7 @@ export default function SavedMealEditor({ mealId }: { mealId?: string }) {
                 onChange={(e) =>
                   setMeal((m) => ({ ...m, category: (e.target.value || undefined) as MealCategory | undefined }))
                 }
-                className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="mt-1 h-9 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">{copy.noCategory}</option>
                 {MEAL_CATEGORIES.map((c) => (
@@ -145,7 +145,7 @@ export default function SavedMealEditor({ mealId }: { mealId?: string }) {
               onClick={save}
               disabled={!isDirty || saving}
               title={copy.saveShortcut}
-              className="inline-flex items-center gap-2 rounded-lg bg-beshaped-dark-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-beshaped-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-beshaped-dark-green"
+              className="inline-flex items-center gap-2 rounded-lg bg-action px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-action-hover"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isNew ? copy.createMeal : copy.saveChanges}

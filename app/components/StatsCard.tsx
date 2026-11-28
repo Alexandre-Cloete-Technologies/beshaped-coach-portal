@@ -39,7 +39,7 @@ export default function StatsCard({ type, value, label }: StatsCardProps) {
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {label}
         </p>
-        <p className="text-2xl font-bold text-card-foreground">{value}</p>
+        <p className="text-2xl font-semibold text-card-foreground">{value}</p>
       </div>
     </div>
   );

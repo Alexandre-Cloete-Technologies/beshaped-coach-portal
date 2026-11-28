@@ -396,7 +396,7 @@ export default function WorkoutHistory() {
           phase: `Day ${log.dayNumber} - Week ${log.weekNumber} - Phase ${log.phaseNumber}`,
           workoutLogExercises: log.exercises,
           duration,
-          volume: log.totalVolume ? `${log.totalVolume.toLocaleString()} lb` : undefined,
+          volume: log.totalVolume ? `${log.totalVolume.toLocaleString()} kg` : undefined,
           workoutLogId: log.id,
           programName: log.programName,
           phaseNumber: log.phaseNumber,
@@ -601,7 +601,7 @@ export default function WorkoutHistory() {
               >
                 <ChevronLeft className="w-5 h-5 text-muted-foreground" />
               </button>
-              <h3 className="text-lg font-bold text-card-foreground">
+              <h3 className="text-lg font-semibold text-card-foreground">
                 {currentMonthName} {currentYear}
               </h3>
               <button 
@@ -671,7 +671,7 @@ export default function WorkoutHistory() {
                   <span
                     className={`text-sm font-medium ${
                       dayData.isSelected
-                        ? "font-bold text-white"
+                        ? "font-semibold text-white"
                         : dayData.isCurrentMonth
                         ? "text-card-foreground"
                         : "text-gray-300 dark:text-gray-600"
@@ -681,7 +681,7 @@ export default function WorkoutHistory() {
                   </span>
                   {dayData.status && (
                     <span
-                      className={`text-[8px] font-bold mt-0.5 leading-tight whitespace-nowrap px-1 rounded ${
+                      className={`text-[8px] font-semibold mt-0.5 leading-tight whitespace-nowrap px-1 rounded ${
                         dayData.isSelected 
                           ? "text-white/90" 
                           : dayData.status === "completed" 
@@ -717,11 +717,11 @@ export default function WorkoutHistory() {
 
           {/* Monthly Summary */}
           {/* <div className="bg-card rounded-xl border border-border p-6">
-            <h4 className="font-bold text-card-foreground mb-4">Monthly Summary</h4>
+            <h4 className="font-semibold text-card-foreground mb-4">Monthly Summary</h4>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Consistency</span>
-                <span className="text-sm font-bold text-green-600">92%</span>
+                <span className="text-sm font-semibold text-green-600">92%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div className="bg-green-500 h-2 rounded-full" style={{ width: "92%" }}></div>
@@ -729,11 +729,11 @@ export default function WorkoutHistory() {
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="bg-muted p-3 rounded-lg">
                   <div className="text-xs text-muted-foreground mb-1">Total Volume</div>
-                  <div className="text-sm font-bold text-card-foreground">142k lb</div>
+                  <div className="text-sm font-semibold text-card-foreground">142k lb</div>
                 </div>
                 <div className="bg-muted p-3 rounded-lg">
                   <div className="text-xs text-muted-foreground mb-1">Workouts</div>
-                  <div className="text-sm font-bold text-card-foreground">22</div>
+                  <div className="text-sm font-semibold text-card-foreground">22</div>
                 </div>
               </div>
             </div>
@@ -744,7 +744,7 @@ export default function WorkoutHistory() {
         <div className="w-full lg:w-2/3 flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
             <div className="flex flex-col gap-1">
-              <h3 className="text-xl font-bold text-card-foreground">{getWorkoutListTitle()}</h3>
+              <h3 className="text-xl font-semibold text-card-foreground">{getWorkoutListTitle()}</h3>
               {filteredWorkouts.length > 0 && filteredWorkouts[0].programName && (
                 <span className="text-sm font-medium text-muted-foreground">
                   {filteredWorkouts[0].programName}
@@ -765,7 +765,7 @@ export default function WorkoutHistory() {
               <button
                 type="button"
                 onClick={() => setReloadKey((k) => k + 1)}
-                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+                className="mt-4 h-9 px-4 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors"
               >
                 Try again
               </button>
@@ -795,11 +795,11 @@ export default function WorkoutHistory() {
                 <summary className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-2 cursor-pointer hover:bg-accent/50 transition-colors select-none relative list-none">
                   <div className="flex items-center gap-4 min-w-[120px]  ">
                     <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-muted text-muted-foreground border border-border">
-                      <span className="text-xs font-bold uppercase tracking-wide">{workout.date.split(" ")[0]}</span>
-                      <span className="text-xl font-bold leading-none">{workout.date.split(" ")[1]}</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide">{workout.date.split(" ")[0]}</span>
+                      <span className="text-xl font-semibold leading-none">{workout.date.split(" ")[1]}</span>
                     </div>
                     <div>
-                      <h4 className="text-card-foreground font-bold text-base">{workout.dayOfWeek}</h4>
+                      <h4 className="text-card-foreground font-semibold text-base">{workout.dayOfWeek}</h4>
                       <p className="text-muted-foreground text-xs">Started at: {workout.startedTime}</p>
                       <p className="text-muted-foreground text-xs">Completed at: {workout.completedTime}</p>
                       <p className="text-muted-foreground text-xs">Duration: {workout.duration ?? "--"}</p>
@@ -808,9 +808,9 @@ export default function WorkoutHistory() {
 
                   <div className="flex-1 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
                     <div className="flex flex-col gap-1">
-                      <h3 className="text-card-foreground font-bold text-lg">{workout.name}</h3>
+                      <h3 className="text-card-foreground font-semibold text-lg">{workout.name}</h3>
                       {workout.phase && (
-                        <p className="text-xs font-bold text-foreground mt-1 ">
+                        <p className="text-xs font-semibold text-foreground mt-1 ">
                           {workout.phase}
                         </p>
                       )}
@@ -836,7 +836,7 @@ export default function WorkoutHistory() {
                       {workout.workoutLogExercises.map((exercise, exIdx) => (
                         <div key={exIdx} className="bg-card rounded-lg p-4 border border-border">
                           <div className="flex justify-between items-start mb-3">
-                            <h5 className="font-bold text-card-foreground text-sm">
+                            <h5 className="font-semibold text-card-foreground text-sm">
                               {exIdx + 1}. {exercise.name}
                             </h5>
                             <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
@@ -853,11 +853,11 @@ export default function WorkoutHistory() {
                                     : "bg-muted border border-border"
                                 }`}
                               >
-                                <span className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
+                                <span className="text-[10px] text-muted-foreground uppercase font-semibold mb-0.5">
                                   Set {set.setNumber || setIdx + 1}
                                 </span>
                                 {set.completed && set.weight && set.reps ? (
-                                  <span className="font-bold text-card-foreground">
+                                  <span className="font-semibold text-card-foreground">
                                     {set.weight} x {set.reps}
                                   </span>
                                 ) : (
@@ -880,7 +880,7 @@ export default function WorkoutHistory() {
                     <div className="flex flex-col gap-2">
                       {workout.phase && (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wide text-primary">Phase & Day:</span>
+                          <span className="text-xs font-semibold uppercase tracking-wide text-primary">Phase & Day:</span>
                           <span className="text-sm text-card-foreground">{workout.phase}</span>
                         </div>
                       )}

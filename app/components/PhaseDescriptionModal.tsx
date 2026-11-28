@@ -49,7 +49,7 @@ export default function PhaseDescriptionModal({
           </button>
           <button
             onClick={onSave}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            className="rounded-lg bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action-hover transition-colors"
           >
             Save
           </button>

@@ -3,6 +3,8 @@
 import { Search, User, Calendar, Ruler, Camera, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import Sidebar from "../components/Sidebar";
+import PageHeader from "../components/PageHeader";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -327,22 +329,16 @@ export default function AssessmentPage() {
 
       <main className="ml-[220px] min-h-dvh">
         <div className="p-8 w-full">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground mb-1">Assessment</h1>
-              <p className="text-sm text-muted-foreground">
-                Record client assessments and track progress over time.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="inline-flex shrink-0 items-center justify-center gap-2 h-10 px-4 rounded-lg border border-border bg-background text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset form
-            </button>
-          </div>
+          <PageHeader
+            title="Assessment"
+            description="Record client assessments and track progress over time."
+            actions={
+              <Button variant="outline" onClick={resetForm}>
+                <RotateCcw />
+                Reset form
+              </Button>
+            }
+          />
 
           {/* Client Selection */}
           <section className="bg-card rounded-xl border border-border shadow-sm p-6 mb-8">
@@ -363,13 +359,13 @@ export default function AssessmentPage() {
                     placeholder="Search clients..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring mb-2"
+                    className="w-full h-10 pl-10 pr-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring mb-2"
                   />
                 </div>
                 <select
                   value={selectedClientId}
                   onChange={(e) => setSelectedClientId(e.target.value)}
-                  className="w-full h-10 pl-3 pr-10 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                  className="w-full h-10 pl-3 pr-10 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
                 >
                   <option value="">Choose a client...</option>
                   {loadingClients ? (
@@ -396,7 +392,7 @@ export default function AssessmentPage() {
                         type="date"
                         value={assessmentDate}
                         onChange={(e) => setAssessmentDate(e.target.value)}
-                        className="h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        className="h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                     </div>
                   </div>
@@ -474,7 +470,7 @@ export default function AssessmentPage() {
                     placeholder="e.g. 175"
                     value={height}
                     onChange={(e) => setHeight(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
                 <div>
@@ -487,7 +483,7 @@ export default function AssessmentPage() {
                     placeholder="e.g. 72.5"
                     value={weight}
                     onChange={(e) => setWeight(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
                 <div>
@@ -525,7 +521,7 @@ export default function AssessmentPage() {
                     placeholder="e.g. 32"
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
@@ -551,7 +547,7 @@ export default function AssessmentPage() {
                       onChange={(e) =>
                         setCircumferences((prev) => ({ ...prev, [key]: e.target.value }))
                       }
-                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                 ))}
@@ -576,7 +572,7 @@ export default function AssessmentPage() {
                       placeholder="e.g. 12"
                       value={skinfolds[site]}
                       onChange={(e) => updateSkinfold(site, e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                 ))}
@@ -628,7 +624,7 @@ export default function AssessmentPage() {
                       <button
                         type="button"
                         onClick={() => removePhoto(index)}
-                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600"
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center hover:bg-red-600"
                       >
                         ×
                       </button>
