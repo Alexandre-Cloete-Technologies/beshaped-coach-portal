@@ -32,6 +32,7 @@ import {
   type WorkoutTemplate,
 } from "../lib/useProgramEditor";
 
+import { useToast } from "@/lib/toast";
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export interface ProgramBuilderProps {
@@ -58,6 +59,7 @@ export default function ProgramBuilder({
   backHref = "/programs",
   defaultExpandAllPhases = false,
 }: ProgramBuilderProps) {
+  const toast = useToast();
   const editor = useProgramEditor({
     initialProgram,
     draftKey,
@@ -195,23 +197,23 @@ export default function ProgramBuilder({
     if (saving) return;
     const trimmedName = program.name.trim();
     if (!trimmedName) {
-      alert("Please enter a program title before saving.");
+      toast.error("Please enter a program title before saving.");
       return;
     }
     if (
       program.accessType === "paid" &&
       (program.price == null || program.price < 0)
     ) {
-      alert("Please enter a valid price for paid programs.");
+      toast.error("Please enter a valid price for paid programs.");
       return;
     }
     // Every exercise must be a real library exercise: the mobile app loads them by id.
     if (loadingExercises) {
-      alert("The exercise library is still loading. Try saving again in a moment.");
+      toast.error("The exercise library is still loading. Try saving again in a moment.");
       return;
     }
     if (exercisesError) {
-      alert("The exercise library didn't load, so the program's exercises can't be checked. Reload it, then save.");
+      toast.error("The exercise library didn't load, so the program's exercises can't be checked. Reload it, then save.");
       return;
     }
     const unknown = findUnknownExercises(program, new Set(exercises.map((e) => e.id)));
@@ -221,7 +223,7 @@ export default function ProgramBuilder({
         .map((u) => `• ${u.exerciseName} (${u.phaseName}, ${u.workoutName})`)
         .join("\n");
       const more = unknown.length > 8 ? `\n…and ${unknown.length - 8} more.` : "";
-      alert(
+      toast.error(
         `These exercises aren't in the exercise library, so the app couldn't load them:\n\n${list}${more}\n\nReplace them with exercises from the library, then save.`
       );
       return;
@@ -232,7 +234,7 @@ export default function ProgramBuilder({
       console.error("Save program failed:", err);
       const message =
         err instanceof Error ? err.message : "Something went wrong while saving.";
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -480,7 +482,7 @@ export default function ProgramBuilder({
                 type="text"
                 value={phase.name}
                 onChange={(e) => updatePhaseName(phaseIdx, e.target.value)}
-                className="text-base font-bold text-card-foreground bg-transparent border-none p-0 focus:ring-0 shrink-0 w-auto min-w-[6rem] max-w-[40%]"
+                className="text-base font-semibold text-card-foreground bg-transparent border-none p-0 focus:ring-0 shrink-0 w-auto min-w-[6rem] max-w-[40%]"
                 placeholder="Phase Name"
               />
             </div>
@@ -553,7 +555,7 @@ export default function ProgramBuilder({
                       e.stopPropagation();
                       setPhaseMenuOpenId(null);
                       if (program.phases.length <= 1) {
-                        alert("A program must have at least one phase.");
+                        toast.error("A program must have at least one phase.");
                         return;
                       }
                       setPhasePendingDeleteIdx(phaseIdx);
@@ -576,7 +578,7 @@ export default function ProgramBuilder({
               <div className="grid grid-cols-7 gap-0 min-w-[800px] mb-2">
                 {dayNames.map((day) => (
                   <div key={day} className="text-center">
-                    <span className="text-xs font-bold uppercase tracking-wider">
+                    <span className="text-xs font-semibold uppercase tracking-wider">
                       {day}
                     </span>
                   </div>
@@ -642,7 +644,7 @@ export default function ProgramBuilder({
                 type="text"
                 value={program.name}
                 onChange={(e) => setProgramName(e.target.value)}
-                className="w-full bg-transparent border-none text-3xl xl:text-4xl font-bold text-white placeholder-blue-200 focus:ring-0 px-0 leading-tight focus:outline-none"
+                className="w-full bg-transparent border-none text-3xl xl:text-4xl font-semibold text-white placeholder-blue-200 focus:ring-0 px-0 leading-tight focus:outline-none"
                 placeholder="Name your program"
               />
             </div>
@@ -665,7 +667,7 @@ export default function ProgramBuilder({
                       value="free"
                       checked={program.accessType === "free"}
                       onChange={() => setAccessType("free")}
-                      className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                      className="rounded-full border-white/40 text-beshaped-dark-green focus:ring-white/50"
                     />
                     <span className="text-sm font-medium">Free</span>
                   </label>
@@ -676,7 +678,7 @@ export default function ProgramBuilder({
                       value="assigned"
                       checked={program.accessType === "assigned"}
                       onChange={() => setAccessType("assigned")}
-                      className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                      className="rounded-full border-white/40 text-beshaped-dark-green focus:ring-white/50"
                     />
                     <span className="text-sm font-medium">Custom</span>
                   </label>
@@ -687,7 +689,7 @@ export default function ProgramBuilder({
                       value="paid"
                       checked={program.accessType === "paid"}
                       onChange={() => setAccessType("paid")}
-                      className="rounded-full border-white/40 text-blue-600 focus:ring-white/50"
+                      className="rounded-full border-white/40 text-beshaped-dark-green focus:ring-white/50"
                     />
                     <span className="text-sm font-medium">Paid</span>
                   </label>
@@ -876,11 +878,11 @@ export default function ProgramBuilder({
                       type="text"
                       value={templateNameDraft}
                       onChange={(e) => setTemplateNameDraft(e.target.value)}
-                      className="mt-1 w-full text-xl font-bold text-card-foreground bg-transparent border-b-2 border-transparent hover:border-border focus:border-primary focus:outline-none px-0 py-1 transition-colors"
+                      className="mt-1 w-full text-xl font-semibold text-card-foreground bg-transparent border-b-2 border-transparent hover:border-border focus:border-primary focus:outline-none px-0 py-1 transition-colors"
                       placeholder="Workout name"
                     />
                   ) : (
-                    <h3 className="mt-1 text-xl font-bold text-card-foreground">
+                    <h3 className="mt-1 text-xl font-semibold text-card-foreground">
                       {selectedTemplate.name}
                     </h3>
                   )}
@@ -975,7 +977,7 @@ export default function ProgramBuilder({
                               await fetchWorkoutTemplates();
                             } catch (err) {
                               console.error("Error updating workout name:", err);
-                              alert(
+                              toast.error(
                                 "Failed to update workout name. Please try again."
                               );
                             } finally {
@@ -983,7 +985,7 @@ export default function ProgramBuilder({
                             }
                           }}
                           disabled={savingTemplateName}
-                          className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          className="px-4 py-2 rounded-lg text-sm font-medium bg-action text-white hover:bg-action-hover transition-colors disabled:opacity-50"
                         >
                           {savingTemplateName ? "Saving..." : "Save Name"}
                         </button>
@@ -1003,7 +1005,7 @@ export default function ProgramBuilder({
                     setSelectedTemplate(null);
                     setShowDeleteTemplateConfirm(false);
                   }}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold hover:bg-beshaped-dark-green hover:text-white transition-colors"
+                  className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
                 >
                   Close
                 </button>
@@ -1024,7 +1026,7 @@ export default function ProgramBuilder({
                   setShowDeleteTemplateConfirm(false);
                 } catch (err) {
                   console.error("Error deleting workout:", err);
-                  alert("Failed to delete workout. Please try again.");
+                  toast.error("Failed to delete workout. Please try again.");
                   throw err;
                 }
               }}

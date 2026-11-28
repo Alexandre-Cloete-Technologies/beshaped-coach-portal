@@ -5,6 +5,7 @@ import Image from "next/image";
 import { X, Upload, ImageIcon } from "lucide-react";
 import { listFilesWithUrls, uploadFile } from "@/lib/firebase";
 
+import { useToast } from "@/lib/toast";
 const ANATOMY_STORAGE_PATH = "videos/exercises/anatomy";
 
 function isMp4Url(nameOrUrl: string) {
@@ -22,6 +23,7 @@ export default function AnatomyGifPicker({
   onChange,
   label = "Anatomy Walkthrough",
 }: AnatomyGifPickerProps) {
+  const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [gifs, setGifs] = useState<{ name: string; url: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +61,7 @@ export default function AnatomyGifPicker({
     const isGif = file.type === "image/gif";
     const isMp4 = file.type === "video/mp4";
     if (!isGif && !isMp4) {
-      alert("Please select a GIF or MP4 file.");
+      toast.error("Please select a GIF or MP4 file.");
       return;
     }
 
@@ -215,7 +217,7 @@ export default function AnatomyGifPicker({
                   type="button"
                   onClick={triggerUpload}
                   disabled={uploading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Upload className="w-4 h-4" />
                   {uploading ? "Uploading..." : "Upload GIF or MP4"}

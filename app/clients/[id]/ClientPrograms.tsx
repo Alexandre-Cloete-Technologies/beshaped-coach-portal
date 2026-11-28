@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+import { useToast } from "@/lib/toast";
 interface ProgramItem {
   id: string;
   name: string;
@@ -23,6 +24,7 @@ interface ClientProgramsProps {
 }
 
 export default function ClientPrograms({ clientId }: ClientProgramsProps) {
+  const toast = useToast();
   const [availablePrograms, setAvailablePrograms] = useState<ProgramItem[]>([]);
   const [allPrograms, setAllPrograms] = useState<ProgramItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +113,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
       setSelectedProgramId("");
     } catch (err) {
       console.error("Error adding program:", err);
-      alert("Failed to add program. Please try again.");
+      toast.error("Failed to add program. Please try again.");
     } finally {
       setAdding(false);
     }
@@ -130,7 +132,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
       setAvailablePrograms((prev) => prev.filter((p) => p.id !== programId));
     } catch (err) {
       console.error("Error removing program:", err);
-      alert("Failed to remove program. Please try again.");
+      toast.error("Failed to remove program. Please try again.");
     } finally {
       setRemovingId(null);
     }
@@ -161,7 +163,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
             <select
               value={selectedProgramId}
               onChange={(e) => setSelectedProgramId(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[200px]"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[200px]"
             >
               <option value="">Select a program to add</option>
               {programsToAdd.map((p) => (
@@ -173,7 +175,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
             <button
               onClick={handleAdd}
               disabled={!selectedProgramId || adding}
-              className="h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="h-10 px-4 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               {adding ? "Adding..." : "Add"}
@@ -191,7 +193,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
               <select
                 value={selectedProgramId}
                 onChange={(e) => setSelectedProgramId(e.target.value)}
-                className="h-10 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[200px]"
+                className="h-10 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[200px]"
               >
                 <option value="">Select a program</option>
                 {programsToAdd.map((p) => (
@@ -203,7 +205,7 @@ export default function ClientPrograms({ clientId }: ClientProgramsProps) {
               <button
                 onClick={handleAdd}
                 disabled={!selectedProgramId || adding}
-                className="h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="h-10 px-4 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 {adding ? "Adding..." : "Add Program"}

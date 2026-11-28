@@ -18,6 +18,7 @@ import {
   getCategoryFromMuscle,
 } from "@/lib/exerciseConstants";
 
+import { useToast } from "@/lib/toast";
 type Difficulty = "beginner" | "intermediate" | "advanced";
 
 interface ExerciseDetail {
@@ -90,6 +91,7 @@ const CANONICAL_MUSCLE_MAP: Record<string, string> = muscleCategoryDetails.reduc
 );
 
 export default function ExerciseDetailPage() {
+  const toast = useToast();
   const params = useParams();
   const exerciseId = params?.id as string;
   const [exercise, setExercise] = useState<ExerciseDetail | null>(null);
@@ -191,7 +193,7 @@ export default function ExerciseDetailPage() {
   const handleSave = async () => {
     if (!exercise) return;
     if (!exercise.name.trim()) {
-      alert("Please enter an exercise name");
+      toast.error("Please enter an exercise name");
       return;
     }
 
@@ -218,7 +220,7 @@ export default function ExerciseDetailPage() {
       });
     } catch (err) {
       console.error("Error saving exercise:", err);
-      alert("Failed to save. Please try again.");
+      toast.error("Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -294,7 +296,7 @@ export default function ExerciseDetailPage() {
                 <ArrowLeft className="w-5 h-5 text-muted-foreground" />
               </Link>
               <div>
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">
+                <h1 className="text-3xl font-semibold text-foreground tracking-tight">
                   {exercise.name}
                 </h1>
                 <div className="flex items-center gap-3 mt-2">
@@ -317,7 +319,7 @@ export default function ExerciseDetailPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 bg-action hover:bg-action-hover text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
@@ -336,7 +338,7 @@ export default function ExerciseDetailPage() {
                     type="text"
                     value={exercise.name}
                     onChange={(e) => handleChange("name", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                     placeholder="e.g., Barbell Bench Press"
                   />
                 </div>
@@ -349,7 +351,7 @@ export default function ExerciseDetailPage() {
                     type="url"
                     value={exercise.videoUrl}
                     onChange={(e) => handleChange("videoUrl", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                     placeholder="https://..."
                   />
                   {exercise.videoUrl && (
@@ -372,7 +374,7 @@ export default function ExerciseDetailPage() {
                   <select
                     value={exercise.equipment}
                     onChange={(e) => handleChange("equipment", e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
                   >
                     <option value="">Select Equipment</option>
                     {equipmentOptions.map((opt) => (
@@ -447,7 +449,7 @@ export default function ExerciseDetailPage() {
                               onClick={() => toggleMuscle(muscle, true)}
                               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                                 exercise.musclesInvolved.includes(muscle)
-                                  ? "bg-blue-600 text-white"
+                                  ? "bg-primary text-primary-foreground"
                                   : "bg-muted text-muted-foreground hover:bg-muted/80"
                               }`}
                             >

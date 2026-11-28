@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Dumbbell, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Dumbbell, Edit, Search, Trash2 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
+import PageHeader from "../components/PageHeader";
+import { buttonVariants } from "@/components/ui/button";
 import WorkoutEditorModal, { ModalExercise } from "../components/WorkoutEditorModal";
 import ConfirmModal from "../components/ConfirmModal";
 import { collection, deleteDoc, doc, getDocs } from "firebase/firestore";
@@ -237,23 +239,16 @@ export default function WorkoutsPage() {
       <Sidebar />
 
       <main className="ml-[220px] min-h-screen w-[calc(100%-220px)]">
-        <div className="p-2 w-full max-w-none">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-2 ">
-            <div>
-              {/* <Breadcrumbs items={[{ label: "Workouts" }]} /> */}
-              <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">Workouts</h1>
-              <p className="text-muted-foreground max-w-3xl">
-                Build reusable workout templates from your exercise library. Saved workouts appear in
-                the program builder when you assign training days.
-              </p>
-            </div>
-            <Link
-              href="/workouts/create"
-              className="flex items-center justify-center gap-2 shrink-0 bg-beshaped-green hover:bg-beshaped-dark-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
-            >
-              Create workout
-            </Link>
-          </div>
+        <div className="p-8 w-full max-w-none">
+          <PageHeader
+            title="Workouts"
+            description="Reusable workout templates you can add to your programs."
+            actions={
+              <Link href="/workouts/create" className={buttonVariants()}>
+                Create workout
+              </Link>
+            }
+          />
 
           <div className="bg-card p-3  shadow-sm border border-border mb-4">
             <div className="relative w-full max-w-full">
@@ -292,28 +287,27 @@ export default function WorkoutsPage() {
               {!searchQuery.trim() && (
                 <Link
                   href="/workouts/create"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors"
                 >
-                  <Plus className="w-4 h-4" />
                   Create workout
                 </Link>
               )}
             </div>
           ) : (
-            <div className="w-full overflow-x-auto border border-border bg-card shadow-sm">
+            <div className="w-full overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
               <table className="w-full min-w-[640px] table-fixed border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40 text-left">
-                    <th className="px-2 py-1 align-middle font-semibold text-muted-foreground w-[34%]">
+                  <tr className="border-b border-border bg-muted/30 text-left">
+                    <th className="py-3 px-4 align-middle text-xs font-medium uppercase tracking-wider text-muted-foreground w-[34%]">
                       Name
                     </th>
-                    <th className="px-2 py-1 align-middle font-semibold text-muted-foreground w-[42%]">
+                    <th className="py-3 px-4 align-middle text-xs font-medium uppercase tracking-wider text-muted-foreground w-[42%]">
                       Description
                     </th>
-                    <th className="px-2 py-1 align-middle font-semibold text-muted-foreground w-[12%]">
+                    <th className="py-3 px-4 align-middle text-xs font-medium uppercase tracking-wider text-muted-foreground w-[12%]">
                       Exercises
                     </th>
-                    <th className="px-2 py-1 align-middle font-semibold text-muted-foreground w-[12%] text-right">
+                    <th className="py-3 px-4 align-middle text-xs font-medium uppercase tracking-wider text-muted-foreground w-[12%] text-right">
                       Actions
                     </th>
                   </tr>
@@ -322,37 +316,39 @@ export default function WorkoutsPage() {
                   {filteredWorkouts.map((w) => (
                     <tr
                       key={w.id}
-                      className="border-b border-border transition-colors duration-150 last:border-b-0 hover:bg-beshaped-green/10 dark:hover:bg-beshaped-green/20"
+                      className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/40"
                     >
-                      <td className="px-2 py-0.5 align-middle">
+                      <td className="py-3 px-4 align-middle">
                         <Link
                           href={`/workouts/${w.id}`}
-                          className="font-medium text-card-foreground hover:text-primary hover:underline"
+                          className="font-medium text-card-foreground"
                         >
                           {w.name}
                         </Link>
                       </td>
-                      <td className="px-2 py-0.5 align-middle text-muted-foreground">
+                      <td className="py-3 px-4 align-middle text-muted-foreground">
                         <span className="line-clamp-2 break-words" title={w.description || undefined}>
                           {w.description?.trim() ? w.description : "—"}
                         </span>
                       </td>
-                      <td className="px-2 py-0.5 align-middle text-card-foreground tabular-nums">{w.exercises}</td>
-                      <td className="px-2 py-0.5 align-middle text-right">
+                      <td className="py-3 px-4 align-middle text-card-foreground tabular-nums">{w.exercises}</td>
+                      <td className="py-3 px-4 align-middle text-right">
                         <div className="inline-flex items-center justify-end gap-1">
                           <button
                             type="button"
                             onClick={() => openEditWorkout(w)}
-                            className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                            className="p-2 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                             title="Edit"
+                            aria-label={`Edit ${w.name}`}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Edit className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
                             onClick={() => setDeleteTarget(w)}
-                            className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            className="p-2 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
                             title="Delete"
+                            aria-label={`Delete ${w.name}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

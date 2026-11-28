@@ -177,7 +177,7 @@ export default function Progress({ clientId }: ProgressProps) {
                   {/* Progress Photos */}
           <div className="bg-card rounded-xl p-6 border border-border">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-card-foreground text-lg font-bold">Progress Photos</h3>
+              <h3 className="text-card-foreground text-lg font-semibold">Progress Photos</h3>
               <button className="text-primary text-sm font-semibold hover:underline flex items-center gap-1">
                 <span>View All</span>
                 <ArrowRight className="w-4 h-4" />
@@ -188,7 +188,7 @@ export default function Progress({ clientId }: ProgressProps) {
               {/* Left Column: Large Latest Photo */}
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-card-foreground">Latest Photo</span>
+                  <span className="text-sm font-semibold text-card-foreground">Latest Photo</span>
                   {latestPhotoLog && (
                     <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                       {toDateValue(latestPhotoLog.photoTakenDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -204,7 +204,7 @@ export default function Progress({ clientId }: ProgressProps) {
                   >
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-white text-xl font-bold drop-shadow-md">
+                      <span className="text-white text-xl font-semibold drop-shadow-md">
                         {toDateValue(latestPhotoLog.photoTakenDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
@@ -219,7 +219,7 @@ export default function Progress({ clientId }: ProgressProps) {
               {/* Right Column: Grid of Smaller Photos */}
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-card-foreground">Recent Photos</span>
+                  <span className="text-sm font-semibold text-card-foreground">Recent Photos</span>
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                     Last 30 Days
                   </span>
@@ -302,23 +302,23 @@ export default function Progress({ clientId }: ProgressProps) {
           <div className="bg-card rounded-xl p-6 border border-border">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
               <div>
-                <h3 className="text-card-foreground text-lg font-bold">Bodyweight History</h3>
+                <h3 className="text-card-foreground text-lg font-semibold">Bodyweight History</h3>
               </div>
               <div className="flex gap-4">
                 <div className="flex flex-col">
                   <span className="text-xs text-muted-foreground font-medium uppercase">Current</span>
-                  <span className="text-xl font-bold text-card-foreground">
+                  <span className="text-xl font-semibold text-card-foreground">
                     {currentWeight !== null ? currentWeight : "N/A"} <span className="text-sm font-medium text-muted-foreground">{weightUnit || "kg"}</span>
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs text-muted-foreground font-medium uppercase">Change</span>
                   {weightChange !== null ? (
-                      <span className={`text-xl font-bold ${weightChange > 0 ? "text-red-500" : "text-emerald-600"}`}>
+                      <span className={`text-xl font-semibold ${weightChange > 0 ? "text-red-500" : "text-emerald-600"}`}>
                       {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} <span className="text-sm font-medium text-muted-foreground">{weightUnit || "kg"}</span>
                       </span>
                   ) : (
-                      <span className="text-xl font-bold text-muted-foreground">-</span>
+                      <span className="text-xl font-semibold text-muted-foreground">-</span>
                   )}
                 </div>
               </div>
@@ -368,7 +368,7 @@ export default function Progress({ clientId }: ProgressProps) {
                           {/* Data points */}
                           {weightParams.points.map((p, i) => (
                                <circle key={i} className="fill-card stroke-primary transition-all duration-300 hover:r-6" cx={p.x} cy={p.y} r="4" strokeWidth="2.5">
-                                   <title>{p.date} - {p.val} lbs</title>
+                                   <title>{p.date} - {p.val} {p.unit}</title>
                                </circle>
                           ))}
                       </svg>
@@ -392,7 +392,7 @@ export default function Progress({ clientId }: ProgressProps) {
           {/* Key Lifts Performance */}
           <div className="bg-card rounded-xl p-6 border border-border">
             <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-              <h3 className="text-card-foreground text-lg font-bold">Key Lifts Performance</h3>
+              <h3 className="text-card-foreground text-lg font-semibold">Key Lifts Performance</h3>
               <div className="flex items-center gap-2">
                 <select
                   className="bg-muted border-none text-sm font-medium rounded-lg text-card-foreground py-2 pl-3 pr-8 focus:ring-1 focus:ring-ring cursor-pointer"
@@ -476,7 +476,7 @@ export default function Progress({ clientId }: ProgressProps) {
             {/* Volume Load */}
             {/* <div className="bg-card rounded-xl p-6 border border-border flex flex-col">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-card-foreground text-lg font-bold">Volume Load</h3>
+                <h3 className="text-card-foreground text-lg font-semibold">Volume Load</h3>
                 <span className="text-xs text-muted-foreground">Weekly Total (lbs)</span>
               </div>
               <div className="flex-1 flex items-end justify-between gap-2 h-48 pt-4">
@@ -510,7 +510,7 @@ export default function Progress({ clientId }: ProgressProps) {
             {/* Personal Records */}
             <div className="bg-card rounded-xl p-6 border border-border">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-card-foreground text-lg font-bold">Personal Records</h3>
+                <h3 className="text-card-foreground text-lg font-semibold">Personal Records</h3>
                 <button className="text-primary hover:text-blue-700">
                   <Plus className="w-5 h-5" />
                 </button>
@@ -523,12 +523,12 @@ export default function Progress({ clientId }: ProgressProps) {
                       <Award className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-card-foreground">Back Squat</p>
+                      <p className="text-sm font-semibold text-card-foreground">Back Squat</p>
                       <p className="text-xs text-muted-foreground">Jun 12, 2023</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-card-foreground">225 lbs</p>
+                    <p className="text-sm font-semibold text-card-foreground">225 lbs</p>
                     <p className="text-xs text-muted-foreground">1 Rep Max</p>
                   </div>
                 </div>
@@ -540,12 +540,12 @@ export default function Progress({ clientId }: ProgressProps) {
                       <Award className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-card-foreground">Deadlift</p>
+                      <p className="text-sm font-semibold text-card-foreground">Deadlift</p>
                       <p className="text-xs text-muted-foreground">May 28, 2023</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-card-foreground">315 lbs</p>
+                    <p className="text-sm font-semibold text-card-foreground">315 lbs</p>
                     <p className="text-xs text-muted-foreground">3 Reps</p>
                   </div>
                 </div>
@@ -557,12 +557,12 @@ export default function Progress({ clientId }: ProgressProps) {
                       <Award className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-card-foreground">Pull Ups</p>
+                      <p className="text-sm font-semibold text-card-foreground">Pull Ups</p>
                       <p className="text-xs text-muted-foreground">May 15, 2023</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-card-foreground">12 Reps</p>
+                    <p className="text-sm font-semibold text-card-foreground">12 Reps</p>
                     <p className="text-xs text-muted-foreground">Bodyweight</p>
                   </div>
                 </div>

@@ -283,7 +283,7 @@ export default function ClientDetailPage() {
                     isOnline={false}
                   />
                   <div>
-                    <h1 className="text-2xl font-bold text-foreground mb-1">
+                    <h1 className="text-2xl font-semibold text-foreground mb-1">
                       Loading client…
                     </h1>
                     <p className="text-sm text-muted-foreground">Fetching info…</p>
@@ -321,7 +321,7 @@ export default function ClientDetailPage() {
             <p className="text-red-500 mb-4">{error || "Client not found"}</p>
             <Link 
               href="/clients"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="text-beshaped-dark-green hover:text-beshaped-green font-medium"
             >
               ← Back to Clients
             </Link>
@@ -383,7 +383,8 @@ export default function ClientDetailPage() {
 
             {/* Tabs */}
             <div className="flex items-center gap-1 border-t border-border pt-3">
-              {tabs.map((tab) => {
+              {/* Settings stays hidden until it has content (no "coming soon" tab). */}
+              {tabs.filter((tab) => tab.id !== "settings").map((tab) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
                 return (
@@ -392,7 +393,7 @@ export default function ClientDetailPage() {
                     onClick={() => handleTabChange(tab.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
-                        ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+                        ? "bg-beshaped-green/10 text-beshaped-dark-green dark:bg-beshaped-green/15 dark:text-beshaped-green"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     }`}
                   >
@@ -474,11 +475,6 @@ export default function ClientDetailPage() {
               </div>
 
               
-            </div>
-          )}
-          {activeTab === "settings" && (
-            <div className="bg-card rounded-xl border border-border shadow-sm p-8 text-center">
-              <p className="text-muted-foreground">Settings content coming soon...</p>
             </div>
           )}
         </div>

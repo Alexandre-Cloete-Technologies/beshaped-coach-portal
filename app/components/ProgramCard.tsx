@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Layers, Edit, Trash2 } from "lucide-react";
+import { Calendar, Layers, Users, Edit, Trash2 } from "lucide-react";
 
 export interface ProgramData {
   id: string;
@@ -27,114 +27,94 @@ interface ProgramCardProps {
   onDelete?: (id: string) => void;
 }
 
-export default function ProgramCard({ 
-  program, 
-  onView, 
-  onEdit, 
-  onDelete 
-}: ProgramCardProps) {
+/** Small tag for how clients get the program: Free, Custom or Paid (with the price when set). */
+function AccessTag({ accessType, price }: Pick<ProgramData, "accessType" | "price">) {
+  if (!accessType) return null;
+  const label =
+    accessType === "paid" ? (price != null ? `$${price}` : "Paid") : accessType === "assigned" ? "Custom" : "Free";
+  // Brand green (the action shade, so the white text stays readable), same for every access type.
   return (
-    <article className="group relative flex flex-col bg-card rounded-xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-      <div className="p-5 flex flex-col h-full">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1 pr-2">
-            <h3 className="text-lg font-bold text-card-foreground leading-tight">{program.name}</h3>
-            {program.accessType && (
-              <span
-                className="inline-flex items-center justify-center mt-2 px-2.5 py-1  text-xs font-bold text-white bg-beshaped-dark-green shadow-sm border border-blue-700/30 dark:border-blue-500/40"
-                aria-label={`Access: ${program.accessType}`}
-              >
-                {program.accessType === "paid" && program.price != null
-                  ? `$${program.price}`
-                  : program.accessType === "assigned"
-                    ? "Custom"
-                    : "Free"}
-              </span>
-            )}
-            <p
-              className={`text-sm font-medium text-card-foreground ${program.accessType ? "mt-2" : "mt-1"}`}
-            >
-              {program.updatedAt || (program.createdBy ? `Created by ${program.createdBy}` : "")}
-            </p>
-          </div>
+    <span className="inline-flex shrink-0 items-center rounded-none bg-action px-3 py-1 text-xs font-medium text-white">
+      {label}
+    </span>
+  );
+}
+
+/**
+ * A program in the library. The whole card opens the program; edit and delete sit in the footer.
+ * Hover only firms up the border and shadow (no lifting), like the other cards and tables.
+ */
+export default function ProgramCard({ program, onView, onEdit, onDelete }: ProgramCardProps) {
+  const clients = program.activeClients ?? 0;
+  const byline = program.updatedAt || (program.createdBy ? `Created by ${program.createdBy}` : "");
+
+  return (
+    <article
+      role="link"
+      tabIndex={0}
+      aria-label={`Open ${program.name}`}
+      onClick={() => onView?.(program.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onView?.(program.id);
+      }}
+      className="flex cursor-pointer flex-col rounded-xl border border-border bg-card shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-base font-semibold leading-snug text-card-foreground">{program.name}</h3>
+          <AccessTag accessType={program.accessType} price={program.price} />
         </div>
 
-        {/* Meta Data Grid */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="w-4 h-4" />
-            <span className="text-sm font-medium">{program.totalDuration} Weeks</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Layers className="w-4 h-4" />
-            <span className="text-sm font-medium">{program.phasesCount} {program.phasesCount === 1 ? "Phase" : "Phases"}</span>
-          </div>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Calendar className="h-4 w-4" />
+            {program.totalDuration} {program.totalDuration === 1 ? "week" : "weeks"}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Layers className="h-4 w-4" />
+            {program.phasesCount} {program.phasesCount === 1 ? "phase" : "phases"}
+          </span>
         </div>
 
-        {/* Focus & Stats */}
-        <div className="mb-6 space-y-3">
+        {program.description?.trim() && (
+          <p className="line-clamp-2 text-sm text-muted-foreground">{program.description}</p>
+        )}
 
-          <div>
-            <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Active Clients</span>
-            <div className="flex items-center mt-1 gap-2">
-              {program.clientAvatars && program.clientAvatars.length > 0 ? (
-                <>
-                  <div className="flex -space-x-2">
-                    {program.clientAvatars.slice(0, 3).map((avatar, idx) => (
-                      <div 
-                        key={idx}
-                        className="size-6 rounded-full ring-2 ring-card bg-cover bg-center bg-gradient-to-br from-blue-400 to-indigo-500"
-                        style={avatar ? { backgroundImage: `url("${avatar}")` } : {}}
-                      />
-                    ))}
-                  </div>
-                  {(program.activeClients || 0) > 3 && (
-                    <span className="text-xs font-medium text-muted-foreground">
-                      +{(program.activeClients || 0) - 3} more
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="text-xs font-medium text-muted-foreground">
-                  {program.activeClients || 0} clients
-                </span>
-              )}
-            </div>
-          </div>
+        {byline && <p className="mt-auto text-xs text-muted-foreground">{byline}</p>}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-3">
+        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+          <span className="inline-flex shrink-0 items-center gap-1.5">
+            <Users className="h-3.5 w-3.5" />
+            {clients} {clients === 1 ? "client" : "clients"}
+          </span>
         </div>
-
-        {/* Footer Actions */}
-        <div className="mt-auto pt-4 border-t border-border flex items-center gap-2">
-          <button 
-            onClick={() => onView?.(program.id)}
-            className="flex-1 bg-card border border-border hover:border-primary hover:text-primary py-2 rounded-lg text-sm font-semibold transition-colors"
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit?.(program.id);
+            }}
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            title="Edit"
+            aria-label={`Edit ${program.name}`}
           >
-            View
+            <Edit className="h-4 w-4" />
           </button>
-          <div className="flex gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <button 
-              onClick={() => onEdit?.(program.id)}
-              className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" 
-              title="Edit"
-            >
-              <Edit className="w-5 h-5" />
-            </button>
-            {/* <button 
-              onClick={() => onDuplicate?.(program.id)}
-              className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" 
-              title="Duplicate"
-            >
-              <Copy className="w-5 h-5" />
-            </button> */}
-            <button 
-              onClick={() => onDelete?.(program.id)}
-              className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" 
-              title="Delete"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(program.id);
+            }}
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+            title="Delete"
+            aria-label={`Delete ${program.name}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </article>

@@ -8,6 +8,7 @@ import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { fetchScopedClients } from "@/lib/coachScope";
 import { assignProgramToClient } from "@/lib/programAssignment";
 
+import { useToast } from "@/lib/toast";
 interface AssignProgramModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,6 +27,7 @@ interface ProgramOption {
 }
 
 export default function AssignProgramModal({ isOpen, onClose, onAssigned }: AssignProgramModalProps) {
+  const toast = useToast();
   const { uid, role } = useSignedInCoach();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -127,7 +129,7 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
       onClose();
     } catch (error) {
       console.error("Error assigning program:", error);
-      alert("Failed to assign program. Please try again.");
+      toast.error("Failed to assign program. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -165,7 +167,7 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
                 disabled={loadingData}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
               >
                 <option value="">{loadingData ? "Loading users..." : "Select a User"}</option>
                 {users.map((user) => (
@@ -198,7 +200,7 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
                 value={selectedProgramId}
                 onChange={(e) => setSelectedProgramId(e.target.value)}
                 disabled={loadingData}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
               >
                 <option value="">{loadingData ? "Loading programs..." : "Select a Program"}</option>
                 {programs.map((program) => (
@@ -216,14 +218,14 @@ export default function AssignProgramModal({ isOpen, onClose, onAssigned }: Assi
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
+            className="h-10 px-4 rounded-lg border border-border bg-card text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading || !selectedUserId || !selectedProgramId}
-            className="h-10 px-5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-5 rounded-lg bg-action text-white text-xs font-medium hover:bg-action-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Assigning..." : "Assign Program"}
           </button>

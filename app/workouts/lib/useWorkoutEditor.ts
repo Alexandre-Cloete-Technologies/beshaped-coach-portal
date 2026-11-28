@@ -15,6 +15,7 @@ import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { Exercise, getCategoryFromMuscle } from "./exercise";
 import { ModalExercise } from "../../components/WorkoutEditorModal";
 
+import { useToast } from "@/lib/toast";
 /** Sets as free text in the editor (same idea as reps); parsed when saving. */
 export type CreateWorkoutExercise = Omit<ModalExercise, "sets"> & { sets?: string };
 
@@ -104,6 +105,7 @@ export function useWorkoutEditor({
   existingWorkoutId,
   redirectTo = "/workouts",
 }: UseWorkoutEditorOptions = {}): WorkoutEditorState {
+  const toast = useToast();
   const router = useRouter();
   const { uid, role } = useSignedInCoach();
   const [workoutName, setWorkoutName] = useState(initialWorkoutName);
@@ -324,7 +326,7 @@ export function useWorkoutEditor({
       router.push(redirectTo);
     } catch (err) {
       console.error("Error saving workout:", err);
-      alert("Failed to save workout. Please try again.");
+      toast.error("Failed to save workout. Please try again.");
     } finally {
       setSaving(false);
     }

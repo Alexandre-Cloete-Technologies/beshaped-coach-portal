@@ -119,7 +119,7 @@ export default function FoodPicker({ onSelect, onClose }: FoodPickerProps) {
               className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 selected
                   ? "border-beshaped-dark-green bg-beshaped-dark-green text-white"
-                  : "border-border bg-background text-foreground hover:bg-muted"
+                  : "border-border bg-card text-foreground hover:bg-muted"
               }`}
             >
               {filter.label}

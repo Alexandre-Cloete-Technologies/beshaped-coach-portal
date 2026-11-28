@@ -10,9 +10,11 @@ import {
   type ProgramFormData,
 } from "../lib/useProgramEditor";
 
+import { useToast } from "@/lib/toast";
 const PROGRAM_BUILDER_DRAFT_KEY = "program-builder-draft";
 
 export default function ProgramBuilderPage() {
+  const toast = useToast();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
@@ -35,7 +37,7 @@ export default function ProgramBuilderPage() {
       router.push("/programs");
     } catch (error) {
       console.error("Error saving program:", error);
-      alert("Failed to save program. Please try again.");
+      toast.error("Failed to save program. Please try again.");
     } finally {
       setSaving(false);
     }

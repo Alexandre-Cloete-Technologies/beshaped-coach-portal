@@ -2,6 +2,7 @@
 
 import { Search, AlertTriangle, UserPlus } from "lucide-react";
 import Sidebar from "../components/Sidebar";
+import PageHeader from "../components/PageHeader";
 import ProgramCard, { ProgramData } from "../components/ProgramCard";
 import ProgramsListSkeleton from "./components/ProgramsListSkeleton";
 import AssignProgramModal from "../components/AssignProgramModal";
@@ -141,39 +142,8 @@ export default function ProgramsPage() {
 
       {/* Main Content */}
       <main className="ml-[220px] min-h-screen">
-        <div className="p-4">
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-2">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">Program Library</h1>
-              <p className="text-muted-foreground">Manage your training templates and custom programs.</p>
-            </div>
-            
-            {/* Segmented Control */}
-            {/* <div className="bg-muted p-1 rounded-lg inline-flex">
-              <button 
-                onClick={() => setViewMode("library")}
-                className={`px-6 py-2 rounded-md text-sm font-semibold transition-all ${
-                  viewMode === "library" 
-                    ? "bg-card text-card-foreground shadow-sm" 
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Library
-              </button>
-              <button 
-                onClick={() => setViewMode("builder")}
-                className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "builder" 
-                    ? "bg-card text-card-foreground shadow-sm" 
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Builder
-              </button>
-            </div> */}
-          </div>
-
+        <div className="p-8">
+          <PageHeader title="Programs" description="Your training templates and custom programs." />
           {/* Toolbar */}
           <div className=" bg-card p-2  shadow-sm border border-border mb-2 flex flex-col xl:flex-row gap-4 items-center justify-between">
             {/* Search & Filters Group */}
@@ -211,14 +181,14 @@ export default function ProgramsPage() {
             <div className="flex gap-3 w-full md:w-auto">
               <button
                 onClick={() => setAssignModalOpen(true)}
-                className="flex items-center justify-center gap-2 bg-card hover:bg-accent border border-border text-card-foreground px-5 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all"
+                className="flex items-center justify-center gap-2 bg-card hover:bg-accent border border-border text-card-foreground px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-all"
               >
                 <UserPlus className="w-4 h-4" />
                 Assign Program
               </button>
               <Link 
                 href="/programs/builder"
-                className="flex items-center justify-center gap-2 bg-beshaped-dark-green hover:bg-beshaped-green text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all"
+                className="flex items-center justify-center gap-2 bg-action hover:bg-action-hover text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-colors"
               >
                 Create New Program
               </Link>
@@ -238,7 +208,7 @@ export default function ProgramsPage() {
               <button
                 type="button"
                 onClick={() => setReloadKey((k) => k + 1)}
-                className="mt-4 h-9 px-4 rounded-lg bg-beshaped-dark-green text-white text-sm font-medium hover:bg-beshaped-green transition-colors"
+                className="mt-4 h-9 px-4 rounded-lg bg-action text-white text-sm font-medium hover:bg-action-hover transition-colors"
               >
                 Try again
               </button>
@@ -298,7 +268,7 @@ export default function ProgramsPage() {
               <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30">
                 <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
-              <h2 className="text-lg font-bold text-card-foreground">Delete Program</h2>
+              <h2 className="text-lg font-semibold text-card-foreground">Delete Program</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-1">
               Are you sure you want to delete <span className="font-semibold text-card-foreground">{programToDelete?.name}</span>?

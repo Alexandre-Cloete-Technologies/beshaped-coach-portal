@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import ConfirmModal from "./ConfirmModal";
 
+import { useToast } from "@/lib/toast";
 export interface ModalExercise {
   id: string;
   name: string;
@@ -50,6 +51,7 @@ export default function WorkoutEditorModal({
   onTemplateSaved,
   onDelete,
 }: WorkoutEditorModalProps) {
+  const toast = useToast();
   const { uid, role } = useSignedInCoach();
   const [localWorkoutName, setLocalWorkoutName] = useState(
     workoutName || ""
@@ -274,10 +276,10 @@ export default function WorkoutEditorModal({
       }
 
       onTemplateSaved?.();
-      alert(existingWorkoutId ? "Workout updated." : "Workout template saved.");
+      toast.success(existingWorkoutId ? "Workout updated." : "Workout template saved.");
     } catch (error) {
       console.error("Error saving workout template:", error);
-      alert("Failed to save workout template. Please try again.");
+      toast.error("Failed to save workout template. Please try again.");
     } finally {
       setSavingTemplate(false);
     }
@@ -293,7 +295,7 @@ export default function WorkoutEditorModal({
               type="text"
               value={localWorkoutName}
               onChange={(e) => setLocalWorkoutName(e.target.value)}
-              className="w-full bg-transparent border-none text-xl font-bold text-card-foreground placeholder:text-muted-foreground px-0 py-0.5 leading-tight rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted/40"
+              className="w-full bg-transparent border-none text-xl font-semibold text-card-foreground placeholder:text-muted-foreground px-0 py-0.5 leading-tight rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted/40"
               placeholder="New Workout"
             />
             <p className="text-sm text-muted-foreground mt-1">
@@ -330,7 +332,7 @@ export default function WorkoutEditorModal({
                   value={modalSearchQuery}
                   onChange={(e) => setModalSearchQuery(e.target.value)}
                   placeholder="Search exercises…"
-                  className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+                  className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
                 />
               </div>
               <div
@@ -349,7 +351,7 @@ export default function WorkoutEditorModal({
                       className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                         allActive
                           ? "border-primary bg-beshaped-green text-primary-foreground"
-                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                          : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                       }`}
                     >
                       All
@@ -371,7 +373,7 @@ export default function WorkoutEditorModal({
                       className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                         isActive
                           ? "border-primary bg-beshaped-green text-primary-foreground"
-                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                          : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                       }`}
                     >
                       {cat}
@@ -517,7 +519,7 @@ export default function WorkoutEditorModal({
                     }`}
                   >
                     <div className="flex items-start gap-2">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-xs font-bold text-muted-foreground">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-xs font-semibold text-muted-foreground">
                         {index + 1}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -543,7 +545,7 @@ export default function WorkoutEditorModal({
                                   className={` border px-2 py-1 text-xs font-medium transition-colors ${
                                     isActive
                                       ? "border-primary bg-beshaped-green text-primary-foreground"
-                                      : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                      : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                                   }`}
                                 >
                                   {num}
@@ -610,7 +612,7 @@ export default function WorkoutEditorModal({
                                       className={` border px-2 py-1 text-xs font-medium transition-colors ${
                                         isActive
                                           ? "border-primary bg-beshaped-green text-primary-foreground"
-                                          : "border-border bg-muted/50 text-foreground hover:bg-beshaped-green hover:border-beshaped-dark-green hover:text-white"
+                                          : "border-border bg-muted/50 text-foreground hover:bg-muted hover:border-foreground/20"
                                       }`}
                                     >
                                       {repShortcut}
@@ -684,7 +686,7 @@ export default function WorkoutEditorModal({
           </button>
           <button
             onClick={handleDone}
-            className="px-6 py-2 bg-beshaped-dark-green text-white rounded-lg font-semibold hover:bg-beshaped-green transition-colors"
+            className="px-6 py-2 bg-action text-white rounded-lg font-medium hover:bg-action-hover transition-colors"
           >
             Done
           </button>

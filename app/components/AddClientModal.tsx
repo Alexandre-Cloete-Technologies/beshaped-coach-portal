@@ -8,6 +8,7 @@ import { createAccountForClient } from "@/lib/firebase/auth";
 import { useSignedInCoach } from "@/lib/auth/AuthProvider";
 import { assignProgramToClient } from "@/lib/programAssignment";
 
+import { useToast } from "@/lib/toast";
 interface AddClientModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,6 +16,7 @@ interface AddClientModalProps {
 }
 
 export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddClientModalProps) {
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [programs, setPrograms] = useState<{id: string; name: string}[]>([]);
@@ -173,7 +175,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
       onClose();
     } catch (error) {
       console.error("Error adding client:", error);
-      alert("Failed to add client. Please try again.");
+      toast.error("Failed to add client. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -212,7 +214,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 value={formData.username}
                 onChange={handleInputChange}
                 required
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="johndoe"
               />
             </div>
@@ -228,7 +230,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="john@example.com"
               />
             </div>
@@ -246,7 +248,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                   onChange={handleInputChange}
                   required
                   minLength={6}
-                  className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                  className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                   placeholder="Min 6 characters"
                 />
                 <button
@@ -274,7 +276,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 name="phoneNumber"
                 value={formData.phoneNumber}
                 onChange={handleInputChange}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
                 placeholder="+264 81 234 5678"
               />
             </div>
@@ -290,7 +292,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                     name="assignedCoach"
                     value={formData.assignedCoach || coachUid}
                     onChange={(e) => setFormData(prev => ({ ...prev, assignedCoach: e.target.value }))}
-                    className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
                   >
                     {!coaches.some((coach) => coach.id === coachUid) && (
                       <option value={coachUid}>Me</option>
@@ -315,7 +317,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 name="goals"
                 value={formData.goals}
                 onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
-                className="w-full h-28 px-3 py-2 rounded-lg border border-border bg-background text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
+                className="w-full h-28 px-3 py-2 rounded-lg border border-border bg-card text-sm text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none"
                 placeholder="e.g. Lose 5kg, Improve squat form..."
               />
             </div>
@@ -330,7 +332,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
                 value={formData.currentProgram}
                 onChange={(e) => setFormData(prev => ({ ...prev, currentProgram: e.target.value }))}
                 disabled={loadingPrograms && programs.length === 0}
-                className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
+                className="w-full h-11 px-3 rounded-lg border border-border bg-card text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all appearance-none"
               >
                 <option value="">Select a Program</option>
                 {programs.map((program) => (
@@ -355,14 +357,14 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }: AddCl
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-lg border border-border bg-background text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
+            className="h-10 px-4 rounded-lg border border-border bg-card text-xs text-card-foreground font-medium hover:bg-accent transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading || !formData.username || !formData.email || !formData.password || formData.password.length < 6}
-            className="h-10 px-5 rounded-lg bg-beshaped-dark-green text-white text-xs font-medium hover:bg-beshaped-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-5 rounded-lg bg-action text-white text-xs font-medium hover:bg-action-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Adding..." : "Add Client"}
           </button>

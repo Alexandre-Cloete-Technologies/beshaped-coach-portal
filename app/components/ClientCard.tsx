@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { formatLastWorkout, type ClientActivity } from "@/lib/clientActivity";
+
+/** The card's three quick links: small outline buttons, a step less rounded than the card. */
+const cardLinkClass = cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-sm font-normal shadow-none");
 
 export interface ClientData {
   id: string;
@@ -33,7 +38,7 @@ function ProgressBar({ current, total }: ProgressBarProps) {
     <div className="flex items-center gap-2 flex-1">
       <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div 
-          className="h-full bg-blue-500 rounded-full transition-all"
+          className="h-full bg-primary rounded-full transition-all"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -63,7 +68,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
   return (
     <div 
       onClick={() => router.push(`/clients/${client.id}`)}
-      className="bg-card rounded-2xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4 cursor-pointer"
+      className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4 cursor-pointer"
     >
       {/* Header: Photo, Name, Status */}
       <div className="flex items-start justify-between">
@@ -109,9 +114,6 @@ export default function ClientCard({ client }: { client: ClientData }) {
         <div className="flex-1 space-y-2">
           {/* Program Progress */}
           <div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-muted-foreground">Program Progress</span>
-            </div>
             {activity.totalInProgram > 0 ? (
               <>
                 <div className="text-xs text-muted-foreground mb-1">
@@ -128,11 +130,11 @@ export default function ClientCard({ client }: { client: ClientData }) {
           <div className="space-y-1 text-xs">
             <div className="flex justify-between items-center gap-2">
               <span className="text-muted-foreground">Last workout</span>
-              <span className="font-medium text-card-foreground">{formatLastWorkout(activity.lastWorkoutAt)}</span>
+              <span className="text-card-foreground">{formatLastWorkout(activity.lastWorkoutAt)}</span>
             </div>
             <div className="flex justify-between items-start gap-2">
               <span className="text-muted-foreground whitespace-nowrap">Next workout</span>
-              <span className="font-medium text-card-foreground text-right">
+              <span className="text-card-foreground text-right">
                 {activity.nextWorkout
                   ? `${activity.nextWorkout.inProgress ? "In progress: " : ""}${activity.nextWorkout.name}`
                   : activity.totalInProgram > 0
@@ -142,7 +144,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
             </div>
             <div className="flex justify-between items-center gap-2">
               <span className="text-muted-foreground">Current body weight</span>
-              <span className="font-medium text-card-foreground tabular-nums">
+              <span className="text-card-foreground tabular-nums">
                 {client.weight !== null
                   ? `${client.weight} ${client.weightUnit || "kg"}`
                   : "—"}
@@ -152,7 +154,7 @@ export default function ClientCard({ client }: { client: ClientData }) {
               <div className="flex items-start">
                 <div className="flex-1">
                   <span className="text-muted-foreground">Goals: </span>
-                  <span className="font-medium text-card-foreground">{client.goals}</span>
+                  <span className="text-card-foreground">{client.goals}</span>
                 </div>
               </div>
             )}
@@ -166,19 +168,19 @@ export default function ClientCard({ client }: { client: ClientData }) {
       >
         <Link
           href={`/clients/${client.id}?tab=workout-history`}
-          className="rounded-none border border-border bg-card px-3 py-2 text-xs font-medium text-card-foreground transition-colors hover:border-beshaped-dark-green hover:bg-beshaped-dark-green hover:text-white"
+          className={cardLinkClass}
         >
           Workout History
         </Link>
         <Link
           href={`/clients/${client.id}?tab=progress`}
-          className="rounded-none border border-border bg-card px-3 py-2 text-xs font-medium text-card-foreground transition-colors hover:border-beshaped-dark-green hover:bg-beshaped-dark-green hover:text-white"
+          className={cardLinkClass}
         >
           Progress
         </Link>
         <Link
           href={`/clients/${client.id}?tab=programs`}
-          className="rounded-none border border-border bg-card px-3 py-2 text-xs font-medium text-card-foreground transition-colors hover:border-beshaped-dark-green hover:bg-beshaped-dark-green hover:text-white"
+          className={cardLinkClass}
         >
           Programs
         </Link>

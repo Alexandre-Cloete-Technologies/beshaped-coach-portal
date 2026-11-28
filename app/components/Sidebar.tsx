@@ -12,6 +12,7 @@ import {
   Languages
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import SignedInUser from "./SignedInUser";
 import { useLocale, useMessages } from "@/lib/i18n/LocaleProvider";
 import type { Messages } from "@/lib/i18n/messages";
@@ -41,7 +42,7 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-[220px] bg-sidebar flex flex-col border-r border-sidebar-border">
       {/* Logo Section */}
       <div className="p-5 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-neutral-900 flex items-center justify-center">
         <Image
               src={"/logotwo.png"}
               alt="Company Logo"
@@ -50,8 +51,10 @@ export default function Sidebar() {
               className="h-auto w-full object-contain"
             />
         </div>
-        <div>
-          <h1 className="font-semibold text-sidebar-foreground text-base">BeShaped Fitness</h1>
+        <div className="min-w-0">
+          <p className="whitespace-nowrap text-[15px] font-semibold leading-tight tracking-tight text-sidebar-foreground">
+            BeShaped Fitness
+          </p>
           <span className="text-xs text-muted-foreground">{t.coachPortal}</span>
         </div>
       </div>
@@ -65,17 +68,17 @@ export default function Sidebar() {
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <li key={item.label}>
-                <a
+                <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                     isActive
-                      ? "bg-blue-50 text-beshaped-dark-green dark:bg-blue-950/50 dark:text-blue-400"
+                      ? "bg-beshaped-green/10 font-medium text-beshaped-dark-green dark:bg-beshaped-green/15 dark:text-beshaped-green"
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   }`}
                 >
                   {item.icon}
                   {t.nav[item.label]}
-                </a>
+                </Link>
               </li>
             );
           })}
@@ -88,19 +91,11 @@ export default function Sidebar() {
           type="button"
           onClick={toggleLocale}
           aria-label={locale === "en" ? t.switchToAfrikaans : t.switchToEnglish}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
         >
           <Languages size={20} />
           {locale === "en" ? "Afrikaans" : "English"}
         </button>
-        {/* Settings */}
-        {/* <a
-          href="/settings"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          <Settings size={20} />
-          Settings
-        </a> */}
 
         {/* User Profile */}
         <SignedInUser />
